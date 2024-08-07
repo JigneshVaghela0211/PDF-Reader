@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.pdf.pdfreader"
-    compileSdkVersion(34)
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.pdf.pdfreader"
-        minSdkVersion(24)
-        targetSdkVersion(34)
+        minSdk = 24
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -41,14 +41,14 @@ android {
 dependencies {
     //UI components
     implementation(libs.androidx.constraintlayout)
-    implementation (libs . androidx . appcompat)
-            implementation (libs . material)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
 
-            implementation (libs . androidx . core . ktx)
-            implementation (libs . androidx . activity)
-            // Hilt
-            implementation (libs . hilt . android)
-            kapt (libs . hilt . compiler)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity)
+    // Hilt
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
 }
 
 // Allow references to generated code
