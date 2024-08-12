@@ -2,8 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.hilt)
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
     id("kotlin-android")
+
 }
 
 android {
@@ -36,6 +37,9 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    buildFeatures {
+        viewBinding = true
+    }
 }
 
 dependencies {
@@ -48,10 +52,5 @@ dependencies {
     implementation(libs.androidx.activity)
     // Hilt
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
-}
-
-// Allow references to generated code
-kapt {
-    correctErrorTypes = true
+    ksp(libs.hilt.compiler)
 }
