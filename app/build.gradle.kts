@@ -22,8 +22,14 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+//            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+        }
+
         getByName("release") {
             isMinifyEnabled = false
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -53,5 +59,6 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    implementation("com.airbnb.android:lottie:5.2.0")
+    implementation(libs.lottie)
+    implementation("com.github.fondesa:kpermissions:3.5.0")
 }

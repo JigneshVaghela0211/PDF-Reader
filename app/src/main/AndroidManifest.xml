@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+
     <application
         android:name=".app.PDF"
         android:allowBackup="true"
@@ -14,7 +17,7 @@
         android:theme="@style/Theme.PDFReader"
         tools:targetApi="31">
         <activity
-            android:name=".ui.LauncherActivity"
+            android:name=".ui.activity.LauncherActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,7 +27,7 @@
         </activity>
 
         <activity
-            android:name=".ui.HomeActivity"
+            android:name=".ui.activity.HomeActivity"
             android:exported="false">
 
         </activity>
