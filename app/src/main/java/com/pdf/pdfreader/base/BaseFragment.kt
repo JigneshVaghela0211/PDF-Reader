@@ -24,6 +24,9 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
 
     private var _binding: T? = null
 
+    @Inject
+    lateinit var navigator: Navigator
+
     protected val binding: T
         get() = _binding!!
 

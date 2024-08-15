@@ -22,14 +22,6 @@ interface ActivityBuilder {
     fun byFinishingAll(): ActivityBuilder
 
     fun <T : BaseFragment<*>> setPage(page: Class<T>): ActivityBuilder
-
-    /**
-     * This method has been deprecated.
-     * Use forResult(startForResult: ActivityResultLauncher<Intent>)
-     */
-    @Deprecated("This method has been deprecated")
-    fun forResult(requestCode: Int): ActivityBuilder
-
     fun forResult(startForResult: ActivityResultLauncher<Intent>): ActivityBuilder
 
     fun shouldAnimate(isAnimate: Boolean): ActivityBuilder

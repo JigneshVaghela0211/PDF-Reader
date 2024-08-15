@@ -28,7 +28,6 @@ class ActivityStarter @Inject internal constructor(val baseActivity: BaseActivit
         private var bundle: Bundle? = null
         private var activityOptionsBundle: Bundle? = null
         private var isToFinishCurrent: Boolean = false
-        private var requestCode: Int = 0
         private var startForResult: ActivityResultLauncher<Intent>? = null
 
         override fun start() {
@@ -37,51 +36,13 @@ class ActivityStarter @Inject internal constructor(val baseActivity: BaseActivit
             if (!shouldAnimate) intent!!.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
 
             if (startForResult != null) {
-                //startForResult flow with launcher
                 startForResult?.launch(intent!!)
-            } else if (requestCode != 0) {
-                //startForResult flow with request code
-                val currentFragment = baseActivity.getCurrentFragment<BaseFragment<*>>()
-                if (currentFragment != null)
-                    currentFragment.startActivityForResult(intent, requestCode)
-                else
-                    baseActivity.startActivityForResult(intent!!, requestCode)
             } else {
-                //normal case
                 if (activityOptionsBundle == null)
                     baseActivity.startActivity(intent)
                 else
                     baseActivity.startActivity(intent, activityOptionsBundle)
             }
-
-            // for only requestCode flow
-            /*if (requestCode == 0) {
-                if (activityOptionsBundle == null)
-                    baseActivity.startActivity(intent)
-                else
-                    baseActivity.startActivity(intent, activityOptionsBundle)
-            } else {
-                val currentFragment = baseActivity.getCurrentFragment<BaseFragment<*>>()
-                if (currentFragment != null) currentFragment.startActivityForResult(
-                    intent, requestCode
-                )
-                else baseActivity.startActivityForResult(intent, requestCode)
-            }*/
-
-            // for only launcher flow
-            /*if (startForResult == null) {
-                if (activityOptionsBundle == null)
-                    baseActivity.startActivity(intent)
-                else
-                    baseActivity.startActivity(intent, activityOptionsBundle)
-            } else {
-                //val currentFragment = context.getCurrentFragment<BaseFragment<*>>()
-                startForResult!!.launch(intent)
-            }*/
-
-            /*if (shouldAnimate)
-                context.overridePendingTransition(R.anim.slide_enter, R.anim.slide_exit);*/
-
             if (isToFinishCurrent) baseActivity.finish()
         }
 
@@ -112,12 +73,6 @@ class ActivityStarter @Inject internal constructor(val baseActivity: BaseActivit
 
         override fun <T : BaseFragment<*>> setPage(page: Class<T>): ActivityBuilder {
             intent!!.putExtra(ACTIVITY_FIRST_PAGE, page)
-            return this
-        }
-        
-        @Deprecated("This method has been deprecated", level = DeprecationLevel.ERROR)
-        override fun forResult(requestCode: Int): ActivityBuilder {
-            this.requestCode = requestCode
             return this
         }
 

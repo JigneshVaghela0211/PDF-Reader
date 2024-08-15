@@ -11,11 +11,9 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.ColorRes
-import androidx.annotation.StringRes
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import com.google.android.material.snackbar.BaseTransientBottomBar
@@ -32,13 +30,30 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
     lateinit var activityStarter: ActivityStarter
 
     private var alertDialog: AlertDialog? = null
+    private val callback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            hideKeyboard()
+        }
+
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        setContentView(createViewBinding())
+        setContentView(createViewBinding())
         setUpAlertDialog()
+        onBackPressedDispatcher.addCallback(this, callback)
+        manageBackPressed()
+        bindData()
+    }
 
-      }
+    private fun manageBackPressed() {
+        val currentFragment = getCurrentFragment<BaseFragment<*>>()
+        if (currentFragment == null) {
+            callback.isEnabled = false
+        } else if (currentFragment.onBackActionPerform() && shouldGoBack()) {
+            callback.isEnabled = false
+        }
+    }
 
 
     private fun setUpAlertDialog() {
@@ -47,7 +62,7 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
                 .create()
     }
 
-    fun <F : BaseFragment<*>> getCurrentFragment(): F? {
+    private fun <F : BaseFragment<*>> getCurrentFragment(): F? {
         return if (findFragmentPlaceHolder() == 0) null else supportFragmentManager.findFragmentById(
             findFragmentPlaceHolder()
         ) as F?
@@ -55,25 +70,26 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
 
     abstract fun findFragmentPlaceHolder(): Int
 
+    abstract fun createViewBinding(): View
+    abstract fun bindData()
     fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
+
     protected fun shouldGoBack(): Boolean {
         return true
     }
 
-    override fun onBackPressed() {
-        hideKeyboard()
-
-
-        val currentFragment = getCurrentFragment<BaseFragment<*>>()
-        if (currentFragment == null) super.onBackPressed()
-        else if (currentFragment.onBackActionPerform() && shouldGoBack()) super.onBackPressed()
-    }
+//    override fun onBackPressed() {
+//        hideKeyboard()
+//
+//
+//        val currentFragment = getCurrentFragment<BaseFragment<*>>()
+//        if (currentFragment == null) super.onBackPressed()
+//        else if (currentFragment.onBackActionPerform() && shouldGoBack()) super.onBackPressed()
+//    }
 
     fun hideKeyboard() {
-        // Check if no view has focus:
-
         val view = this.currentFocus
         if (view != null) {
             val inputManager =
@@ -84,6 +100,7 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
         }
 
     }
+
 
     private var progress: Dialog? = null
     fun showLoadingDialog(toShow: Boolean) {
@@ -102,49 +119,16 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
     }
 
 
-
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
-            onBackPressed()
+//            onBackPressed()
+            onBackPressedDispatcher.onBackPressed()
             return true
         }
 
         return super.onOptionsItemSelected(item)
     }
 
-    override fun setToolbar(toolbar: Toolbar) {
-        setSupportActionBar(toolbar)
-    }
-
-    override fun showToolbar(b: Boolean) {
-        val supportActionBar = supportActionBar
-        if (supportActionBar != null) {
-
-            if (b) supportActionBar.show()
-            else supportActionBar.hide()
-        }
-    }
-
-    override fun setToolbarTitle(title: CharSequence) {
-        if (supportActionBar != null) {
-            supportActionBar!!.title = title
-        }
-    }
-
-    override fun setToolbarTitle(@StringRes title: Int) {
-
-        if (supportActionBar != null) {
-            supportActionBar!!.setTitle(title)
-        }
-    }
-
-    override fun showBackButton(b: Boolean) {
-
-        val supportActionBar = supportActionBar
-        supportActionBar?.setDisplayHomeAsUpEnabled(b)
-    }
-
-    override fun setToolbarColor(@ColorRes color: Int) {}
 
     fun showSnackBar(message: String) {
         hideKeyboard()
@@ -173,14 +157,6 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
     fun logout() {
     }
 
-    override fun setToolbarElevation(isVisible: Boolean) {
-
-        if (supportActionBar != null) {
-            supportActionBar!!.elevation = if (isVisible) 8f else 0f
-        }
-    }
-
-
 
     fun showKeyboard() {
         val view = this.currentFocus
@@ -208,6 +184,6 @@ abstract class BaseActivity : AppCompatActivity(), HasToolbar, Navigator {
 
 
     override fun goBack() {
-        onBackPressed()
+        onBackPressedDispatcher.onBackPressed()
     }
 }
