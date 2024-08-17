@@ -1,9 +1,7 @@
 package com.pdf.pdfreader.utiles
 
 fun main() {
-
-
-    val font = arrayOf(
+    val fonts = arrayOf(
         Font("TextViewUltralight100", "sf_pro_ultralight_100"),
         Font("TextViewThin200", "sf_pro_thin_200"),
         Font("TextViewLight300", "sf_pro_light_300"),
@@ -14,39 +12,42 @@ fun main() {
         Font("TextViewHeavy800", "sf_pro_heavy_800"),
         Font("TextViewBlack900", "sf_pro_black_900"),
     )
-    val color = arrayOf(StyleColor("Black", "black"), StyleColor("Blue", "blue"))
+    val colors = arrayOf(StyleColor("Black", "black"), StyleColor("Blue", "blue"))
+    val output = StringBuilder()
 
+    fonts.forEach { font ->
+        generateFontStyles(output, font)
+        generateTextSizeStyles(output, font)
+        generateColorStyles(output, font, colors)
+    }
 
+    println(output.toString())
+}
 
+fun generateFontStyles(output: StringBuilder, font: Font) {
+    output.appendLine("<style name=\"${font.name}\" parent=\"Widget.AppCompat.TextView\">")
+    output.appendLine("    <item name=\"android:fontFamily\">@font/${font.fontResourceName}</item>")
+    output.appendLine("    <item name=\"android:includeFontPadding\">false</item>")
+    output.appendLine("</style>")
+    output.appendLine()
+}
 
-    font.forEach { i ->
-        println("<style name=\"${i.name}\" parent=\"Widget.AppCompat.TextView\">")
-        println("    <item name=\"android:fontFamily\">@font/${i.fontResourceName}</item>")
-        println("    <item name=\"android:includeFontPadding\">false</item>")
-        println("</style>")
-        println()
+fun generateTextSizeStyles(output: StringBuilder, font: Font) {
+    (12..32).forEach { size ->
+        output.appendLine("<style name=\"${font.name}.$size\">")
+        output.appendLine("    <item name=\"android:textSize\">@dimen/sp_$size</item>")
+        output.appendLine("</style>")
+        output.appendLine()
+    }
+}
 
-        (12..33).forEachIndexed { _, j ->
-            if (j < 33) {
-                println("<style name=\"${i.name}.$j\">")
-                println("    <item name=\"android:textSize\">@dimen/sp_${j}</item>")
-                println("</style>")
-                println()
-                return@forEachIndexed
-
-            } else {
-                (12..33).forEach { k ->
-                    if (k < 33) {
-                        color.forEach {color ->
-                            println("<style name=\"${i.name}.${k}.${color.name}\">")
-                            println("    <item name=\"android:textColor\">@color/${color.colorResourceName}</item>")
-                            println("</style>")
-                            println()
-                        }
-                    }
-                }
-
-            }
+fun generateColorStyles(output: StringBuilder, font: Font, colors: Array<StyleColor>) {
+    (12..32).forEach { size ->
+        colors.forEach { color ->
+            output.appendLine("<style name=\"${font.name}.$size.${color.name}\">")
+            output.appendLine("    <item name=\"android:textColor\">@color/${color.colorResourceName}</item>")
+            output.appendLine("</style>")
+            output.appendLine()
         }
     }
 }

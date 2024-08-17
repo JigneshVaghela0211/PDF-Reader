@@ -93,84 +93,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewUltralight100.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewUltralight100.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewUltralight100.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200" parent="Widget.AppCompat.TextView">
@@ -266,84 +350,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewThin200.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewThin200.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewThin200.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300" parent="Widget.AppCompat.TextView">
@@ -439,84 +607,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewLight300.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewLight300.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewLight300.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400" parent="Widget.AppCompat.TextView">
@@ -612,84 +864,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewRegular400.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewRegular400.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewRegular400.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500" parent="Widget.AppCompat.TextView">
@@ -785,84 +1121,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewMedium500.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewMedium500.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewMedium500.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600" parent="Widget.AppCompat.TextView">
@@ -958,84 +1378,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewSemiBold600.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewSemiBold600.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewSemiBold600.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700" parent="Widget.AppCompat.TextView">
@@ -1131,84 +1635,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBold700.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBold700.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBold700.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800" parent="Widget.AppCompat.TextView">
@@ -1304,84 +1892,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewHeavy800.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.31.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewHeavy800.31.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewHeavy800.32.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.32.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900" parent="Widget.AppCompat.TextView">
@@ -1477,85 +2149,168 @@
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.12.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.13.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.13.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.14.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.14.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.15.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.15.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.16.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.16.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.17.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.17.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.18.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.18.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.19.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.19.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.20.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.20.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.21.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.21.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.22.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.22.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.23.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.23.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.24.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.24.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.25.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.25.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.26.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.26.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.27.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.27.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.28.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.28.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.29.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.29.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.30.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.30.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
+
     <style name="TextViewBlack900.31.Black">
         <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.31.Blue">
+        <item name="android:textColor">@color/blue</item>
     </style>
 
     <style name="TextViewBlack900.32.Black">
         <item name="android:textColor">@color/black</item>
     </style>
 
+    <style name="TextViewBlack900.32.Blue">
+        <item name="android:textColor">@color/blue</item>
+    </style>
 
 </resources>
