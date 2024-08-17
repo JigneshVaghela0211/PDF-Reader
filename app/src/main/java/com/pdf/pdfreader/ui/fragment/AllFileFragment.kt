@@ -1,68 +1,92 @@
 package com.pdf.pdfreader.ui.fragment
 
+import android.content.Context
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import com.pdf.pdfreader.BuildConfig
 import com.pdf.pdfreader.base.BaseFragment
 import com.pdf.pdfreader.databinding.AllFileFragmentBinding
 import com.pdf.pdfreader.extension.hasAllFilesPermission
+import com.pdf.pdfreader.utiles.PdfFileDetails
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 
 @AndroidEntryPoint
 class AllFileFragment : BaseFragment<AllFileFragmentBinding>() {
-    override fun createViewBinding(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        attachToRoot: Boolean
-    ): AllFileFragmentBinding {
-        return AllFileFragmentBinding.inflate(layoutInflater)
-    }
+    private var job: Job? = null
 
-    override fun onResume() {
-        super.onResume()
-        permissionStatus()
-    }
+    override fun createViewBinding() = AllFileFragmentBinding.inflate(layoutInflater)
+
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun bindData() {
-        binding.permissionRequest.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= 30) {
-                if (hasAllFilesPermission()) {
-                    Toast.makeText(this.requireContext(), "Granted", Toast.LENGTH_LONG)
-                        .show()
-                    return@setOnClickListener
-                }
-
-                startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                        Uri.parse("package:${BuildConfig.APPLICATION_ID}")
-                    )
+        if (hasAllFilesPermission()) {
+            loadPdfFiles()
+        } else {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:${BuildConfig.APPLICATION_ID}")
                 )
-            } else {
-                Toast.makeText(requireContext(), "Sorry", Toast.LENGTH_LONG).show()
-            }
-
+            )
         }
-        permissionStatus()
     }
 
-    private fun permissionStatus() {
-        if (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                hasAllFilesPermission()
-            } else {
-                return
+    private fun getPdfFileDetails(context: Context): List<PdfFileDetails> {
+        val pdfList = mutableListOf<PdfFileDetails>()
+        val uri = MediaStore.Files.getContentUri("external")
+
+        val selection = MediaStore.Files.FileColumns.MIME_TYPE + " = ?"
+        val selectionArgs = arrayOf("application/pdf")
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns.DATA,
+            MediaStore.Files.FileColumns.DISPLAY_NAME,
+            MediaStore.Files.FileColumns.DATE_MODIFIED,
+            MediaStore.Files.FileColumns.SIZE,
+            MediaStore.Files.FileColumns.MIME_TYPE,
+        )
+
+        val cursor: Cursor? = context.contentResolver.query(
+            uri,
+            projection,
+            selection,
+            selectionArgs,
+            null
+        )
+
+        cursor?.use {
+            while (cursor.moveToNext()) {
+                val filePath =
+                    cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                val fileName =
+                    cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME))
+                val lastModified =
+                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)) * 1000 // Convert to milliseconds
+                val size =
+                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE))
+
+                pdfList.add(PdfFileDetails(filePath, fileName, lastModified, size))
             }
-        ) {
-            binding.textViewStatus.text = "Grant"
-        } else {
-            binding.textViewStatus.text = "Deny"
+        }
+        return pdfList
+    }
+
+    private fun loadPdfFiles() {
+        job?.cancel()
+        job = CoroutineScope(Dispatchers.Main).launch {
+            val pdfFiles = withContext(Dispatchers.IO) {
+                getPdfFileDetails(requireContext())
+            }
         }
     }
 }

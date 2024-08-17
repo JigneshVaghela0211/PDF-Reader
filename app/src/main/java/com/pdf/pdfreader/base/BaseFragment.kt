@@ -1,20 +1,16 @@
 package com.pdf.pdfreader.base
 
 import android.content.Context
-import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
 import androidx.viewbinding.ViewBinding
-import java.net.ConnectException
-import java.net.SocketTimeoutException
+import com.pdf.pdfreader.BuildConfig
 import javax.inject.Inject
 
 abstract class BaseFragment<T : ViewBinding> : Fragment() {
@@ -36,7 +32,7 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        _binding = createViewBinding(inflater, container, false)
+        _binding = createViewBinding()
         return binding.root
     }
 
@@ -88,9 +84,9 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
     }
 
     fun showToast(message: String) {
-//        if (BuildConfig.DEBUG) {
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-//        }
+        if (BuildConfig.DEBUG) {
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun showMessage(@StringRes stringId: Int) {
@@ -105,8 +101,6 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
     }
 
 
-
-
     open fun onBackActionPerform(): Boolean {
         return true
     }
@@ -114,7 +108,6 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
     open fun onViewClick(view: View) {
 
     }
-
 
 
     override fun onDestroyView() {
@@ -131,11 +124,7 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
     /**
      * This method is used for binding view with your binding
      */
-    protected abstract fun createViewBinding(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        attachToRoot: Boolean
-    ): T
+    protected abstract fun createViewBinding(): T
 
     protected abstract fun bindData()
 }

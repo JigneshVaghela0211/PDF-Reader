@@ -43,9 +43,6 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    buildFeatures {
-        viewBinding = true
-    }
 }
 
 dependencies {
@@ -60,5 +57,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.lottie)
-    implementation("com.github.fondesa:kpermissions:3.5.0")
+//    implementation("com.github.fondesa:kpermissions:3.5.0")
+//
+//    implementation("com.github.bumptech.glide:glide:4.14.2")
+//    implementation("com.twitter.sdk.android:tweet-ui:3.3.0")
+
 }

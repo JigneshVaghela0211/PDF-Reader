@@ -1,0 +1,1561 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextViewUltralight100" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_ultralight_100</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewUltralight100.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewUltralight100.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewUltralight100.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewUltralight100.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewUltralight100.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewUltralight100.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewUltralight100.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewUltralight100.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewUltralight100.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewUltralight100.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewUltralight100.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewUltralight100.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewUltralight100.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewUltralight100.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewUltralight100.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewUltralight100.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewUltralight100.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewUltralight100.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewUltralight100.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewUltralight100.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewUltralight100.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewUltralight100.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewUltralight100.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_thin_200</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewThin200.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewThin200.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewThin200.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewThin200.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewThin200.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewThin200.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewThin200.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewThin200.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewThin200.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewThin200.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewThin200.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewThin200.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewThin200.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewThin200.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewThin200.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewThin200.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewThin200.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewThin200.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewThin200.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewThin200.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewThin200.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewThin200.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewThin200.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_light_300</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewLight300.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewLight300.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewLight300.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewLight300.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewLight300.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewLight300.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewLight300.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewLight300.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewLight300.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewLight300.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewLight300.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewLight300.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewLight300.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewLight300.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewLight300.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewLight300.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewLight300.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewLight300.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewLight300.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewLight300.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewLight300.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewLight300.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewLight300.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_regular_400</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewRegular400.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewRegular400.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewRegular400.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewRegular400.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewRegular400.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewRegular400.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewRegular400.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewRegular400.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewRegular400.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewRegular400.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewRegular400.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewRegular400.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewRegular400.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewRegular400.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewRegular400.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewRegular400.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewRegular400.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewRegular400.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewRegular400.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewRegular400.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewRegular400.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewRegular400.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewRegular400.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_medium_500</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewMedium500.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewMedium500.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewMedium500.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewMedium500.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewMedium500.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewMedium500.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewMedium500.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewMedium500.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewMedium500.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewMedium500.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewMedium500.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewMedium500.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewMedium500.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewMedium500.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewMedium500.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewMedium500.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewMedium500.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewMedium500.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewMedium500.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewMedium500.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewMedium500.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewMedium500.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewMedium500.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_semibold_600</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewSemiBold600.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewSemiBold600.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewSemiBold600.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewSemiBold600.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewSemiBold600.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewSemiBold600.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewSemiBold600.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewSemiBold600.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewSemiBold600.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewSemiBold600.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewSemiBold600.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewSemiBold600.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewSemiBold600.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewSemiBold600.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewSemiBold600.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewSemiBold600.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewSemiBold600.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewSemiBold600.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewSemiBold600.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewSemiBold600.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewSemiBold600.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewSemiBold600.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewSemiBold600.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_bold_700</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewBold700.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewBold700.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewBold700.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewBold700.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewBold700.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewBold700.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewBold700.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewBold700.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewBold700.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewBold700.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewBold700.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewBold700.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewBold700.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewBold700.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewBold700.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewBold700.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewBold700.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewBold700.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewBold700.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewBold700.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewBold700.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewBold700.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBold700.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_heavy_800</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewHeavy800.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewHeavy800.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewHeavy800.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewHeavy800.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewHeavy800.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewHeavy800.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewHeavy800.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewHeavy800.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewHeavy800.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewHeavy800.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewHeavy800.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewHeavy800.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewHeavy800.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewHeavy800.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewHeavy800.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewHeavy800.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewHeavy800.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewHeavy800.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewHeavy800.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewHeavy800.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewHeavy800.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewHeavy800.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewHeavy800.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">@font/sf_pro_black_900</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="TextViewBlack900.12">
+        <item name="android:textSize">@dimen/sp_12</item>
+    </style>
+
+    <style name="TextViewBlack900.13">
+        <item name="android:textSize">@dimen/sp_13</item>
+    </style>
+
+    <style name="TextViewBlack900.14">
+        <item name="android:textSize">@dimen/sp_14</item>
+    </style>
+
+    <style name="TextViewBlack900.15">
+        <item name="android:textSize">@dimen/sp_15</item>
+    </style>
+
+    <style name="TextViewBlack900.16">
+        <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+
+    <style name="TextViewBlack900.17">
+        <item name="android:textSize">@dimen/sp_17</item>
+    </style>
+
+    <style name="TextViewBlack900.18">
+        <item name="android:textSize">@dimen/sp_18</item>
+    </style>
+
+    <style name="TextViewBlack900.19">
+        <item name="android:textSize">@dimen/sp_19</item>
+    </style>
+
+    <style name="TextViewBlack900.20">
+        <item name="android:textSize">@dimen/sp_20</item>
+    </style>
+
+    <style name="TextViewBlack900.21">
+        <item name="android:textSize">@dimen/sp_21</item>
+    </style>
+
+    <style name="TextViewBlack900.22">
+        <item name="android:textSize">@dimen/sp_22</item>
+    </style>
+
+    <style name="TextViewBlack900.23">
+        <item name="android:textSize">@dimen/sp_23</item>
+    </style>
+
+    <style name="TextViewBlack900.24">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+
+    <style name="TextViewBlack900.25">
+        <item name="android:textSize">@dimen/sp_25</item>
+    </style>
+
+    <style name="TextViewBlack900.26">
+        <item name="android:textSize">@dimen/sp_26</item>
+    </style>
+
+    <style name="TextViewBlack900.27">
+        <item name="android:textSize">@dimen/sp_27</item>
+    </style>
+
+    <style name="TextViewBlack900.28">
+        <item name="android:textSize">@dimen/sp_28</item>
+    </style>
+
+    <style name="TextViewBlack900.29">
+        <item name="android:textSize">@dimen/sp_29</item>
+    </style>
+
+    <style name="TextViewBlack900.30">
+        <item name="android:textSize">@dimen/sp_30</item>
+    </style>
+
+    <style name="TextViewBlack900.31">
+        <item name="android:textSize">@dimen/sp_31</item>
+    </style>
+
+    <style name="TextViewBlack900.32">
+        <item name="android:textSize">@dimen/sp_32</item>
+    </style>
+
+    <style name="TextViewBlack900.12.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.13.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.14.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.15.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.16.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.17.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.18.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.19.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.20.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.21.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.22.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.23.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.24.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.25.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.26.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.27.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.28.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.29.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.30.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.31.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+    <style name="TextViewBlack900.32.Black">
+        <item name="android:textColor">@color/black</item>
+    </style>
+
+
+</resources>
