@@ -5,6 +5,7 @@
     android:layout_height="wrap_content">
 
     <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/imageViewThumbnail"
         android:layout_width="@dimen/dp_100"
         android:layout_height="@dimen/dp_100"
         android:layout_margin="@dimen/dp_5"
@@ -13,6 +14,24 @@
         app:layout_constraintTop_toTopOf="parent"
         app:srcCompat="@color/app_main_color" />
 
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/textViewFileName"
+        style="@style/TextViewRegular400.16.Black"
+        android:layout_width="@dimen/dp_0"
+        android:maxLines="1"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/dp_15"
+        android:ellipsize="middle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/imageViewThumbnail"
+        app:layout_constraintTop_toTopOf="@id/imageViewThumbnail" />
 
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/textViewFileDate"
+        style="@style/TextViewRegular400.14.Black"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintStart_toStartOf="@id/textViewFileName"
+        app:layout_constraintTop_toBottomOf="@id/textViewFileName" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
