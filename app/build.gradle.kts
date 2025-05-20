@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.pdf.pdfreader"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.pdf.pdfreader"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 29
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -36,12 +36,22 @@ android {
             )
         }
     }
+
+    packaging {
+        resources {
+            excludes += listOf("META-INF/DEPENDENCIES")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+    }
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
     }
 }
 
@@ -57,9 +67,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.lottie)
-//    implementation("com.github.fondesa:kpermissions:3.5.0")
-//
-//    implementation("com.github.bumptech.glide:glide:4.14.2")
-//    implementation("com.twitter.sdk.android:tweet-ui:3.3.0")
+
+    //PDF Box
+    implementation("org.apache.pdfbox:pdfbox:2.0.27")
+
 
 }

@@ -1,7 +1,6 @@
 package com.pdf.pdfreader.utiles
 
 fun main() {
-    IntRange
     val fonts = arrayOf(
         Font("TextViewUltralight100", "sf_pro_ultralight_100"),
         Font("TextViewThin200", "sf_pro_thin_200"),

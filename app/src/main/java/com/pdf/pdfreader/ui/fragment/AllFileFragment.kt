@@ -11,8 +11,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.pdf.pdfreader.BuildConfig
 import com.pdf.pdfreader.base.BaseFragment
 import com.pdf.pdfreader.databinding.AllFileFragmentBinding
+import com.pdf.pdfreader.extension.eLog
 import com.pdf.pdfreader.extension.hasAllFilesPermission
 import com.pdf.pdfreader.ui.adapter.PDFAdapter
+import com.pdf.pdfreader.utiles.FileUtils
+import com.pdf.pdfreader.utiles.PDFUtils
 import com.pdf.pdfreader.utiles.PdfFileDetails
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.ArrayList
 
 
 @AndroidEntryPoint
@@ -27,7 +32,29 @@ class AllFileFragment : BaseFragment<AllFileFragmentBinding>() {
     private var job: Job? = null
     private val list = ArrayList<PdfFileDetails>()
     private val pdfAdapter by lazy {
-        PDFAdapter(list)
+        PDFAdapter(list) {
+            FileUtils.getUri(File(it.filePath))?.let { uri ->
+////                eLog("$it")
+//                requireActivity().contentResolver.openFileDescriptor(
+//                    uri,
+//                    "r"
+//                )?.use { parcelFileDescriptor ->
+//
+//                    val pdfRenderer = PdfRenderer(parcelFileDescriptor).openPage(0)
+//                    val bitmap = Bitmap.createBitmap( `
+//                        pdfRenderer.width,
+//                        pdfRenderer.height,
+//                        Bitmap.Config.ARGB_8888
+//                    )
+//                    eLog("$bitmap")
+//                    pdfRenderer.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+//                    eLog("Bit Map ---->" + bitmap.byteCount.toString())
+//                    pdfRenderer.close()
+//                }
+
+                eLog("Name : ${it.fileName} --------> Protected : " + PDFUtils.hasPassword(it.filePath).toString())
+            }
+        }
     }
 
     override fun createViewBinding() = AllFileFragmentBinding.inflate(layoutInflater)
@@ -133,6 +160,11 @@ class AllFileFragment : BaseFragment<AllFileFragmentBinding>() {
             list.addAll(pdfFiles)
             pdfAdapter.notifyItemRangeChanged(0, list.size)
 
+//            withContext(Dispatchers.IO) {
+//                list.forEach {
+//
+//                }
+//            }
         }
     }
 }
