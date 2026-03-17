@@ -3,8 +3,8 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.compose.compiler)
     id("kotlin-android")
-
 }
 
 android {
@@ -52,24 +52,35 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+        compose = true
     }
 }
 
 dependencies {
     //UI components
-    implementation(libs.androidx.constraintlayout)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.lottie)
 
-    //PDF Box
-    implementation("org.apache.pdfbox:pdfbox:2.0.27")
+    // Jetpack Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.material.icons.extended)
 
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 
 }
