@@ -71,9 +71,13 @@ class PdfViewModel @Inject constructor(
 
     fun loadPdfFiles(isInitialLoad: Boolean = true) {
         viewModelScope.launch {
+            val currentState = _uiState.value
             _uiState.update { 
-                if (isInitialLoad) it.copy(isLoading = true, errorMessage = null)
-                else it.copy(isRefreshing = true, errorMessage = null)
+                if (isInitialLoad && currentState.pdfFiles.isEmpty()) {
+                    it.copy(isLoading = true, errorMessage = null)
+                } else {
+                    it.copy(isRefreshing = true, errorMessage = null)
+                }
             }
             try {
                 refreshPdfFilesUseCase()

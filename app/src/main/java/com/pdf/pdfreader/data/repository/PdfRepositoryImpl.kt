@@ -35,6 +35,7 @@ class PdfRepositoryImpl @Inject constructor(
 
     override suspend fun refreshPdfFiles() {
         withContext(Dispatchers.IO) {
+            val existingPdfs = pdfDao.getPdfsOnce().associateBy { it.path }
             val files = mutableListOf<PdfEntity>()
             val uri = MediaStore.Files.getContentUri("external")
             val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} = ?"
@@ -72,9 +73,20 @@ class PdfRepositoryImpl @Inject constructor(
                     val type = cursor.getString(idType)
                     val isTrashed = if (idTrashed != -1) cursor.getInt(idTrashed) == 1 else false
                     
-                    val isLocked = isPdfLocked(path)
-                    val thumbnailFile = thumbnailManager.getThumbnailFile(path)
-                    val thumbnailPath = if (thumbnailFile.exists()) thumbnailFile.absolutePath else null
+                    val existing = existingPdfs[path]
+                    val isLocked: Boolean
+                    val thumbnailPath: String?
+
+                    if (existing != null && existing.lastModified == date) {
+                        // Reuse cached metadata
+                        isLocked = existing.isLocked
+                        thumbnailPath = existing.thumbnailPath
+                    } else {
+                        // File is new or modified
+                        isLocked = isPdfLocked(path)
+                        val thumbnailFile = thumbnailManager.getThumbnailFile(path)
+                        thumbnailPath = if (thumbnailFile.exists()) thumbnailFile.absolutePath else null
+                    }
 
                     files.add(
                         PdfEntity(

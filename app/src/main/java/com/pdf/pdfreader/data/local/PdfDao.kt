@@ -8,6 +8,9 @@ interface PdfDao {
     @Query("SELECT * FROM pdf_files ORDER BY lastModified DESC")
     fun getAllPdfs(): Flow<List<PdfEntity>>
 
+    @Query("SELECT * FROM pdf_files")
+    suspend fun getPdfsOnce(): List<PdfEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPdfs(pdfs: List<PdfEntity>)
 
