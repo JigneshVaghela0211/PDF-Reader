@@ -9,5 +9,6 @@ data class PdfFile(
     val formattedSize: String,
     val formattedDate: String,
     val isLocked: Boolean = false,
-    val isTrashed: Boolean = false
+    val isTrashed: Boolean = false,
+    val thumbnailPath: String? = null
 )

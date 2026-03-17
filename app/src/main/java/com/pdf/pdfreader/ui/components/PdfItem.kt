@@ -18,10 +18,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.domain.model.PdfFile
+import com.pdf.pdfreader.utiles.ThumbnailManager
 
 @Composable
 fun PdfItem(
     pdf: PdfFile,
+    thumbnailManager: ThumbnailManager,
     onClick: (PdfFile) -> Unit
 ) {
     Card(
@@ -40,6 +42,7 @@ fun PdfItem(
         ) {
             PdfThumbnail(
                 pdf = pdf,
+                thumbnailManager = thumbnailManager,
                 modifier = Modifier.size(64.dp)
             )
             

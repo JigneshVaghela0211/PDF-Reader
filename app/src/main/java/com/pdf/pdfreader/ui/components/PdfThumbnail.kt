@@ -26,37 +26,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+import com.pdf.pdfreader.utiles.ThumbnailManager
+
 @Composable
 fun PdfThumbnail(
     pdf: PdfFile,
+    thumbnailManager: ThumbnailManager,
     modifier: Modifier = Modifier
 ) {
     var thumbnail by remember(pdf.path) { mutableStateOf<Bitmap?>(null) }
-    var error by remember(pdf.path) { mutableStateOf(false) }
 
     LaunchedEffect(pdf.path) {
-        if (!pdf.isLocked) {
-            withContext(Dispatchers.IO) {
-                try {
-                    val file = File(pdf.path)
-                    if (file.exists()) {
-                        val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                        val renderer = PdfRenderer(pfd)
-                        if (renderer.pageCount > 0) {
-                            val page = renderer.openPage(0)
-                            val bitmap = Bitmap.createBitmap(page.width / 4, page.height / 4, Bitmap.Config.ARGB_8888)
-                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                            thumbnail = bitmap
-                            page.close()
-                        }
-                        renderer.close()
-                        pfd.close()
-                    }
-                } catch (e: Exception) {
-                    error = true
-                }
-            }
-        }
+        thumbnail = thumbnailManager.getThumbnail(pdf.path, pdf.isLocked)
     }
 
     Box(

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.domain.usecase.GetPdfFilesUseCase
 import com.pdf.pdfreader.domain.usecase.RefreshPdfFilesUseCase
+import com.pdf.pdfreader.utiles.ThumbnailManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,8 @@ data class PdfUiState(
 @HiltViewModel
 class PdfViewModel @Inject constructor(
     private val getPdfFilesUseCase: GetPdfFilesUseCase,
-    private val refreshPdfFilesUseCase: RefreshPdfFilesUseCase
+    private val refreshPdfFilesUseCase: RefreshPdfFilesUseCase,
+    val thumbnailManager: ThumbnailManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PdfUiState())

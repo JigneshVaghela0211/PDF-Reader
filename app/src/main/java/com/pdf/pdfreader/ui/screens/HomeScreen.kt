@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import com.pdf.pdfreader.utiles.ThumbnailManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -134,6 +135,7 @@ fun HomeScreen(viewModel: PdfViewModel) {
                         ) { pdf ->
                             PdfItem(
                                 pdf = pdf,
+                                thumbnailManager = viewModel.thumbnailManager,
                                 onClick = { /* Open PDF logic */ }
                             )
                         }

@@ -9,27 +9,33 @@ import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.domain.repository.PdfRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.pdf.pdfreader.data.local.PdfDao
+import com.pdf.pdfreader.data.local.PdfEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.pdf.pdfreader.utiles.ThumbnailManager
+import kotlin.math.log10
 
 @Singleton
 class PdfRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val pdfDao: PdfDao,
+    private val thumbnailManager: ThumbnailManager
 ) : PdfRepository {
-
-    private val _pdfFiles = MutableStateFlow<List<PdfFile>>(emptyList())
     
-    override fun getPdfFiles() = _pdfFiles
+    override fun getPdfFiles(): Flow<List<PdfFile>> = pdfDao.getAllPdfs().map { entities ->
+        entities.map { it.toDomain() }
+    }
 
     override suspend fun refreshPdfFiles() {
         withContext(Dispatchers.IO) {
-            val files = mutableListOf<PdfFile>()
+            val files = mutableListOf<PdfEntity>()
             val uri = MediaStore.Files.getContentUri("external")
             val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} = ?"
             val selectionArgs = arrayOf("application/pdf")
@@ -67,9 +73,11 @@ class PdfRepositoryImpl @Inject constructor(
                     val isTrashed = if (idTrashed != -1) cursor.getInt(idTrashed) == 1 else false
                     
                     val isLocked = isPdfLocked(path)
+                    val thumbnailFile = thumbnailManager.getThumbnailFile(path)
+                    val thumbnailPath = if (thumbnailFile.exists()) thumbnailFile.absolutePath else null
 
                     files.add(
-                        PdfFile(
+                        PdfEntity(
                             path = path,
                             name = name,
                             size = size,
@@ -78,14 +86,28 @@ class PdfRepositoryImpl @Inject constructor(
                             formattedSize = formatFileSize(size),
                             formattedDate = formatDate(date),
                             isLocked = isLocked,
-                            isTrashed = isTrashed
+                            isTrashed = isTrashed,
+                            thumbnailPath = thumbnailPath
                         )
                     )
                 }
             }
-            _pdfFiles.value = files
+            pdfDao.syncPdfs(files)
         }
     }
+
+    private fun PdfEntity.toDomain() = PdfFile(
+        path = path,
+        name = name,
+        lastModified = lastModified,
+        size = size,
+        type = type,
+        formattedSize = formattedSize,
+        formattedDate = formattedDate,
+        isLocked = isLocked,
+        isTrashed = isTrashed,
+        thumbnailPath = thumbnailPath
+    )
 
     private fun isPdfLocked(path: String): Boolean {
         return try {
@@ -108,7 +130,7 @@ class PdfRepositoryImpl @Inject constructor(
     private fun formatFileSize(size: Long): String {
         if (size <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
+        val digitGroups = (log10(size.toDouble()) / log10(1024.0)).toInt()
         return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
     }
 
