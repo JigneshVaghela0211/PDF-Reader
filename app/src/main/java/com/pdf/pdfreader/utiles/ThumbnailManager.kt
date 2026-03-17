@@ -99,6 +99,10 @@ class ThumbnailManager @Inject constructor(
             if (renderer.pageCount > 0) {
                 val page = renderer.openPage(0)
                 val bitmap = Bitmap.createBitmap(page.width / 4, page.height / 4, Bitmap.Config.ARGB_8888)
+                
+                // Fill with white background (PDF pages are transparent by default)
+                bitmap.eraseColor(android.graphics.Color.WHITE)
+                
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                 
                 // Save to Disk for future sessions
