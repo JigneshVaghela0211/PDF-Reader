@@ -9,9 +9,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,26 +34,15 @@ fun HomeContent(
     onRefresh: () -> Unit,
     onPdfClick: (PdfFile) -> Unit
 ) {
-    val pullToRefreshState = rememberPullToRefreshState()
-
-    PullToRefreshBox(
+    SmartSwipeRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        state = pullToRefreshState,
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues),
-        indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = pullToRefreshState,
-                isRefreshing = isRefreshing,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
-        }
+        headerColor = MaterialTheme.colorScheme.primary
     ) {
-        if (isLoading) {
+        if (isLoading && !isRefreshing) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(strokeCap = androidx.compose.ui.graphics.StrokeCap.Round)
             }
