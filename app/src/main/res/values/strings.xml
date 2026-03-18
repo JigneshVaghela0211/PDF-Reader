@@ -35,4 +35,15 @@
     <string name="order">Order</string>
     <string name="cancel">Cancel</string>
     <string name="apply">Apply</string>
+    <string name="enter_password">Enter Password</string>
+    <string name="pdf_locked_desc">This PDF is password protected. Please enter the password to view it.</string>
+    <string name="incorrect_password">Incorrect password</string>
+    <string name="native_renderer_limit">This PDF is password protected, and the system\'s native renderer doesn\'t support unlocking it without a library.</string>
+    <string name="opening_pdf_failed">PDF Opening Failed</string>
+    <string name="open_pdf">Open</string>
+    <string name="rendering">Rendering...</string>
+    <string name="page">Page</string>
+    <string name="of">of</string>
+    <string name="go_back">Go Back</string>
+    <string name="retry">Retry</string>
 </resources>

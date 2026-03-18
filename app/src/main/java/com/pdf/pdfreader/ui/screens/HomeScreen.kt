@@ -25,7 +25,8 @@ import com.pdf.pdfreader.ui.viewmodel.PdfViewModel
 @Composable
 fun HomeScreen(
     viewModel: PdfViewModel,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToReader: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -122,7 +123,7 @@ fun HomeScreen(
                 isSearching = uiState.searchQuery.isNotEmpty(),
                 thumbnailManager = viewModel.thumbnailManager,
                 onRefresh = { viewModel.loadPdfFiles(false) },
-                onPdfClick = { /* Open PDF logic */ }
+                onPdfClick = { onNavigateToReader(it.path) }
             )
         }
     }

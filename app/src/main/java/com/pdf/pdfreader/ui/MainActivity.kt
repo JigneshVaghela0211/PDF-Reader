@@ -20,6 +20,11 @@ import com.pdf.pdfreader.ui.screens.SplashScreen
 import com.pdf.pdfreader.ui.theme.PDFReaderTheme
 import com.pdf.pdfreader.ui.viewmodel.MainViewModel
 import com.pdf.pdfreader.ui.viewmodel.PdfViewModel
+import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
+import com.pdf.pdfreader.ui.screens.PdfReaderScreen
+import android.net.Uri
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -55,12 +60,27 @@ class MainActivity : AppCompatActivity() {
                         composable("home") {
                             HomeScreen(
                                 viewModel = pdfViewModel,
-                                onNavigateToSettings = { navController.navigate("settings") }
+                                onNavigateToSettings = { navController.navigate("settings") },
+                                onNavigateToReader = { path -> 
+                                    navController.navigate("pdf_reader/${Uri.encode(path)}") 
+                                }
                             )
                         }
                         composable("settings") {
                             SettingsScreen(
                                 mainViewModel = mainViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "pdf_reader/{path}",
+                            arguments = listOf(navArgument("path") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val path = backStackEntry.arguments?.getString("path") ?: ""
+                            val readerViewModel: PdfReaderViewModel = hiltViewModel()
+                            PdfReaderScreen(
+                                viewModel = readerViewModel,
+                                path = Uri.decode(path),
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
