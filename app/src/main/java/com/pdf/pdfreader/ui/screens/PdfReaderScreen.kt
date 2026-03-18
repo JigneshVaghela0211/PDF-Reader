@@ -1,12 +1,7 @@
 package com.pdf.pdfreader.ui.screens
 
-import android.graphics.Bitmap
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,18 +13,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.viewinterop.AndroidView
 import com.pdf.pdfreader.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.barteksc.pdfviewer.PDFView
+import com.github.barteksc.pdfviewer.util.FitPolicy
 import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
 import kotlinx.coroutines.launch
 import java.io.File
@@ -42,16 +36,16 @@ fun PdfReaderScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollState = rememberLazyListState()
+    val scrollState = rememberLazyListState() // Not used by lib but kept for structural consistency
     val coroutineScope = rememberCoroutineScope()
     
-    // Zoom and Pan state
-    var scale by remember { mutableStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-
     LaunchedEffect(path) {
         viewModel.initialize(path)
     }
+
+    val lastLoadedFile = remember { mutableStateOf("") }
+    val lastLoadedPassword = remember { mutableStateOf("") }
+    val lastReloadTrigger = remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -100,36 +94,47 @@ fun PdfReaderScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 5f)
-                        offset += pan
-                    }
-                },
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offset.x,
-                        translationY = offset.y
-                    ),
-                state = scrollState,
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(uiState.totalPages) { index ->
-                    val bitmap = uiState.visiblePages[index]
-                    PdfPageItem(
-                        bitmap = bitmap,
-                        onVisible = { viewModel.onPageVisible(index) }
-                    )
+            AndroidView(
+                factory = { context ->
+                    PDFView(context, null)
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { pdfView ->
+                    if (lastLoadedFile.value != uiState.filePath || 
+                        lastLoadedPassword.value != uiState.password ||
+                        lastReloadTrigger.intValue != uiState.reloadTrigger) {
+                        
+                        pdfView.fromFile(File(uiState.filePath))
+                            .password(if (uiState.password.isNotEmpty()) uiState.password else null)
+                            .defaultPage(uiState.currentPage)
+                            .enableSwipe(true)
+                            .swipeHorizontal(false)
+                            .enableDoubletap(true)
+                            .onLoad { pages -> viewModel.onLoadComplete(pages) }
+                            .onPageChange { page, count -> viewModel.onPageChanged(page, count) }
+                            .onError { t -> viewModel.onError(t) }
+                            .enableAntialiasing(true)
+                            .spacing(10)
+                            .pageFitPolicy(FitPolicy.WIDTH)
+                            .fitEachPage(true)
+                            .load()
+                            
+                        // Set zoom limits for high-detail areas (like barcodes)
+                        pdfView.setMinZoom(1f)
+                        pdfView.setMidZoom(3f)
+                        pdfView.setMaxZoom(10f)
+                            
+                        lastLoadedFile.value = uiState.filePath
+                        lastLoadedPassword.value = uiState.password
+                        lastReloadTrigger.intValue = uiState.reloadTrigger
+                    } else if (pdfView.currentPage != uiState.currentPage) {
+                        pdfView.jumpTo(uiState.currentPage)
+                    }
                 }
-            }
+            )
 
             if (uiState.totalPages > 1) {
                 Box(
@@ -146,10 +151,11 @@ fun PdfReaderScreen(
                     Slider(
                         value = uiState.currentPage.toFloat(),
                         onValueChange = { page -> 
+                            // Library handles internal scrolling sync if we use its listeners, 
+                            // here we just want to jump to page.
+                            // But usually we don't need a slider with PDFView as it's a native scrollable.
                             viewModel.updateCurrentPage(page.toInt())
-                            coroutineScope.launch {
-                                scrollState.scrollToItem(page.toInt())
-                            }
+                            // No need to scroll LazyColumn anymore, PDFView handles it
                         },
                         valueRange = 0f..(uiState.totalPages - 1).toFloat(),
                         steps = if (uiState.totalPages > 2) uiState.totalPages - 2 else 0,
@@ -163,13 +169,6 @@ fun PdfReaderScreen(
                 }
             }
             
-            // Sync current page number from scroll
-            LaunchedEffect(scrollState) {
-                snapshotFlow { scrollState.firstVisibleItemIndex }.collect { index ->
-                    viewModel.updateCurrentPage(index)
-                }
-            }
-
             if (uiState.isLoading) {
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
@@ -191,47 +190,9 @@ fun PdfReaderScreen(
             uiState.errorMessage?.let { message ->
                 ErrorView(
                     message = message,
-                    onRetry = { viewModel.initialize(path) },
+                    onRetry = { viewModel.initialize(uiState.filePath) },
                     onExit = onNavigateBack
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun PdfPageItem(
-    bitmap: Bitmap?,
-    onVisible: () -> Unit
-) {
-    SideEffect {
-        onVisible()
-    }
-    
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 200.dp)
-            .background(Color.White, RoundedCornerShape(8.dp))
-            .padding(1.dp) // Border effect
-            .background(Color.White, RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-                Text(stringResource(R.string.rendering), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
