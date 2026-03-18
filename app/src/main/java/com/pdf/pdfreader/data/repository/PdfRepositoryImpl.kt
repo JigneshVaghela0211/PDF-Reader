@@ -34,10 +34,21 @@ class PdfRepositoryImpl @Inject constructor(
         entities.map { it.toDomain() }
     }
 
+    override fun getFavoritePdfs(): Flow<List<PdfFile>> = pdfDao.getFavoritePdfs().map { entities ->
+        entities.map { it.toDomain() }
+    }
+
+    override fun getRecentPdfs(): Flow<List<PdfFile>> = pdfDao.getRecentPdfs().map { entities ->
+        entities.map { it.toDomain() }
+    }
+
     override suspend fun refreshPdfFiles() {
         withContext(Dispatchers.IO) {
-            val existingPdfs = pdfDao.getPdfsOnce().associateBy { it.path }
-            val files = mutableListOf<PdfEntity>()
+            // Get current DB state to preserve user metadata (favorites, lastOpened)
+            val existingPdfs = pdfDao.getAllPdfsOnce().associateBy { it.path }
+            val scannedFiles = mutableListOf<PdfEntity>()
+            val scannedPaths = mutableListOf<String>()
+            
             val uri = MediaStore.Files.getContentUri("external")
             val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} = ?"
             val selectionArgs = arrayOf("application/pdf")
@@ -53,9 +64,7 @@ class PdfRepositoryImpl @Inject constructor(
                 }
             }.toTypedArray()
 
-            val sortOrder = "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
-
-            context.contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
                 val idPath = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
                 val idName = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
                 val idSize = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
@@ -68,45 +77,60 @@ class PdfRepositoryImpl @Inject constructor(
 
                 while (cursor.moveToNext()) {
                     val path = cursor.getString(idPath)
-                    val name = cursor.getString(idName)
-                    val size = cursor.getLong(idSize)
                     val date = cursor.getLong(idDate) * 1000
-                    val type = cursor.getString(idType)
-                    val isTrashed = if (idTrashed != -1) cursor.getInt(idTrashed) == 1 else false
+                    scannedPaths.add(path)
                     
-                    val existing = existingPdfs[path]
-                    val isLocked: Boolean
-                    val thumbnailPath: String?
-
-                    if (existing != null && existing.lastModified == date) {
-                        // Reuse cached metadata
-                        isLocked = existing.isLocked
-                        thumbnailPath = existing.thumbnailPath
-                    } else {
-                        // File is new or modified
-                        isLocked = isPdfLocked(path)
+                    val dbEntity = existingPdfs[path]
+                    
+                    // If file not in DB, scan it. If it is, only update if modified OR just keep it.
+                    if (dbEntity == null || dbEntity.lastModified != date) {
+                        val name = cursor.getString(idName)
+                        val size = cursor.getLong(idSize)
+                        val type = cursor.getString(idType)
+                        val isTrashed = if (idTrashed != -1) cursor.getInt(idTrashed) == 1 else false
+                        
+                        val isLocked = isPdfLocked(path)
                         val thumbnailFile = thumbnailManager.getThumbnailFile(path)
-                        thumbnailPath = if (thumbnailFile.exists()) thumbnailFile.absolutePath else null
-                    }
+                        val thumbnailPath = if (thumbnailFile.exists()) thumbnailFile.absolutePath else null
 
-                    files.add(
-                        PdfEntity(
-                            path = path,
-                            name = name,
-                            size = size,
-                            lastModified = date,
-                            type = type,
-                            formattedSize = formatFileSize(size),
-                            formattedDate = formatDate(date),
-                            isLocked = isLocked,
-                            isTrashed = isTrashed,
-                            thumbnailPath = thumbnailPath
+                        scannedFiles.add(
+                            PdfEntity(
+                                path = path,
+                                name = name,
+                                size = size,
+                                lastModified = date,
+                                type = type,
+                                formattedSize = formatFileSize(size),
+                                formattedDate = formatDate(date),
+                                isLocked = isLocked,
+                                isTrashed = isTrashed,
+                                isFavorite = dbEntity?.isFavorite ?: false, // Preserve favorite status
+                                lastOpened = dbEntity?.lastOpened ?: 0L,     // Preserve last opened status
+                                thumbnailPath = thumbnailPath
+                            )
                         )
-                    )
+                    }
                 }
             }
-            pdfDao.syncPdfs(files)
+            
+            // Insert new/updated files
+            if (scannedFiles.isNotEmpty()) {
+                pdfDao.upsertPdfs(scannedFiles)
+            }
+            
+            // Remove deleted files
+            if (scannedPaths.isNotEmpty()) {
+                pdfDao.deleteStalePdfs(scannedPaths)
+            }
         }
+    }
+
+    override suspend fun updateFavorite(path: String, isFavorite: Boolean) {
+        pdfDao.updateFavorite(path, isFavorite)
+    }
+
+    override suspend fun updateLastOpened(path: String, timestamp: Long) {
+        pdfDao.updateLastOpened(path, timestamp)
     }
 
     private fun PdfEntity.toDomain() = PdfFile(
@@ -119,6 +143,8 @@ class PdfRepositoryImpl @Inject constructor(
         formattedDate = formattedDate,
         isLocked = isLocked,
         isTrashed = isTrashed,
+        isFavorite = isFavorite,
+        lastOpened = lastOpened,
         thumbnailPath = thumbnailPath
     )
 

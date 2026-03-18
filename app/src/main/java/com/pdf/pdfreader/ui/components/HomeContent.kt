@@ -10,6 +10,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -38,13 +42,17 @@ fun HomeContent(
     onFavorite: (PdfFile) -> Unit,
     onDelete: (PdfFile) -> Unit
 ) {
-    var selectedPdfForActions by remember { mutableStateOf<PdfFile?>(null) }
+    var selectedPdfPath by remember { mutableStateOf<String?>(null) }
+    val selectedPdf = remember(selectedPdfPath, files) { 
+        files.find { it.path == selectedPdfPath } 
+    }
+    
     val sheetState = rememberModalBottomSheetState()
     
-    if (selectedPdfForActions != null) {
-        val pdf = selectedPdfForActions!!
+    if (selectedPdf != null) {
+        val pdf = selectedPdf
         ModalBottomSheet(
-            onDismissRequest = { selectedPdfForActions = null },
+            onDismissRequest = { selectedPdfPath = null },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = { BottomSheetDefaults.DragHandle() }
@@ -54,18 +62,18 @@ fun HomeContent(
                 thumbnailManager = thumbnailManager,
                 onRename = { 
                     onRename(pdf)
-                    selectedPdfForActions = null
+                    selectedPdfPath = null
                 },
                 onShare = { 
                     onShare(pdf)
-                    selectedPdfForActions = null
+                    selectedPdfPath = null
                 },
                 onFavorite = { onFavorite(pdf) },
                 onDelete = { 
                     onDelete(pdf)
-                    selectedPdfForActions = null
+                    selectedPdfPath = null
                 },
-                onDismiss = { selectedPdfForActions = null }
+                onDismiss = { selectedPdfPath = null }
             )
         }
     }
@@ -103,7 +111,7 @@ fun HomeContent(
                             pdf = pdf,
                             thumbnailManager = thumbnailManager,
                             onClick = onPdfClick,
-                            onMoreClick = { selectedPdfForActions = it }
+                            onMoreClick = { selectedPdfPath = it.path }
                         )
                     }
                 }

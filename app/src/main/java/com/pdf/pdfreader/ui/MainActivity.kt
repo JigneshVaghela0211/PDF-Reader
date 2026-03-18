@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pdf.pdfreader.ui.screens.HomeScreen
+import com.pdf.pdfreader.ui.screens.MainScreen
 import com.pdf.pdfreader.ui.screens.SettingsScreen
 import com.pdf.pdfreader.ui.screens.SplashScreen
 import com.pdf.pdfreader.ui.theme.PDFReaderTheme
@@ -42,7 +43,6 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    val pdfViewModel: PdfViewModel = hiltViewModel()
 
                     NavHost(
                         navController = navController,
@@ -51,25 +51,18 @@ class MainActivity : AppCompatActivity() {
                         composable("splash") {
                             SplashScreen(
                                 onNavigateToHome = {
-                                    navController.navigate("home") {
+                                    navController.navigate("main") {
                                         popUpTo("splash") { inclusive = true }
                                     }
                                 }
                             )
                         }
-                        composable("home") {
-                            HomeScreen(
-                                viewModel = pdfViewModel,
-                                onNavigateToSettings = { navController.navigate("settings") },
-                                onNavigateToReader = { path -> 
-                                    navController.navigate("pdf_reader/${Uri.encode(path)}") 
-                                }
-                            )
-                        }
-                        composable("settings") {
-                            SettingsScreen(
+                        composable("main") {
+                            MainScreen(
                                 mainViewModel = mainViewModel,
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateToReader = { path ->
+                                    navController.navigate("pdf_reader/${Uri.encode(path)}")
+                                }
                             )
                         }
                         composable(

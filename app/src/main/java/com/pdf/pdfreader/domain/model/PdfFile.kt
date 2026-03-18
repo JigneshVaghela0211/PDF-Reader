@@ -10,5 +10,7 @@ data class PdfFile(
     val formattedDate: String,
     val isLocked: Boolean = false,
     val isTrashed: Boolean = false,
+    val isFavorite: Boolean = false,
+    val lastOpened: Long = 0L,
     val thumbnailPath: String? = null
 )

@@ -3,6 +3,7 @@ package com.pdf.pdfreader.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdf.pdfreader.domain.model.PdfFile
+import com.pdf.pdfreader.domain.repository.PdfRepository
 import com.pdf.pdfreader.domain.usecase.GetPdfFilesUseCase
 import com.pdf.pdfreader.domain.usecase.RefreshPdfFilesUseCase
 import com.pdf.pdfreader.utiles.ThumbnailManager
@@ -34,6 +35,7 @@ data class PdfUiState(
 class PdfViewModel @Inject constructor(
     private val getPdfFilesUseCase: GetPdfFilesUseCase,
     private val refreshPdfFilesUseCase: RefreshPdfFilesUseCase,
+    private val pdfRepository: PdfRepository,
     val thumbnailManager: ThumbnailManager
 ) : ViewModel() {
 
@@ -116,6 +118,18 @@ class PdfViewModel @Inject constructor(
             } finally {
                 _uiState.update { it.copy(isLoading = false, isRefreshing = false) }
             }
+        }
+    }
+
+    fun toggleFavorite(pdf: PdfFile) {
+        viewModelScope.launch {
+            pdfRepository.updateFavorite(pdf.path, !pdf.isFavorite)
+        }
+    }
+
+    fun markAsOpened(path: String) {
+        viewModelScope.launch {
+            pdfRepository.updateLastOpened(path, System.currentTimeMillis())
         }
     }
 }

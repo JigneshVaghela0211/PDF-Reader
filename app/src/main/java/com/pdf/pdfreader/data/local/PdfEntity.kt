@@ -14,5 +14,7 @@ data class PdfEntity(
     val formattedDate: String,
     val isLocked: Boolean,
     val isTrashed: Boolean,
+    val isFavorite: Boolean = false,
+    val lastOpened: Long = 0L,
     val thumbnailPath: String? = null
 )
