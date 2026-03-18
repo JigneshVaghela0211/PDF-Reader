@@ -21,6 +21,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.pdf.pdfreader.utiles.ThumbnailManager
 import kotlin.math.log10
+import kotlin.math.pow
 
 @Singleton
 class PdfRepositoryImpl @Inject constructor(
@@ -143,7 +144,7 @@ class PdfRepositoryImpl @Inject constructor(
         if (size <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
         val digitGroups = (log10(size.toDouble()) / log10(1024.0)).toInt()
-        return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        return String.format("%.1f %s", size / 1024.0.pow(digitGroups.toDouble()), units[digitGroups])
     }
 
     private fun formatDate(timestamp: Long): String {

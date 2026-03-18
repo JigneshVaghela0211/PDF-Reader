@@ -44,6 +44,11 @@ class ThumbnailManager @Inject constructor(
         return File(thumbnailDir, "$cacheKey.jpg")
     }
 
+    fun getCachedThumbnail(path: String): Bitmap? {
+        val cacheKey = path.hashCode().toString()
+        return memoryCache.get(cacheKey)
+    }
+
     suspend fun getThumbnail(path: String, isLocked: Boolean): Bitmap? {
         if (isLocked) return null
 

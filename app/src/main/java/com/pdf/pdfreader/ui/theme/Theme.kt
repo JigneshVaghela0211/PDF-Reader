@@ -15,13 +15,18 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.pdf.pdfreader.data.local.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PDFRed,
+    primary = Color(0xFFFF897D), // Lighter red for dark mode
     secondary = PurpleGrey80,
     tertiary = Pink80,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E)
+    background = Color(0xFF0F0F0F),
+    surface = Color(0xFF1A1A1A),
+    onBackground = Color(0xFFE3E3E3),
+    onSurface = Color(0xFFE3E3E3),
+    surfaceVariant = Color(0xFF2B2B2B),
+    onSurfaceVariant = Color(0xFFC7C7C7)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -29,24 +34,25 @@ private val LightColorScheme = lightColorScheme(
     secondary = PurpleGrey40,
     tertiary = Pink40,
     background = BackgroundColor,
-    surface = SurfaceColor
-
-    /* Other default colors to override
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
+    surface = SurfaceColor,
     onBackground = Color(0xFF1C1B1F),
     onSurface = Color(0xFF1C1B1F),
-    */
+    surfaceVariant = Color(0xFFF0F0F0),
+    onSurfaceVariant = Color(0xFF49454F)
 )
 
 @Composable
 fun PDFReaderTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
+    appTheme: AppTheme = AppTheme.SYSTEM,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (appTheme) {
+        AppTheme.LIGHT -> false
+        AppTheme.DARK -> true
+        AppTheme.SYSTEM -> isSystemInDarkTheme()
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
@@ -61,7 +67,7 @@ fun PDFReaderTheme(
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 

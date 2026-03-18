@@ -34,10 +34,14 @@ fun PdfThumbnail(
     thumbnailManager: ThumbnailManager,
     modifier: Modifier = Modifier
 ) {
-    var thumbnail by remember(pdf.path) { mutableStateOf<Bitmap?>(null) }
+    var thumbnail by remember(pdf.path) { 
+        mutableStateOf(thumbnailManager.getCachedThumbnail(pdf.path)) 
+    }
 
     LaunchedEffect(pdf.path) {
-        thumbnail = thumbnailManager.getThumbnail(pdf.path, pdf.isLocked)
+        if (thumbnail == null) {
+            thumbnail = thumbnailManager.getThumbnail(pdf.path, pdf.isLocked)
+        }
     }
 
     Box(
@@ -54,12 +58,15 @@ fun PdfThumbnail(
                 modifier = Modifier.size(24.dp)
             )
         } else if (thumbnail != null) {
-            Image(
-                bitmap = thumbnail!!.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            val imageBitmap = remember(thumbnail) { thumbnail?.asImageBitmap() }
+            if (imageBitmap != null) {
+                Image(
+                    bitmap = imageBitmap,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
         } else {
             Icon(
                 imageVector = Icons.Default.PictureAsPdf,

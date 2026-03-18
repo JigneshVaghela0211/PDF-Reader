@@ -3,16 +3,20 @@ package com.pdf.pdfreader.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,13 +30,16 @@ fun PdfItem(
     thumbnailManager: ThumbnailManager,
     onClick: (PdfFile) -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .graphicsLayer { clip = true }
             .clickable { onClick(pdf) },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        shadowElevation = 0.5.dp
     ) {
         Row(
             modifier = Modifier
@@ -40,27 +47,48 @@ fun PdfItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PdfThumbnail(
-                pdf = pdf,
-                thumbnailManager = thumbnailManager,
-                modifier = Modifier.size(64.dp)
-            )
-            
+            // High Resolution Thumbnail with Glass Effect border
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BoxDrawer.glassBorder()
+            ) {
+                PdfThumbnail(
+                    pdf = pdf,
+                    thumbnailManager = thumbnailManager,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = pdf.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = pdf.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = pdf.formattedSize,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    DotSeparator()
+                    Text(
+                        text = pdf.formattedDate,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                     if (pdf.isLocked) {
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "Locked",
@@ -69,41 +97,14 @@ fun PdfItem(
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = pdf.formattedSize,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                    DotSeparator()
-                    Text(
-                        text = pdf.formattedDate,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                if (pdf.isTrashed) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "Trashed",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
+            }
+
+            IconButton(onClick = { /* TODO */ }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -111,11 +112,21 @@ fun PdfItem(
 
 @Composable
 private fun DotSeparator() {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     Box(
         modifier = Modifier
             .padding(horizontal = 8.dp)
             .size(3.dp)
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+            .drawBehind {
+                drawCircle(color = color)
+            }
+    )
+}
+
+object BoxDrawer {
+    @Composable
+    fun glassBorder() = androidx.compose.foundation.BorderStroke(
+        width = 0.5.dp,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
     )
 }
