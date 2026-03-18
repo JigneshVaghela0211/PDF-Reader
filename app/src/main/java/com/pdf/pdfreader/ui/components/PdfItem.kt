@@ -28,7 +28,8 @@ import com.pdf.pdfreader.utiles.ThumbnailManager
 fun PdfItem(
     pdf: PdfFile,
     thumbnailManager: ThumbnailManager,
-    onClick: (PdfFile) -> Unit
+    onClick: (PdfFile) -> Unit,
+    onMoreClick: (PdfFile) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -47,7 +48,7 @@ fun PdfItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // High Resolution Thumbnail with Glass Effect border
+            // ... (keep thumbnail content)
             Surface(
                 modifier = Modifier.size(64.dp),
                 shape = RoundedCornerShape(12.dp),
@@ -105,7 +106,7 @@ fun PdfItem(
                 }
             }
 
-            IconButton(onClick = { /* TODO */ }) {
+            IconButton(onClick = { onMoreClick(pdf) }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "More",

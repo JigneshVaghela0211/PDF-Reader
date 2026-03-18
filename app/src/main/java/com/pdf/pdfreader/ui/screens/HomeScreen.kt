@@ -123,7 +123,11 @@ fun HomeScreen(
                 isSearching = uiState.searchQuery.isNotEmpty(),
                 thumbnailManager = viewModel.thumbnailManager,
                 onRefresh = { viewModel.loadPdfFiles(false) },
-                onPdfClick = { onNavigateToReader(it.path) }
+                onPdfClick = { onNavigateToReader(it.path) },
+                onRename = { /* TODO: Rename logic */ },
+                onShare = { /* TODO: Share logic */ },
+                onFavorite = { /* TODO: Favorite logic */ },
+                onDelete = { /* TODO: Delete logic */ }
             )
         }
     }

@@ -32,8 +32,44 @@ fun HomeContent(
     isSearching: Boolean,
     thumbnailManager: ThumbnailManager,
     onRefresh: () -> Unit,
-    onPdfClick: (PdfFile) -> Unit
+    onPdfClick: (PdfFile) -> Unit,
+    onRename: (PdfFile) -> Unit,
+    onShare: (PdfFile) -> Unit,
+    onFavorite: (PdfFile) -> Unit,
+    onDelete: (PdfFile) -> Unit
 ) {
+    var selectedPdfForActions by remember { mutableStateOf<PdfFile?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    
+    if (selectedPdfForActions != null) {
+        val pdf = selectedPdfForActions!!
+        ModalBottomSheet(
+            onDismissRequest = { selectedPdfForActions = null },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            PdfActionsBottomSheet(
+                pdf = pdf,
+                thumbnailManager = thumbnailManager,
+                onRename = { 
+                    onRename(pdf)
+                    selectedPdfForActions = null
+                },
+                onShare = { 
+                    onShare(pdf)
+                    selectedPdfForActions = null
+                },
+                onFavorite = { onFavorite(pdf) },
+                onDelete = { 
+                    onDelete(pdf)
+                    selectedPdfForActions = null
+                },
+                onDismiss = { selectedPdfForActions = null }
+            )
+        }
+    }
+
     SmartSwipeRefresh(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -66,7 +102,8 @@ fun HomeContent(
                         PdfItem(
                             pdf = pdf,
                             thumbnailManager = thumbnailManager,
-                            onClick = onPdfClick
+                            onClick = onPdfClick,
+                            onMoreClick = { selectedPdfForActions = it }
                         )
                     }
                 }
@@ -83,6 +120,7 @@ fun HomeContent(
                         key = { it.path },
                         contentType = { "pdf_grid_item" }
                     ) { pdf ->
+                        // Assuming PdfGridItem will also be updated later or if it has its own logic
                         PdfGridItem(
                             pdf = pdf,
                             thumbnailManager = thumbnailManager,
