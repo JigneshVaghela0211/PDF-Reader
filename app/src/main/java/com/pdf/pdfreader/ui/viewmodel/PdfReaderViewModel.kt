@@ -55,9 +55,15 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
-    fun initialize(path: String) {
+    fun initialize(path: String, password: String? = null) {
         viewModelScope.launch {
-            _uiState.update { it.copy(filePath = path, fileName = File(path).name, isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(
+                filePath = path, 
+                fileName = File(path).name, 
+                isLoading = true, 
+                errorMessage = null,
+                password = password ?: ""
+            ) }
             
             try {
                 withContext(Dispatchers.IO) {
@@ -65,21 +71,25 @@ class PdfReaderViewModel @Inject constructor(
                     pageRenderer?.close()
                     bitmapCache.evictAll()
                     
-                    pageRenderer = PdfPageRenderer(getApplication(), path)
+                    pageRenderer = PdfPageRenderer(getApplication(), path, password)
                     val count = pageRenderer?.pageCount ?: 0
                     
                     _uiState.update { state -> 
                         state.copy(
                             totalPages = count,
                             isLoading = false,
-                            isPasswordProtected = false
+                            isPasswordProtected = false,
+                            isPasswordPromptVisible = false,
+                            isPasswordCorrect = true
                         ) 
                     }
                 }
             } catch (e: SecurityException) {
+                // If we tried with a password and got a SecurityException, it's the wrong password.
                 _uiState.update { it.copy(
                     isPasswordProtected = true,
                     isPasswordPromptVisible = true,
+                    isPasswordCorrect = password == null, // false if password was tried
                     isLoading = false
                 ) }
             } catch (e: Exception) {
@@ -128,12 +138,13 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun submitPassword(password: String) {
-        _uiState.update { it.copy(password = password, isPasswordPromptVisible = false, isLoading = true) }
-        
-        viewModelScope.launch {
-            // Re-simulation of limitation
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            // Android 15+ supports native unlocking
+            initialize(_uiState.value.filePath, password)
+        } else {
+            // Older versions cannot unlock natively
             _uiState.update { it.copy(
-                errorMessage = "Native Android PDF renderer does not support password protected files without professional libraries.",
+                errorMessage = "Native Android PDF renderer only supports password protected files on Android 15 (API 35)+. For older versions, a professional library like Pdfium or PDF.js (via WebView) is required.",
                 isLoading = false
             ) }
         }
