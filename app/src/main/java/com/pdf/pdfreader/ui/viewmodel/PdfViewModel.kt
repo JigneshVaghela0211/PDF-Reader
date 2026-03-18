@@ -5,19 +5,27 @@ import androidx.lifecycle.viewModelScope
 import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.domain.repository.PdfRepository
 import com.pdf.pdfreader.domain.usecase.GetPdfFilesUseCase
-import com.pdf.pdfreader.domain.usecase.RefreshPdfFilesUseCase
+import com.pdf.pdfreader.domain.usecase.SyncFilesUseCase
 import com.pdf.pdfreader.utiles.ThumbnailManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 enum class SortType { LAST_MODIFIED, NAME, FILE_SIZE }
 enum class SortOrder { NEW_TO_OLD, OLD_TO_NEW }
 enum class ViewMode { LIST, GRID }
+
+sealed class UiEvent {
+    data class ShowSnackbar(val message: String) : UiEvent()
+}
 
 data class PdfUiState(
     val pdfFiles: List<PdfFile> = emptyList(),
@@ -34,7 +42,7 @@ data class PdfUiState(
 @HiltViewModel
 class PdfViewModel @Inject constructor(
     private val getPdfFilesUseCase: GetPdfFilesUseCase,
-    private val refreshPdfFilesUseCase: RefreshPdfFilesUseCase,
+    private val syncFilesUseCase: SyncFilesUseCase,
     private val pdfRepository: PdfRepository,
     val thumbnailManager: ThumbnailManager
 ) : ViewModel() {
@@ -42,20 +50,25 @@ class PdfViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PdfUiState())
     val uiState: StateFlow<PdfUiState> = _uiState.asStateFlow()
 
+    private val _eventFlow = MutableSharedFlow<UiEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
+
     init {
         observePdfFiles()
     }
 
     private fun observePdfFiles() {
         viewModelScope.launch {
-            getPdfFilesUseCase().collect { files ->
-                _uiState.update { state -> 
-                    state.copy(
-                        pdfFiles = files,
-                        filteredFiles = processFiles(files, state.searchQuery, state.sortType, state.sortOrder)
-                    ) 
+            getPdfFilesUseCase()
+                .distinctUntilChanged()
+                .collect { files ->
+                    _uiState.update { state -> 
+                        state.copy(
+                            pdfFiles = files,
+                            filteredFiles = processFiles(files, state.searchQuery, state.sortType, state.sortOrder)
+                        ) 
+                    }
                 }
-            }
         }
     }
 
@@ -101,20 +114,24 @@ class PdfViewModel @Inject constructor(
         }
     }
 
-    fun loadPdfFiles(isInitialLoad: Boolean = true) {
+    fun loadPdfFiles(isInitialLoad: Boolean = false) {
         viewModelScope.launch {
             val currentState = _uiState.value
+            
+            // Optimization: If it's an initial load, but we already have data, don't re-sync from storage
+            if (isInitialLoad && currentState.pdfFiles.isNotEmpty()) return@launch
+
             _uiState.update { 
-                if (isInitialLoad && currentState.pdfFiles.isEmpty()) {
+                if (isInitialLoad) {
                     it.copy(isLoading = true, errorMessage = null)
                 } else {
                     it.copy(isRefreshing = true, errorMessage = null)
                 }
             }
             try {
-                refreshPdfFilesUseCase()
+                syncFilesUseCase()
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Failed to load PDF files: ${e.message}") }
+                _uiState.update { it.copy(errorMessage = "Sync failed: ${e.message}") }
             } finally {
                 _uiState.update { it.copy(isLoading = false, isRefreshing = false) }
             }
@@ -127,9 +144,17 @@ class PdfViewModel @Inject constructor(
         }
     }
 
-    fun markAsOpened(path: String) {
+    fun onPdfClick(pdf: PdfFile, onNavigate: (String) -> Unit) {
         viewModelScope.launch {
-            pdfRepository.updateLastOpened(path, System.currentTimeMillis())
+            if (File(pdf.path).exists()) {
+                // File exists, open it and update timestamp
+                pdfRepository.updateLastOpened(pdf.path, System.currentTimeMillis())
+                onNavigate(pdf.path)
+            } else {
+                // File missing! Clean up DB and notify user
+                pdfRepository.deleteFileByPath(pdf.path)
+                _eventFlow.emit(UiEvent.ShowSnackbar("File no longer exists"))
+            }
         }
     }
 }

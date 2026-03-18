@@ -31,4 +31,7 @@ interface PdfDao {
 
     @Query("UPDATE pdf_files SET thumbnailPath = :thumbnailPath WHERE path = :pdfPath")
     suspend fun updateThumbnail(pdfPath: String, thumbnailPath: String?)
+
+    @Query("DELETE FROM pdf_files WHERE path = :path")
+    suspend fun deleteByPath(path: String)
 }

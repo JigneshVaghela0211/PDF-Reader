@@ -17,9 +17,11 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.BuildConfig
 import com.pdf.pdfreader.ui.components.*
 import com.pdf.pdfreader.ui.viewmodel.PdfViewModel
+import com.pdf.pdfreader.ui.viewmodel.UiEvent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +30,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToReader: (String) -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var hasPermission by remember { mutableStateOf(false) }
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -37,6 +39,15 @@ fun HomeScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showFilterSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is UiEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -46,14 +57,18 @@ fun HomeScreen(
                 } else {
                     true
                 }
-                if (hasPermission) {
-                    viewModel.loadPdfFiles()
-                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Initial load logic
+    LaunchedEffect(hasPermission) {
+        if (hasPermission && uiState.pdfFiles.isEmpty()) {
+            viewModel.loadPdfFiles(isInitialLoad = true)
         }
     }
 
@@ -91,6 +106,7 @@ fun HomeScreen(
                 scrollBehavior = scrollBehavior
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { /* TODO: Create PDF logic */ },
@@ -123,10 +139,7 @@ fun HomeScreen(
                 isSearching = uiState.searchQuery.isNotEmpty(),
                 thumbnailManager = viewModel.thumbnailManager,
                 onRefresh = { viewModel.loadPdfFiles(false) },
-                onPdfClick = { 
-                    viewModel.markAsOpened(it.path)
-                    onNavigateToReader(it.path) 
-                },
+                onPdfClick = { viewModel.onPdfClick(it, onNavigateToReader) },
                 onRename = { /* TODO: Rename logic */ },
                 onShare = { /* TODO: Share logic */ },
                 onFavorite = { viewModel.toggleFavorite(it) },

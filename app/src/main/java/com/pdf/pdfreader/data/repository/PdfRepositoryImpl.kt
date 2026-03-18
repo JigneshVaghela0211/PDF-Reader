@@ -42,7 +42,7 @@ class PdfRepositoryImpl @Inject constructor(
         entities.map { it.toDomain() }
     }
 
-    override suspend fun refreshPdfFiles() {
+    override suspend fun syncFilesWithStorage() {
         withContext(Dispatchers.IO) {
             // Get current DB state to preserve user metadata (favorites, lastOpened)
             val existingPdfs = pdfDao.getAllPdfsOnce().associateBy { it.path }
@@ -131,6 +131,10 @@ class PdfRepositoryImpl @Inject constructor(
 
     override suspend fun updateLastOpened(path: String, timestamp: Long) {
         pdfDao.updateLastOpened(path, timestamp)
+    }
+
+    override suspend fun deleteFileByPath(path: String) {
+        pdfDao.deleteByPath(path)
     }
 
     private fun PdfEntity.toDomain() = PdfFile(
