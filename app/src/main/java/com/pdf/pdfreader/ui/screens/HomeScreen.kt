@@ -28,7 +28,8 @@ import com.pdf.pdfreader.ui.viewmodel.UiEvent
 fun HomeScreen(
     viewModel: PdfViewModel,
     onNavigateToSettings: () -> Unit,
-    onNavigateToReader: (String) -> Unit
+    onNavigateToReader: (String) -> Unit,
+    onNavigateToReaderWithSearch: (String, Int, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -135,11 +136,15 @@ fun HomeScreen(
                 isLoading = uiState.isLoading,
                 isRefreshing = uiState.isRefreshing,
                 files = uiState.filteredFiles,
+                searchResults = uiState.searchResults,
                 viewMode = uiState.viewMode,
                 isSearching = uiState.searchQuery.isNotEmpty(),
                 thumbnailManager = viewModel.thumbnailManager,
                 onRefresh = { viewModel.loadPdfFiles(false) },
                 onPdfClick = { viewModel.onPdfClick(it, onNavigateToReader) },
+                onSearchResultClick = { result ->
+                    onNavigateToReaderWithSearch(result.pdfPath, result.pageIndex, uiState.searchQuery)
+                },
                 onRename = { /* TODO: Rename logic */ },
                 onShare = { /* TODO: Share logic */ },
                 onFavorite = { viewModel.toggleFavorite(it) },

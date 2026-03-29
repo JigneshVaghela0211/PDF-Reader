@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
@@ -32,11 +33,13 @@ fun HomeContent(
     isLoading: Boolean,
     isRefreshing: Boolean,
     files: List<PdfFile>,
+    searchResults: List<com.pdf.pdfreader.data.local.SearchResult>,
     viewMode: ViewMode,
     isSearching: Boolean,
     thumbnailManager: ThumbnailManager,
     onRefresh: () -> Unit,
     onPdfClick: (PdfFile) -> Unit,
+    onSearchResultClick: (com.pdf.pdfreader.data.local.SearchResult) -> Unit,
     onRename: (PdfFile) -> Unit,
     onShare: (PdfFile) -> Unit,
     onFavorite: (PdfFile) -> Unit,
@@ -90,7 +93,7 @@ fun HomeContent(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(strokeCap = androidx.compose.ui.graphics.StrokeCap.Round)
             }
-        } else if (files.isEmpty()) {
+        } else if (files.isEmpty() && searchResults.isEmpty()) {
             EmptyPdfContent(
                 modifier = Modifier.fillMaxSize(),
                 isSearching = isSearching
@@ -102,17 +105,51 @@ fun HomeContent(
                     contentPadding = PaddingValues(bottom = 80.dp, top = 16.dp, start = 8.dp, end = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(
-                        items = files,
-                        key = { it.path },
-                        contentType = { "pdf_item" }
-                    ) { pdf ->
-                        PdfItem(
-                            pdf = pdf,
-                            thumbnailManager = thumbnailManager,
-                            onClick = onPdfClick,
-                            onMoreClick = { selectedPdfPath = it.path }
-                        )
+                    if (files.isNotEmpty()) {
+                        if (isSearching) {
+                            item {
+                                Text(
+                                    text = stringResource(R.string.file_matches),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        items(
+                            items = files,
+                            key = { it.path },
+                            contentType = { "pdf_item" }
+                        ) { pdf ->
+                            PdfItem(
+                                pdf = pdf,
+                                thumbnailManager = thumbnailManager,
+                                onClick = onPdfClick,
+                                onMoreClick = { selectedPdfPath = it.path }
+                            )
+                        }
+                    }
+
+                    if (isSearching && searchResults.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.text_matches),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        items(
+                            items = searchResults,
+                            key = { "${it.pdfPath}_${it.pageIndex}_${it.snippet}" },
+                            contentType = { "search_result" }
+                        ) { result ->
+                            SearchResultItem(
+                                result = result,
+                                onClick = onSearchResultClick
+                            )
+                        }
                     }
                 }
             } else {
@@ -211,6 +248,54 @@ fun EmptyPdfContent(
                 text = stringResource(R.string.adjust_search),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+fun SearchResultItem(
+    result: com.pdf.pdfreader.data.local.SearchResult,
+    onClick: (com.pdf.pdfreader.data.local.SearchResult) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        onClick = { onClick(result) }
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = result.fileName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = stringResource(R.string.page) + " " + (result.pageIndex + 1),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            val cleanSnippet = result.snippet.replace("<b>", "").replace("</b>", "")
+            Text(
+                text = cleanSnippet,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
             )
         }
     }

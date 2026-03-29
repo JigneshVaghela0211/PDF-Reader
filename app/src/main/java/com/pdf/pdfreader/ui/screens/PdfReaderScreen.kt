@@ -1,7 +1,11 @@
 package com.pdf.pdfreader.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -9,85 +13,134 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.viewinterop.AndroidView
 import com.pdf.pdfreader.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.github.barteksc.pdfviewer.PDFView
-import com.github.barteksc.pdfviewer.util.FitPolicy
 import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
+import com.pdf.pdfreader.ui.components.AnnotationTool
+import com.pdf.pdfreader.ui.components.PdfAnnotationOverlay
+import com.pdf.pdfreader.ui.components.AnnotationTopBar
 import kotlinx.coroutines.launch
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
     path: String,
+    initialPageIndex: Int = -1,
+    searchQuery: String? = null,
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollState = rememberLazyListState() // Not used by lib but kept for structural consistency
+    val scrollState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
     LaunchedEffect(path) {
         viewModel.initialize(path)
     }
 
-    val lastLoadedFile = remember { mutableStateOf("") }
-    val lastLoadedPassword = remember { mutableStateOf("") }
-    val lastReloadTrigger = remember { mutableIntStateOf(0) }
+    LaunchedEffect(uiState.totalPages, initialPageIndex) {
+        if (uiState.totalPages > 0 && initialPageIndex in 0 until uiState.totalPages) {
+            scrollState.scrollToItem(initialPageIndex)
+            viewModel.updateCurrentPage(initialPageIndex)
+        }
+    }
+
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
+
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
+        scale = (scale * zoomChange).coerceIn(1f, 10f)
+        if (scale > 1f) {
+            offsetX += offsetChange.x
+            offsetY += offsetChange.y
+        } else {
+            offsetX = 0f
+            offsetY = 0f
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = uiState.fileName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
+            if (uiState.isEditMode) {
+                AnnotationTopBar(
+                    currentTool = uiState.currentTool,
+                    currentColor = uiState.currentColor,
+                    currentStrokeWidth = uiState.currentStrokeWidth,
+                    onToolChange = viewModel::setAnnotationTool,
+                    onColorChange = viewModel::setAnnotationColor,
+                    onStrokeWidthChange = viewModel::setAnnotationStrokeWidth,
+                    onClose = { viewModel.setEditMode(false) },
+                    onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) }
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = uiState.fileName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                            if (uiState.totalPages > 0) {
+                                Text(
+                                    text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.go_back))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.setEditMode(true) }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
                         if (uiState.totalPages > 0) {
                             Text(
-                                text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}",
+                                text = "${((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()}%",
+                                modifier = Modifier.padding(horizontal = 16.dp),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.go_back))
-                    }
-                },
-                actions = {
-                    if (uiState.totalPages > 0) {
-                        Text(
-                            text = "${((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()}%",
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -97,44 +150,34 @@ fun PdfReaderScreen(
                 .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            AndroidView(
-                factory = { context ->
-                    PDFView(context, null)
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { pdfView ->
-                    if (lastLoadedFile.value != uiState.filePath || 
-                        lastLoadedPassword.value != uiState.password ||
-                        lastReloadTrigger.intValue != uiState.reloadTrigger) {
-                        
-                        pdfView.fromFile(File(uiState.filePath))
-                            .password(if (uiState.password.isNotEmpty()) uiState.password else null)
-                            .defaultPage(uiState.currentPage)
-                            .enableSwipe(true)
-                            .swipeHorizontal(false)
-                            .enableDoubletap(true)
-                            .onLoad { pages -> viewModel.onLoadComplete(pages) }
-                            .onPageChange { page, count -> viewModel.onPageChanged(page, count) }
-                            .onError { t -> viewModel.onError(t) }
-                            .enableAntialiasing(true)
-                            .spacing(10)
-                            .pageFitPolicy(FitPolicy.WIDTH)
-                            .fitEachPage(true)
-                            .load()
-                            
-                        // Set zoom limits for high-detail areas (like barcodes)
-                        pdfView.setMinZoom(1f)
-                        pdfView.setMidZoom(3f)
-                        pdfView.setMaxZoom(10f)
-                            
-                        lastLoadedFile.value = uiState.filePath
-                        lastLoadedPassword.value = uiState.password
-                        lastReloadTrigger.intValue = uiState.reloadTrigger
-                    } else if (pdfView.currentPage != uiState.currentPage) {
-                        pdfView.jumpTo(uiState.currentPage)
+            if (!uiState.isLoading && uiState.totalPages > 0) {
+                LazyColumn(
+                    state = scrollState,
+                    userScrollEnabled = !uiState.isEditMode,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .transformable(state = transformableState)
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY
+                        )
+                ) {
+                    items(uiState.totalPages, key = { it }) { pageIndex ->
+                        PdfPage(
+                            pageIndex = pageIndex,
+                            viewModel = viewModel,
+                            width = screenWidthPx,
+                            searchQuery = searchQuery
+                        )
                     }
                 }
-            )
+
+                LaunchedEffect(scrollState.firstVisibleItemIndex) {
+                    viewModel.updateCurrentPage(scrollState.firstVisibleItemIndex)
+                }
+            }
 
             if (uiState.totalPages > 1) {
                 Box(
@@ -151,13 +194,12 @@ fun PdfReaderScreen(
                     Slider(
                         value = uiState.currentPage.toFloat(),
                         onValueChange = { page -> 
-                            // Library handles internal scrolling sync if we use its listeners, 
-                            // here we just want to jump to page.
-                            // But usually we don't need a slider with PDFView as it's a native scrollable.
                             viewModel.updateCurrentPage(page.toInt())
-                            // No need to scroll LazyColumn anymore, PDFView handles it
+                            coroutineScope.launch {
+                                scrollState.scrollToItem(page.toInt())
+                            }
                         },
-                        valueRange = 0f..(uiState.totalPages - 1).toFloat(),
+                        valueRange = 0f..(uiState.totalPages - 1).coerceAtLeast(1).toFloat(),
                         steps = if (uiState.totalPages > 2) uiState.totalPages - 2 else 0,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
@@ -193,6 +235,85 @@ fun PdfReaderScreen(
                     onRetry = { viewModel.initialize(uiState.filePath) },
                     onExit = onNavigateBack
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun PdfPage(pageIndex: Int, viewModel: PdfReaderViewModel, width: Int, searchQuery: String? = null) {
+    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var highlights by remember { mutableStateOf<List<androidx.compose.ui.geometry.Rect>>(emptyList()) }
+    
+    LaunchedEffect(pageIndex, width) {
+        bitmap = viewModel.getPageBitmap(pageIndex, width)
+        if (!searchQuery.isNullOrEmpty() && bitmap != null) {
+            highlights = viewModel.getSearchHighlights(pageIndex, searchQuery, width, bitmap!!.height)
+        }
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Image(
+                    bitmap = bitmap!!.asImageBitmap(),
+                    contentDescription = "Page ${pageIndex + 1}",
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth
+                )
+                if (highlights.isNotEmpty()) {
+                    androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                        highlights.forEach { rect ->
+                            drawRect(
+                                color = Color.Yellow.copy(alpha = 0.4f),
+                                topLeft = androidx.compose.ui.geometry.Offset(rect.left, rect.top),
+                                size = androidx.compose.ui.geometry.Size(rect.width, rect.height)
+                            )
+                        }
+                    }
+                }
+                
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                PdfAnnotationOverlay(
+                    modifier = Modifier.matchParentSize(),
+                    isEditMode = uiState.isEditMode,
+                    currentTool = uiState.currentTool,
+                    currentColor = uiState.currentColor,
+                    currentStrokeWidth = uiState.currentStrokeWidth,
+                    annotations = uiState.annotations,
+                    onAnnotationAdded = viewModel::addAnnotation,
+                    onAnnotationRemoved = viewModel::removeAnnotation,
+                    pageIndex = pageIndex
+                )
+                
+                uiState.annotations.filterIsInstance<com.pdf.pdfreader.domain.model.PdfAnnotation.TextNote>()
+                    .filter { it.pageIndex == pageIndex }
+                    .forEach { textNote ->
+                        key(textNote.id) {
+                            com.pdf.pdfreader.ui.components.MovableTextNote(
+                                note = textNote,
+                                isEditMode = uiState.isEditMode,
+                                onUpdate = viewModel::updateAnnotation,
+                                onDelete = { viewModel.removeAnnotation(textNote.id) }
+                            )
+                        }
+                    }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f/1.414f) // Standard A4 ratio as placeholder
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
         }
     }
@@ -294,7 +415,7 @@ fun ErrorView(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
             
             Row(

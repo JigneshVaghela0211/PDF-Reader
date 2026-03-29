@@ -62,18 +62,29 @@ class MainActivity : AppCompatActivity() {
                                 mainViewModel = mainViewModel,
                                 onNavigateToReader = { path ->
                                     navController.navigate("pdf_reader/${Uri.encode(path)}")
+                                },
+                                onNavigateToReaderWithSearch = { path, pageIndex, query ->
+                                    navController.navigate("pdf_reader/${Uri.encode(path)}?pageIndex=$pageIndex&searchQuery=${Uri.encode(query)}")
                                 }
                             )
                         }
                         composable(
-                            route = "pdf_reader/{path}",
-                            arguments = listOf(navArgument("path") { type = NavType.StringType })
+                            route = "pdf_reader/{path}?pageIndex={pageIndex}&searchQuery={searchQuery}",
+                            arguments = listOf(
+                                navArgument("path") { type = NavType.StringType },
+                                navArgument("pageIndex") { type = NavType.IntType; defaultValue = -1 },
+                                navArgument("searchQuery") { type = NavType.StringType; nullable = true; defaultValue = null }
+                            )
                         ) { backStackEntry ->
                             val path = backStackEntry.arguments?.getString("path") ?: ""
+                            val pageIndex = backStackEntry.arguments?.getInt("pageIndex") ?: -1
+                            val searchQuery = backStackEntry.arguments?.getString("searchQuery")?.let { Uri.decode(it) }
                             val readerViewModel: PdfReaderViewModel = hiltViewModel()
                             PdfReaderScreen(
                                 viewModel = readerViewModel,
                                 path = Uri.decode(path),
+                                initialPageIndex = pageIndex,
+                                searchQuery = searchQuery,
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }

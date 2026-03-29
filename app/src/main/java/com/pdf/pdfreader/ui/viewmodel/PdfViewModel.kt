@@ -30,6 +30,7 @@ sealed class UiEvent {
 data class PdfUiState(
     val pdfFiles: List<PdfFile> = emptyList(),
     val filteredFiles: List<PdfFile> = emptyList(),
+    val searchResults: List<com.pdf.pdfreader.data.local.SearchResult> = emptyList(),
     val searchQuery: String = "",
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
@@ -78,6 +79,19 @@ class PdfViewModel @Inject constructor(
                 searchQuery = query,
                 filteredFiles = processFiles(state.pdfFiles, query, state.sortType, state.sortOrder)
             )
+        }
+        
+        if (query.trim().length >= 3) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val results = pdfRepository.searchPdfText("*${query.trim()}*")
+                    _uiState.update { it.copy(searchResults = results) }
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(searchResults = emptyList()) }
+                }
+            }
+        } else {
+            _uiState.update { it.copy(searchResults = emptyList()) }
         }
     }
 

@@ -85,8 +85,10 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.android.pdf.viewer)
     ksp(libs.androidx.room.compiler)
+
+    // PDFBox-Android for text extraction
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

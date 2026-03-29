@@ -34,6 +34,7 @@ fun RecentScreen(
             isLoading = uiState.isLoading,
             isRefreshing = false,
             files = uiState.recentFiles,
+            searchResults = emptyList(),
             viewMode = ViewMode.LIST,
             isSearching = false,
             thumbnailManager = viewModel.thumbnailManager,
@@ -42,6 +43,7 @@ fun RecentScreen(
                 viewModel.markAsOpened(it.path)
                 onNavigateToReader(it.path) 
             },
+            onSearchResultClick = { },
             onRename = { /* Handle */ },
             onShare = { /* Handle */ },
             onFavorite = { /* Handle Favorite */ },

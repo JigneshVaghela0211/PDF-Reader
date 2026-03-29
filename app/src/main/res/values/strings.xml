@@ -46,4 +46,6 @@
     <string name="of">of</string>
     <string name="go_back">Go Back</string>
     <string name="retry">Retry</string>
+    <string name="file_matches">File Matches</string>
+    <string name="text_matches">Text Matches</string>
 </resources>

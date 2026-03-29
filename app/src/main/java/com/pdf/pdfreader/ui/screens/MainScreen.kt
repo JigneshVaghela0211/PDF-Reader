@@ -18,6 +18,7 @@ import com.pdf.pdfreader.ui.viewmodel.PdfViewModel
 @Composable
 fun MainScreen(
     onNavigateToReader: (String) -> Unit,
+    onNavigateToReaderWithSearch: (String, Int, String) -> Unit,
     mainViewModel: MainViewModel
 ) {
     val navController = rememberNavController()
@@ -66,7 +67,8 @@ fun MainScreen(
                 HomeScreen(
                     viewModel = pdfViewModel,
                     onNavigateToSettings = { navController.navigate(BottomNavItem.Settings.route) },
-                    onNavigateToReader = onNavigateToReader
+                    onNavigateToReader = onNavigateToReader,
+                    onNavigateToReaderWithSearch = onNavigateToReaderWithSearch
                 )
             }
             composable("recent") {

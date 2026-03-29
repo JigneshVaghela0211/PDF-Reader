@@ -11,4 +11,5 @@ interface PdfRepository {
     suspend fun updateFavorite(path: String, isFavorite: Boolean)
     suspend fun updateLastOpened(path: String, timestamp: Long)
     suspend fun deleteFileByPath(path: String)
+    suspend fun searchPdfText(query: String): List<com.pdf.pdfreader.data.local.SearchResult>
 }

@@ -34,4 +34,22 @@ interface PdfDao {
 
     @Query("DELETE FROM pdf_files WHERE path = :path")
     suspend fun deleteByPath(path: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTextSnippets(snippets: List<PdfTextSnippet>)
+
+    @Query("DELETE FROM pdf_text_search WHERE pdfPath = :path")
+    suspend fun deleteTextSnippetsByPath(path: String)
+
+    @Query("""
+        SELECT pdf_files.name as fileName, 
+               pdf_text_search.pdfPath, 
+               pdf_text_search.pageIndex, 
+               snippet(pdf_text_search, '<b>', '</b>', '...', -1, 40) as snippet
+        FROM pdf_text_search
+        JOIN pdf_files ON pdf_text_search.pdfPath = pdf_files.path
+        WHERE pdf_text_search MATCH :query
+        LIMIT 50
+    """)
+    suspend fun searchPdfText(query: String): List<SearchResult>
 }

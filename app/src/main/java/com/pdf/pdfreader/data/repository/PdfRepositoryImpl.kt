@@ -20,6 +20,7 @@ import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.pdf.pdfreader.utiles.ThumbnailManager
+import kotlinx.coroutines.launch
 import kotlin.math.log10
 import kotlin.math.pow
 
@@ -27,7 +28,8 @@ import kotlin.math.pow
 class PdfRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val pdfDao: PdfDao,
-    private val thumbnailManager: ThumbnailManager
+    private val thumbnailManager: ThumbnailManager,
+    private val textExtractor: com.pdf.pdfreader.utiles.PdfTextExtractor
 ) : PdfRepository {
     
     override fun getPdfFiles(): Flow<List<PdfFile>> = pdfDao.getAllPdfs().map { entities ->
@@ -116,6 +118,14 @@ class PdfRepositoryImpl @Inject constructor(
             // Insert new/updated files
             if (scannedFiles.isNotEmpty()) {
                 pdfDao.upsertPdfs(scannedFiles)
+                // Fire and forget indexing for new files
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    scannedFiles.forEach { pdf ->
+                        if (!pdf.isLocked) {
+                            textExtractor.extractAndIndexPdf(pdf.path)
+                        }
+                    }
+                }
             }
             
             // Remove deleted files
@@ -135,6 +145,10 @@ class PdfRepositoryImpl @Inject constructor(
 
     override suspend fun deleteFileByPath(path: String) {
         pdfDao.deleteByPath(path)
+    }
+
+    override suspend fun searchPdfText(query: String): List<com.pdf.pdfreader.data.local.SearchResult> {
+        return pdfDao.searchPdfText(query)
     }
 
     private fun PdfEntity.toDomain() = PdfFile(
