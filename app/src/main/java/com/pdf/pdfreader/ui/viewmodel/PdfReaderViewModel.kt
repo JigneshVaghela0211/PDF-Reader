@@ -223,7 +223,11 @@ class PdfReaderViewModel @Inject constructor(
             return
         }
 
-        updatePageState(pageIndex, PageRenderState.Loading)
+        // Only show Loading if page isn't already rendered (prevents blink during search navigation)
+        val currentState = _pageStates.value[pageIndex]
+        if (currentState !is PageRenderState.Success) {
+            updatePageState(pageIndex, PageRenderState.Loading)
+        }
 
         val bitmap: Bitmap? = try {
             withContext(pdfDispatcher) {

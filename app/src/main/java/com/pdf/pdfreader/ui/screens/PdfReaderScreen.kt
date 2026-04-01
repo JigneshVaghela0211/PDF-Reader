@@ -118,46 +118,17 @@ fun PdfReaderScreen(
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
-    var zoomRenderJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-        scale = newScale
-
-        if (newScale > 1f) {
-            offsetX += offsetChange.x
-            offsetY += offsetChange.y
-        } else {
-            offsetX = 0f
-            offsetY = 0f
-        }
-    }
-
-    // Debounced zoom re-render
-    LaunchedEffect(scale) {
-        if (scale > 1.5f) {
-            zoomRenderJob?.cancel()
-            zoomRenderJob = coroutineScope.launch {
-                delay(300) // Debounce
-                // Re-render visible pages at higher resolution
-                val firstVisible = scrollState.firstVisibleItemIndex
-                val lastVisible = scrollState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: firstVisible
-                for (pageIndex in firstVisible..lastVisible) {
-                    viewModel.requestHighResRender(pageIndex, screenWidthPx, scale)
-                }
-            }
-        }
-    }
-
-    // Track scroll and cancel off-screen renders
+    // Track scroll state
     val isScrolling by remember {
         derivedStateOf { scrollState.isScrollInProgress }
     }
 
+    // Update current page and cancel far-off renders
     LaunchedEffect(scrollState.firstVisibleItemIndex) {
         val firstVisible = scrollState.firstVisibleItemIndex
         val lastVisible = scrollState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: firstVisible
-        val safeRange = (firstVisible - 2).coerceAtLeast(0)..(lastVisible + 2).coerceAtMost(uiState.totalPages - 1)
+        val safeRange = (firstVisible - 3).coerceAtLeast(0)..(lastVisible + 3).coerceAtMost(uiState.totalPages - 1)
         viewModel.cancelRenderingOutsideRange(safeRange)
         viewModel.updateCurrentPage(firstVisible)
     }
@@ -261,9 +232,9 @@ fun PdfReaderScreen(
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
-                LazyColumn(
-                    state = scrollState,
-                    userScrollEnabled = !uiState.isEditMode,
+                // Zoom Box wraps the LazyColumn — pinch gestures detected here
+                // before LazyColumn consumes them for scroll
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .transformable(state = transformableState)
@@ -274,15 +245,21 @@ fun PdfReaderScreen(
                             translationY = offsetY
                         )
                 ) {
-                    items(uiState.totalPages, key = { it }) { pageIndex ->
-                        PdfPage(
-                            pageIndex = pageIndex,
-                            viewModel = viewModel,
-                            width = screenWidthPx,
-                            pageStates = pageStates,
-                            isScrolling = isScrolling,
-                            reloadTrigger = uiState.reloadTrigger
-                        )
+                    LazyColumn(
+                        state = scrollState,
+                        userScrollEnabled = !uiState.isEditMode && scale <= 1f,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.totalPages, key = { it }) { pageIndex ->
+                            PdfPage(
+                                pageIndex = pageIndex,
+                                viewModel = viewModel,
+                                width = screenWidthPx,
+                                pageStates = pageStates,
+                                isScrolling = isScrolling,
+                                reloadTrigger = uiState.reloadTrigger
+                            )
+                        }
                     }
                 }
             }
@@ -490,10 +467,13 @@ fun PdfPage(
     }
 
     // Re-request when scrolling stops if page wasn't rendered yet
-    LaunchedEffect(isScrolling, renderState) {
-        if (!isScrolling && renderState !is PageRenderState.Success) {
+    LaunchedEffect(isScrolling) {
+        if (!isScrolling) {
             delay(80)
-            viewModel.requestPageRender(pageIndex, width)
+            val state = pageStates[pageIndex]
+            if (state !is PageRenderState.Success) {
+                viewModel.requestPageRender(pageIndex, width)
+            }
         }
     }
 
