@@ -19,6 +19,17 @@ enum class AnnotationTool {
     PEN, HIGHLIGHTER, ERASER, TEXT
 }
 
+/**
+ * PDF annotation overlay with color bug fix.
+ *
+ * BUG FIX: Previously, `currentColor` and `currentStrokeWidth` were used as
+ * keys in `pointerInput()`, which caused the gesture handler to restart on
+ * every color/stroke change — resetting currentPathPoints mid-stroke.
+ *
+ * FIX: Use `rememberUpdatedState` to capture the latest color/strokeWidth
+ * without restarting the pointer input handler. The `pointerInput` block
+ * is now only keyed on `isEditMode` and `currentTool`.
+ */
 @Composable
 fun PdfAnnotationOverlay(
     modifier: Modifier = Modifier,
@@ -31,29 +42,40 @@ fun PdfAnnotationOverlay(
     onAnnotationRemoved: (String) -> Unit,
     pageIndex: Int
 ) {
+    // Capture latest values without restarting pointer input
+    val latestColor by rememberUpdatedState(currentColor)
+    val latestStrokeWidth by rememberUpdatedState(currentStrokeWidth)
+    val latestAnnotations by rememberUpdatedState(annotations)
+
     var currentPathPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    // Track the color that was active when the current stroke started
+    var strokeColor by remember { mutableStateOf(currentColor) }
+    var strokeWidth by remember { mutableStateOf(currentStrokeWidth) }
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(isEditMode, currentTool, currentColor, currentStrokeWidth) {
+            .pointerInput(isEditMode, currentTool) {
                 if (isEditMode && (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER || currentTool == AnnotationTool.ERASER)) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             if (currentTool != AnnotationTool.ERASER) {
+                                // Capture color/width at stroke START — this is the key fix
+                                strokeColor = latestColor
+                                strokeWidth = latestStrokeWidth
                                 currentPathPoints = listOf(offset)
                             }
                         },
-                        onDrag = { change, dragAmount ->
+                        onDrag = { change, _ ->
                             change.consume()
                             if (currentTool == AnnotationTool.ERASER) {
                                 val position = change.position
-                                val toRemove = annotations.filter { ann ->
+                                val toRemove = latestAnnotations.filter { ann ->
                                     ann is PdfAnnotation.Path && ann.pageIndex == pageIndex &&
-                                            ann.points.any { p -> 
+                                            ann.points.any { p ->
                                                 val dx = p.x - position.x
                                                 val dy = p.y - position.y
-                                                (dx * dx + dy * dy) < 2500f // 50px radius squared
+                                                (dx * dx + dy * dy) < 2500f
                                             }
                                 }
                                 toRemove.forEach { onAnnotationRemoved(it.id) }
@@ -66,8 +88,8 @@ fun PdfAnnotationOverlay(
                                 val newAnnotation = PdfAnnotation.Path(
                                     pageIndex = pageIndex,
                                     points = currentPathPoints,
-                                    color = currentColor,
-                                    strokeWidth = currentStrokeWidth,
+                                    color = strokeColor,  // Use captured color, not current
+                                    strokeWidth = strokeWidth,  // Use captured width, not current
                                     isHighlighter = currentTool == AnnotationTool.HIGHLIGHTER
                                 )
                                 onAnnotationAdded(newAnnotation)
@@ -80,14 +102,14 @@ fun PdfAnnotationOverlay(
                     )
                 }
             }
-            .pointerInput(isEditMode, currentTool, currentColor) {
+            .pointerInput(isEditMode, currentTool) {
                 if (isEditMode && currentTool == AnnotationTool.TEXT) {
                     detectTapGestures { offset ->
                         val newAnnotation = PdfAnnotation.TextNote(
                             pageIndex = pageIndex,
                             text = "",
                             position = offset,
-                            color = currentColor,
+                            color = latestColor,  // Use latest via rememberUpdatedState
                             fontSize = 24f
                         )
                         onAnnotationAdded(newAnnotation)
@@ -95,7 +117,7 @@ fun PdfAnnotationOverlay(
                 }
             }
     ) {
-        // Draw existing annotations
+        // Draw existing annotations for this page
         annotations.filter { it.pageIndex == pageIndex }.forEach { annotation ->
             when (annotation) {
                 is PdfAnnotation.Path -> {
@@ -126,11 +148,11 @@ fun PdfAnnotationOverlay(
                         )
                     }
                 }
-                is PdfAnnotation.TextNote -> { /* handled by standard compose components outside canvas */ }
+                is PdfAnnotation.TextNote -> { /* handled by MovableTextNote composable */ }
             }
         }
 
-        // Draw path in progress
+        // Draw current in-progress path
         if (isEditMode && currentPathPoints.size >= 2) {
             val path = Path()
             val first = currentPathPoints.first()
@@ -141,9 +163,9 @@ fun PdfAnnotationOverlay(
             }
             drawPath(
                 path = path,
-                color = currentColor,
+                color = strokeColor,  // Use captured stroke color
                 style = Stroke(
-                    width = currentStrokeWidth,
+                    width = strokeWidth,  // Use captured stroke width
                     cap = StrokeCap.Round,
                     join = StrokeJoin.Round
                 ),
@@ -151,8 +173,8 @@ fun PdfAnnotationOverlay(
             )
         } else if (isEditMode && currentPathPoints.size == 1) {
             drawCircle(
-                color = currentColor,
-                radius = currentStrokeWidth / 2,
+                color = strokeColor,
+                radius = strokeWidth / 2,
                 center = currentPathPoints.first(),
                 alpha = if (currentTool == AnnotationTool.HIGHLIGHTER) 0.5f else 1.0f
             )
