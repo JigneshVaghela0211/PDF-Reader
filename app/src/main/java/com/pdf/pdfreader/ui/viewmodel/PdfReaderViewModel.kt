@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -19,6 +20,7 @@ import javax.inject.Inject
 import kotlin.collections.emptyList
 
 import com.pdf.pdfreader.domain.model.PdfAnnotation
+import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.ui.components.AnnotationTool
 import androidx.compose.ui.graphics.Color
 
@@ -39,12 +41,16 @@ data class PdfReaderUiState(
     val currentTool: AnnotationTool = AnnotationTool.PEN,
     val currentColor: Color = Color.Red,
     val currentStrokeWidth: Float = 5f,
-    val annotations: List<PdfAnnotation> = emptyList()
+    val annotations: List<PdfAnnotation> = emptyList(),
+    val isBookmarked: Boolean = false,
+    val bookmarks: List<com.pdf.pdfreader.data.local.BookmarkEntity> = emptyList(),
+    val isNightMode: Boolean = false
 )
 
 @HiltViewModel
 class PdfReaderViewModel @Inject constructor(
-    application: Application
+    application: Application,
+    private val pdfRepository: com.pdf.pdfreader.domain.repository.PdfRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(PdfReaderUiState())
@@ -68,7 +74,15 @@ class PdfReaderViewModel @Inject constructor(
     fun initialize(path: String, password: String? = null) {
         viewModelScope.launch {
             val name = File(path).name
-            _uiState.update { it.copy(filePath = path, fileName = name, isLoading = true, errorMessage = null) }
+            var initialPage = 0
+            try {
+                val existing = pdfRepository.getPdfFiles().first().find { it.path == path }
+                if (existing != null) initialPage = existing.lastOpenedPage
+            } catch (e: Exception) { e.printStackTrace() }
+
+            _uiState.update { it.copy(filePath = path, fileName = name, isLoading = true, errorMessage = null, currentPage = initialPage) }
+            
+            observeBookmarks(path)
             
             withContext(pdfDispatcher) {
                 try {
@@ -125,7 +139,7 @@ class PdfReaderViewModel @Inject constructor(
             val doubleCached = bitmapCache.get(pageIndex)
             if (doubleCached != null) return@withContext doubleCached
             
-            val bitmap = pdfRenderer?.renderPage(pageIndex, width)
+            val bitmap = pdfRenderer?.renderPage(pageIndex, width, uiState.value.isNightMode)
             if (bitmap != null) {
                 bitmapCache.put(pageIndex, bitmap)
             }
@@ -337,11 +351,64 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun updateCurrentPage(page: Int) {
-        _uiState.update { it.copy(currentPage = page) }
+        if (page != _uiState.value.currentPage) {
+            _uiState.update { state -> 
+                state.copy(
+                    currentPage = page,
+                    isBookmarked = state.bookmarks.any { it.pageIndex == page }
+                ) 
+            }
+        }
     }
 
+    private fun observeBookmarks(path: String) {
+        viewModelScope.launch {
+            pdfRepository.getBookmarksForPdf(path).collect { bookmarks ->
+                _uiState.update { state ->
+                    state.copy(
+                        bookmarks = bookmarks,
+                        isBookmarked = bookmarks.any { it.pageIndex == state.currentPage }
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleBookmark() {
+        val path = uiState.value.filePath
+        val page = uiState.value.currentPage
+        if (path.isEmpty()) return
+
+        viewModelScope.launch {
+            if (uiState.value.isBookmarked) {
+                pdfRepository.removeBookmark(path, page)
+            } else {
+                pdfRepository.addBookmark(path, page)
+            }
+        }
+    }
+
+    fun toggleNightMode() {
+        val nextMode = !uiState.value.isNightMode
+        _uiState.update { it.copy(isNightMode = nextMode, isLoading = true) }
+        viewModelScope.launch {
+            bitmapCache.evictAll()
+            _uiState.update { it.copy(isLoading = false, reloadTrigger = it.reloadTrigger + 1) }
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override fun onCleared() {
         super.onCleared()
+        val path = _uiState.value.filePath
+        val page = _uiState.value.currentPage
+        if (path.isNotEmpty() && page >= 0) {
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    pdfRepository.updateLastOpenedPage(path, page)
+                } catch (e: Exception) { e.printStackTrace() }
+            }
+        }
         pdfRenderer?.close()
         bitmapCache.evictAll()
     }

@@ -42,4 +42,16 @@ class RecentViewModel @Inject constructor(
             pdfRepository.updateLastOpened(path, System.currentTimeMillis())
         }
     }
+
+    fun renamePdf(pdf: PdfFile, newName: String) {
+        viewModelScope.launch { pdfRepository.renameFile(pdf.path, newName) }
+    }
+
+    fun duplicatePdf(pdf: PdfFile) {
+        viewModelScope.launch { pdfRepository.duplicateFile(pdf.path) }
+    }
+
+    fun deletePdf(pdf: PdfFile) {
+        viewModelScope.launch { pdfRepository.deleteFileCompletely(pdf.path) }
+    }
 }

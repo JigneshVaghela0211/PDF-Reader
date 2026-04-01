@@ -57,7 +57,7 @@ class PdfPageRenderer(
         }
     }
 
-    fun renderPage(pageIndex: Int, width: Int): Bitmap? {
+    fun renderPage(pageIndex: Int, width: Int, isInverted: Boolean = false): Bitmap? {
         if (pageIndex !in 0 until pageCount) return null
         
         return try {
@@ -68,9 +68,27 @@ class PdfPageRenderer(
                 
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
-                canvas.drawColor(Color.WHITE)
+                canvas.drawColor(if (isInverted) Color.BLACK else Color.WHITE)
                 
-                p.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                if (isInverted) {
+                    val paint = android.graphics.Paint()
+                    val matrix = android.graphics.ColorMatrix(floatArrayOf(
+                        -1f, 0f, 0f, 0f, 255f,
+                        0f, -1f, 0f, 0f, 255f,
+                        0f, 0f, -1f, 0f, 255f,
+                        0f, 0f, 0f, 1f, 0f
+                    ))
+                    paint.colorFilter = android.graphics.ColorMatrixColorFilter(matrix)
+                    
+                    // Render to a temporary bitmap first to apply filter
+                    val tempBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    p.render(tempBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    canvas.drawBitmap(tempBitmap, 0f, 0f, paint)
+                    tempBitmap.recycle()
+                } else {
+                    p.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                }
+                
                 p.close()
                 bitmap
             }

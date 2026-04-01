@@ -58,10 +58,18 @@ fun PdfReaderScreen(
         viewModel.initialize(path)
     }
 
-    LaunchedEffect(uiState.totalPages, initialPageIndex) {
-        if (uiState.totalPages > 0 && initialPageIndex in 0 until uiState.totalPages) {
-            scrollState.scrollToItem(initialPageIndex)
-            viewModel.updateCurrentPage(initialPageIndex)
+    LaunchedEffect(uiState.totalPages) {
+        if (uiState.totalPages > 0) {
+            val targetPage = if (initialPageIndex in 0 until uiState.totalPages) {
+                initialPageIndex
+            } else if (uiState.currentPage in 0 until uiState.totalPages) {
+                uiState.currentPage
+            } else {
+                0
+            }
+            if (targetPage > 0) {
+                scrollState.scrollToItem(targetPage)
+            }
         }
     }
 
@@ -125,6 +133,20 @@ fun PdfReaderScreen(
                         IconButton(onClick = { viewModel.setEditMode(true) }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
                         }
+                        IconButton(onClick = viewModel::toggleNightMode) {
+                            Icon(
+                                imageVector = if (uiState.isNightMode) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Night Mode",
+                                tint = if (uiState.isNightMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = viewModel::toggleBookmark) {
+                            Icon(
+                                imageVector = if (uiState.isBookmarked) Icons.Default.Highlight else Icons.Default.Close, // Placeholder, will fix imports
+                                contentDescription = "Bookmark",
+                                tint = if (uiState.isBookmarked) Color.Red else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         if (uiState.totalPages > 0) {
                             Text(
                                 text = "${((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()}%",
@@ -147,7 +169,7 @@ fun PdfReaderScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.Black),
+                .background(if (uiState.isNightMode) Color.Black else Color(0xFFF5F5F5)),
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
@@ -256,7 +278,7 @@ fun PdfPage(pageIndex: Int, viewModel: PdfReaderViewModel, width: Int, searchQue
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .background(Color.White),
+            .background(if (viewModel.uiState.value.isNightMode) Color.Black else Color.White),
         contentAlignment = Alignment.Center
     ) {
         if (bitmap != null) {

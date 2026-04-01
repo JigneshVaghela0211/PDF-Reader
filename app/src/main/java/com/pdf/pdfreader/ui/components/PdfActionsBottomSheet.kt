@@ -34,6 +34,7 @@ fun PdfActionsBottomSheet(
     pdf: PdfFile,
     thumbnailManager: ThumbnailManager,
     onRename: () -> Unit,
+    onDuplicate: () -> Unit,
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
@@ -120,6 +121,7 @@ fun PdfActionsBottomSheet(
         // --- 2. ACTION GRID ---
         val actions = listOf(
             ActionItem(Icons.Outlined.Edit, "Rename", onRename),
+            ActionItem(Icons.Outlined.ContentCopy, "Duplicate", onDuplicate),
             ActionItem(Icons.Outlined.Share, "Share", onShare),
             ActionItem(
                 if (pdf.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, 
@@ -130,13 +132,13 @@ fun PdfActionsBottomSheet(
             ActionItem(Icons.Outlined.Delete, "Delete", onDelete, MaterialTheme.colorScheme.error)
         )
 
-        Row(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(horizontal = 8.dp)
         ) {
-            actions.forEach { action ->
+            items(actions) { action ->
                 ActionButton(action)
             }
         }

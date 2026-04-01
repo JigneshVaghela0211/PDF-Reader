@@ -16,5 +16,6 @@ data class PdfEntity(
     val isTrashed: Boolean,
     val isFavorite: Boolean = false,
     val lastOpened: Long = 0L,
+    val lastOpenedPage: Int = 0,
     val thumbnailPath: String? = null
 )

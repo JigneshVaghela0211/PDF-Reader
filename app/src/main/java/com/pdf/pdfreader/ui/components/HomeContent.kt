@@ -40,11 +40,14 @@ fun HomeContent(
     onRefresh: () -> Unit,
     onPdfClick: (PdfFile) -> Unit,
     onSearchResultClick: (com.pdf.pdfreader.data.local.SearchResult) -> Unit,
-    onRename: (PdfFile) -> Unit,
+    onRename: (PdfFile, String) -> Unit,
+    onDuplicate: (PdfFile) -> Unit,
     onShare: (PdfFile) -> Unit,
     onFavorite: (PdfFile) -> Unit,
-    onDelete: (PdfFile) -> Unit
+    onDeleteConfirm: (PdfFile) -> Unit
 ) {
+    var showRenameDialog by remember { mutableStateOf<PdfFile?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<PdfFile?>(null) }
     var selectedPdfPath by remember { mutableStateOf<String?>(null) }
     val selectedPdf = remember(selectedPdfPath, files) { 
         files.find { it.path == selectedPdfPath } 
@@ -64,7 +67,11 @@ fun HomeContent(
                 pdf = pdf,
                 thumbnailManager = thumbnailManager,
                 onRename = { 
-                    onRename(pdf)
+                    showRenameDialog = pdf
+                    selectedPdfPath = null
+                },
+                onDuplicate = {
+                    onDuplicate(pdf)
                     selectedPdfPath = null
                 },
                 onShare = { 
@@ -73,7 +80,7 @@ fun HomeContent(
                 },
                 onFavorite = { onFavorite(pdf) },
                 onDelete = { 
-                    onDelete(pdf)
+                    showDeleteDialog = pdf
                     selectedPdfPath = null
                 },
                 onDismiss = { selectedPdfPath = null }
@@ -175,6 +182,53 @@ fun HomeContent(
                 }
             }
         }
+    }
+
+    if (showRenameDialog != null) {
+        val pdf = showRenameDialog!!
+        var newName by remember { mutableStateOf(pdf.name.removeSuffix(".pdf")) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = null },
+            title = { Text("Rename PDF") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true,
+                    label = { Text("New Name") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newName.isNotBlank()) onRename(pdf, newName)
+                    showRenameDialog = null
+                }) { Text("Rename") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = null }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (showDeleteDialog != null) {
+        val pdf = showDeleteDialog!!
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = null },
+            title = { Text("Delete PDF") },
+            text = { Text("Are you sure you want to permanently delete '${pdf.name}'?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteConfirm(pdf)
+                        showDeleteDialog = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = null }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
     }
 }
 

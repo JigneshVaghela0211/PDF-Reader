@@ -158,6 +158,52 @@ class PdfViewModel @Inject constructor(
         }
     }
 
+    fun renamePdf(pdf: PdfFile, newName: String) {
+        viewModelScope.launch {
+            val success = pdfRepository.renameFile(pdf.path, newName)
+            if (success) {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Renamed successfully"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Failed to rename"))
+            }
+        }
+    }
+
+    fun duplicatePdf(pdf: PdfFile) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val success = pdfRepository.duplicateFile(pdf.path)
+            _uiState.update { it.copy(isLoading = false) }
+            if (success) {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Duplicated successfully"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Failed to duplicate"))
+            }
+        }
+    }
+
+    fun deletePdf(pdf: PdfFile) {
+        viewModelScope.launch {
+            val success = pdfRepository.deleteFileCompletely(pdf.path)
+            if (success) {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Deleted successfully"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Failed to delete"))
+            }
+        }
+    }
+
+    fun movePdf(pdf: PdfFile, targetDir: String) {
+        viewModelScope.launch {
+            val success = pdfRepository.moveFile(pdf.path, targetDir)
+            if (success) {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Moved successfully"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowSnackbar("Failed to move"))
+            }
+        }
+    }
+
     fun onPdfClick(pdf: PdfFile, onNavigate: (String) -> Unit) {
         viewModelScope.launch {
             if (File(pdf.path).exists()) {

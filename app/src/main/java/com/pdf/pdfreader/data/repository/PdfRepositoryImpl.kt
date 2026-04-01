@@ -28,6 +28,7 @@ import kotlin.math.pow
 class PdfRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val pdfDao: PdfDao,
+    private val bookmarkDao: com.pdf.pdfreader.data.local.BookmarkDao,
     private val thumbnailManager: ThumbnailManager,
     private val textExtractor: com.pdf.pdfreader.utiles.PdfTextExtractor
 ) : PdfRepository {
@@ -106,8 +107,9 @@ class PdfRepositoryImpl @Inject constructor(
                                 formattedDate = formatDate(date),
                                 isLocked = isLocked,
                                 isTrashed = isTrashed,
-                                isFavorite = dbEntity?.isFavorite ?: false, // Preserve favorite status
-                                lastOpened = dbEntity?.lastOpened ?: 0L,     // Preserve last opened status
+                                isFavorite = dbEntity?.isFavorite ?: false,
+                                lastOpened = dbEntity?.lastOpened ?: 0L,
+                                lastOpenedPage = dbEntity?.lastOpenedPage ?: 0,
                                 thumbnailPath = thumbnailPath
                             )
                         )
@@ -143,8 +145,116 @@ class PdfRepositoryImpl @Inject constructor(
         pdfDao.updateLastOpened(path, timestamp)
     }
 
+    override suspend fun updateLastOpenedPage(path: String, page: Int) {
+        pdfDao.updateLastOpenedPage(path, page)
+    }
+
+    override suspend fun getBookmarksForPdf(path: String): Flow<List<com.pdf.pdfreader.data.local.BookmarkEntity>> {
+        return bookmarkDao.getBookmarksForPdf(path)
+    }
+
+    override suspend fun addBookmark(path: String, pageIndex: Int, label: String?) {
+        bookmarkDao.insertBookmark(com.pdf.pdfreader.data.local.BookmarkEntity(pdfPath = path, pageIndex = pageIndex, label = label))
+    }
+
+    override suspend fun removeBookmark(path: String, pageIndex: Int) {
+        bookmarkDao.deleteBookmark(path, pageIndex)
+    }
+
+    override suspend fun isBookmarked(path: String, pageIndex: Int): Boolean {
+        return bookmarkDao.isBookmarked(path, pageIndex)
+    }
+
     override suspend fun deleteFileByPath(path: String) {
         pdfDao.deleteByPath(path)
+    }
+
+    override suspend fun deleteFileCompletely(path: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            pdfDao.deleteByPath(path)
+            val file = File(path)
+            if (file.exists()) {
+                return@withContext file.delete()
+            }
+            return@withContext true
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        false
+    }
+
+    override suspend fun renameFile(oldPath: String, newName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val oldFile = File(oldPath)
+            if (!oldFile.exists()) return@withContext false
+            val nameWithExt = if (newName.lowercase().endsWith(".pdf")) newName else "$newName.pdf"
+            val newFile = File(oldFile.parent, nameWithExt)
+            if (newFile.exists()) return@withContext false
+            if (oldFile.renameTo(newFile)) {
+                // Keep the same entity but update path and name
+                val existing = pdfDao.getAllPdfsOnce().find { it.path == oldPath }
+                if (existing != null) {
+                    pdfDao.deleteByPath(oldPath)
+                    pdfDao.upsertPdfs(listOf(existing.copy(
+                        path = newFile.absolutePath, 
+                        name = newFile.name,
+                        lastModified = newFile.lastModified()
+                    )))
+                } else {
+                    syncFilesWithStorage()
+                }
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        false
+    }
+
+    override suspend fun duplicateFile(path: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val originalFile = File(path)
+            if (!originalFile.exists()) return@withContext false
+            val nameWithoutExt = originalFile.nameWithoutExtension
+            var newFile = File(originalFile.parent, "${nameWithoutExt}_copy.pdf")
+            var counter = 1
+            while (newFile.exists()) {
+                newFile = File(originalFile.parent, "${nameWithoutExt}_copy_$counter.pdf")
+                counter++
+            }
+            originalFile.copyTo(newFile)
+            syncFilesWithStorage()
+            return@withContext true
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        false
+    }
+
+    override suspend fun moveFile(oldPath: String, targetDir: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val oldFile = File(oldPath)
+            val dir = File(targetDir)
+            if (!oldFile.exists() || !dir.exists() || !dir.isDirectory) return@withContext false
+            val newFile = File(dir, oldFile.name)
+            if (newFile.exists()) return@withContext false
+            if (oldFile.renameTo(newFile)) {
+                val existing = pdfDao.getAllPdfsOnce().find { it.path == oldPath }
+                if (existing != null) {
+                    pdfDao.deleteByPath(oldPath)
+                    pdfDao.upsertPdfs(listOf(existing.copy(
+                        path = newFile.absolutePath,
+                        lastModified = newFile.lastModified()
+                    )))
+                } else {
+                    syncFilesWithStorage()
+                }
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        false
     }
 
     override suspend fun searchPdfText(query: String): List<com.pdf.pdfreader.data.local.SearchResult> {
@@ -163,6 +273,7 @@ class PdfRepositoryImpl @Inject constructor(
         isTrashed = isTrashed,
         isFavorite = isFavorite,
         lastOpened = lastOpened,
+        lastOpenedPage = lastOpenedPage,
         thumbnailPath = thumbnailPath
     )
 

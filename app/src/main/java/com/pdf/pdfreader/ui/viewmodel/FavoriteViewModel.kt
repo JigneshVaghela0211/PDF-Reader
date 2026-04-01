@@ -42,4 +42,16 @@ class FavoriteViewModel @Inject constructor(
             pdfRepository.updateFavorite(pdf.path, !pdf.isFavorite)
         }
     }
+
+    fun renamePdf(pdf: PdfFile, newName: String) {
+        viewModelScope.launch { pdfRepository.renameFile(pdf.path, newName) }
+    }
+
+    fun duplicatePdf(pdf: PdfFile) {
+        viewModelScope.launch { pdfRepository.duplicateFile(pdf.path) }
+    }
+
+    fun deletePdf(pdf: PdfFile) {
+        viewModelScope.launch { pdfRepository.deleteFileCompletely(pdf.path) }
+    }
 }

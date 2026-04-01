@@ -145,10 +145,11 @@ fun HomeScreen(
                 onSearchResultClick = { result ->
                     onNavigateToReaderWithSearch(result.pdfPath, result.pageIndex, uiState.searchQuery)
                 },
-                onRename = { /* TODO: Rename logic */ },
+                onRename = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
+                onDuplicate = { viewModel.duplicatePdf(it) },
                 onShare = { /* TODO: Share logic */ },
                 onFavorite = { viewModel.toggleFavorite(it) },
-                onDelete = { /* TODO: Delete logic */ }
+                onDeleteConfirm = { viewModel.deletePdf(it) }
             )
         }
     }

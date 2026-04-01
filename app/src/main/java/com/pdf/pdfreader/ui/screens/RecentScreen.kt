@@ -44,10 +44,11 @@ fun RecentScreen(
                 onNavigateToReader(it.path) 
             },
             onSearchResultClick = { },
-            onRename = { /* Handle */ },
+            onRename = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
+            onDuplicate = { viewModel.duplicatePdf(it) },
             onShare = { /* Handle */ },
             onFavorite = { /* Handle Favorite */ },
-            onDelete = { /* Handle */ }
+            onDeleteConfirm = { viewModel.deletePdf(it) }
         )
     }
 }

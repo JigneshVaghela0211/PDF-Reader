@@ -42,10 +42,11 @@ fun FavoriteScreen(
             onRefresh = { },
             onPdfClick = { onNavigateToReader(it.path) },
             onSearchResultClick = { },
-            onRename = { /* Handle */ },
+            onRename = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
+            onDuplicate = { viewModel.duplicatePdf(it) },
             onShare = { /* Handle */ },
             onFavorite = { viewModel.toggleFavorite(it) },
-            onDelete = { /* Handle */ }
+            onDeleteConfirm = { viewModel.deletePdf(it) }
         )
     }
 }
