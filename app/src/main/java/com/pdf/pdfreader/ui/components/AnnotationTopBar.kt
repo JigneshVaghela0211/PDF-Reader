@@ -11,7 +11,7 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -71,7 +71,7 @@ fun AnnotationTopBar(
                     }
                     IconButton(onClick = { onToolChange(AnnotationTool.ERASER) }) {
                         Icon(
-                            Icons.Default.Clear,
+                            Icons.Default.CleaningServices,
                             contentDescription = "Eraser",
                             tint = if (currentTool == AnnotationTool.ERASER) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurface
