@@ -7,8 +7,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -232,12 +233,10 @@ fun PdfReaderScreen(
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
-                // Zoom Box wraps the LazyColumn — pinch gestures detected here
-                // before LazyColumn consumes them for scroll
+                // Zoom content — NO gesture handlers here, just visual transform
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .transformable(state = transformableState)
                         .graphicsLayer(
                             scaleX = scale,
                             scaleY = scale,
@@ -257,10 +256,41 @@ fun PdfReaderScreen(
                                 width = screenWidthPx,
                                 pageStates = pageStates,
                                 isScrolling = isScrolling,
-                                reloadTrigger = uiState.reloadTrigger
+                                reloadTrigger = uiState.reloadTrigger,
+                                onDoubleTap = {
+                                    if (scale > 1f) {
+                                        scale = 1f; offsetX = 0f; offsetY = 0f
+                                    } else {
+                                        scale = 2.5f
+                                    }
+                                }
                             )
                         }
                     }
+                }
+
+                // Pan + un-zoom overlay — only visible when zoomed
+                if (scale > 1f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onDoubleTap = {
+                                        scale = 1f; offsetX = 0f; offsetY = 0f
+                                    }
+                                )
+                            }
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    val maxX = (size.width * (scale - 1f)) / 2f
+                                    val maxY = (size.height * (scale - 1f)) / 2f
+                                    offsetX = (offsetX + dragAmount.x).coerceIn(-maxX, maxX)
+                                    offsetY = (offsetY + dragAmount.y).coerceIn(-maxY, maxY)
+                                }
+                            }
+                    )
                 }
             }
 
@@ -453,15 +483,14 @@ fun PdfPage(
     width: Int,
     pageStates: Map<Int, PageRenderState>,
     isScrolling: Boolean = false,
-    reloadTrigger: Int = 0
+    reloadTrigger: Int = 0,
+    onDoubleTap: () -> Unit = {}
 ) {
     val renderState = pageStates[pageIndex]
-    // Use rememberUpdatedState so LaunchedEffect always sees latest value
     val currentIsScrolling by rememberUpdatedState(isScrolling)
 
     // Request render when page becomes visible (or after reload)
     LaunchedEffect(pageIndex, width, reloadTrigger) {
-        // Small delay to let fast scroll settle — but ALWAYS request after
         if (currentIsScrolling) delay(150)
         viewModel.requestPageRender(pageIndex, width)
     }
@@ -484,7 +513,10 @@ fun PdfPage(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .background(if (isNightMode) Color.Black else Color.White),
+            .background(if (isNightMode) Color.Black else Color.White)
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { onDoubleTap() })
+            },
         contentAlignment = Alignment.Center
     ) {
         when (renderState) {
