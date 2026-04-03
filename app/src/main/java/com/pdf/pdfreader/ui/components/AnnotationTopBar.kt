@@ -78,16 +78,6 @@ fun AnnotationTopBar(
                         onColorClick = { showColorPicker = true }
                     )
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    if (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER) {
-                        StrokeWidthDot(
-                            currentStrokeWidth = currentStrokeWidth,
-                            currentColor = currentColor,
-                            showStrokeSlider = showStrokeSlider,
-                            onToggle = { showStrokeSlider = !showStrokeSlider }
-                        )
-                    }
                 }
             },
             navigationIcon = {
@@ -156,30 +146,6 @@ fun ColorSelectionButton(
             contentDescription = "Color Picker",
             tint = if (isLight) Color.Black else Color.White,
             modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-@Composable
-fun StrokeWidthDot(
-    currentStrokeWidth: Float,
-    currentColor: Color,
-    showStrokeSlider: Boolean,
-    onToggle: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(if (showStrokeSlider) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onToggle),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size((currentStrokeWidth.coerceIn(3f, 16f)).dp)
-                .clip(CircleShape)
-                .background(currentColor)
         )
     }
 }
