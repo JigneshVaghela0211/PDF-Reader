@@ -277,7 +277,7 @@ fun PdfReaderScreen(
                 ) {
                     LazyColumn(
                         state = scrollState,
-                        userScrollEnabled = !uiState.isEditMode && scale <= 1f,
+                        userScrollEnabled = (!uiState.isEditMode || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE) && scale <= 1f,
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(uiState.totalPages, key = { it }) { pageIndex ->

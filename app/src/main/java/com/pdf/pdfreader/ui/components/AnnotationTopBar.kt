@@ -45,7 +45,9 @@ fun AnnotationTopBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Tool buttons
-                    IconButton(onClick = { onToolChange(AnnotationTool.PEN) }) {
+                    IconButton(onClick = { 
+                        onToolChange(if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE else AnnotationTool.PEN) 
+                    }) {
                         Icon(
                             Icons.Default.Brush,
                             contentDescription = "Pen",
@@ -53,7 +55,9 @@ fun AnnotationTopBar(
                             else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    IconButton(onClick = { onToolChange(AnnotationTool.HIGHLIGHTER) }) {
+                    IconButton(onClick = { 
+                        onToolChange(if (currentTool == AnnotationTool.HIGHLIGHTER) AnnotationTool.NONE else AnnotationTool.HIGHLIGHTER) 
+                    }) {
                         Icon(
                             Icons.Default.Highlight,
                             contentDescription = "Highlighter",
@@ -61,7 +65,9 @@ fun AnnotationTopBar(
                             else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    IconButton(onClick = { onToolChange(AnnotationTool.TEXT) }) {
+                    IconButton(onClick = { 
+                        onToolChange(if (currentTool == AnnotationTool.TEXT) AnnotationTool.NONE else AnnotationTool.TEXT) 
+                    }) {
                         Icon(
                             Icons.Default.TextFields,
                             contentDescription = "Text Note",
@@ -69,7 +75,9 @@ fun AnnotationTopBar(
                             else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    IconButton(onClick = { onToolChange(AnnotationTool.ERASER) }) {
+                    IconButton(onClick = { 
+                        onToolChange(if (currentTool == AnnotationTool.ERASER) AnnotationTool.NONE else AnnotationTool.ERASER) 
+                    }) {
                         Icon(
                             Icons.Default.CleaningServices,
                             contentDescription = "Eraser",

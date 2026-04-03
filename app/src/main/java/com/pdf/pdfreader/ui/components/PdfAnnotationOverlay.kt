@@ -16,7 +16,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import com.pdf.pdfreader.domain.model.PdfAnnotation
 
 enum class AnnotationTool {
-    PEN, HIGHLIGHTER, ERASER, TEXT
+    NONE, PEN, HIGHLIGHTER, ERASER, TEXT
 }
 
 /**
