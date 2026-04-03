@@ -84,7 +84,7 @@ class PdfReaderViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "PdfReaderVM"
-        private const val MAX_CACHE_SIZE_KB = 15 * 1024
+        private val MAX_CACHE_SIZE_KB = (Runtime.getRuntime().maxMemory() / 1024 / 4).toInt().coerceAtLeast(80 * 1024)
         private const val MAX_RETRY_BEFORE_REINIT = 2
         private const val ZOOM_RERENDER_THRESHOLD = 1.5f
     }
@@ -106,7 +106,17 @@ class PdfReaderViewModel @Inject constructor(
     private val bitmapCache = object : LruCache<String, Bitmap>(MAX_CACHE_SIZE_KB) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount / 1024
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
-            if (evicted && !oldValue.isRecycled) oldValue.recycle()
+            if (evicted && !oldValue.isRecycled) {
+                // Check if the bitmap is still in use by any page state.
+                // If yes, do not recycle it to avoid crash/infinite refresh loops.
+                // It will be garbage collected or recycled when removed from _pageStates.
+                val isInUse = _pageStates.value.values.any { 
+                    it is PageRenderState.Success && it.bitmap === oldValue 
+                }
+                if (!isInUse) {
+                    oldValue.recycle()
+                }
+            }
         }
     }
 
@@ -330,11 +340,31 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun cancelRenderingOutsideRange(visibleRange: IntRange) {
-        activeRenderJobs.forEach { (pageIndex, job) ->
+        activeRenderJobs.entries.removeAll { (pageIndex, job) ->
             if (pageIndex !in visibleRange) {
                 job.cancel()
-                activeRenderJobs.remove(pageIndex)
+                true
+            } else {
+                false
             }
+        }
+        
+        // Also prune pageStates so we don't hold references to Bitmaps forever.
+        _pageStates.update { currentStates ->
+            val keysToRemove = currentStates.keys.filter { it !in visibleRange }
+            if (keysToRemove.isEmpty()) return@update currentStates
+            val newStates = currentStates.toMutableMap()
+            for (k in keysToRemove) {
+                val state = newStates.remove(k)
+                if (state is PageRenderState.Success) {
+                    // Free the bitmap if it is no longer in cache
+                    val cacheKeys = listOf("${k}_${state.renderedWidth}", "${k}_${state.renderedWidth}x")
+                    if (!cacheKeys.any { key -> bitmapCache.get(key) === state.bitmap } && !state.bitmap.isRecycled) {
+                        try { state.bitmap.recycle() } catch (e: Exception) { e.printStackTrace() }
+                    }
+                }
+            }
+            newStates
         }
     }
 

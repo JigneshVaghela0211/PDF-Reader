@@ -129,7 +129,7 @@ fun PdfReaderScreen(
     LaunchedEffect(scrollState.firstVisibleItemIndex) {
         val firstVisible = scrollState.firstVisibleItemIndex
         val lastVisible = scrollState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: firstVisible
-        val safeRange = (firstVisible - 3).coerceAtLeast(0)..(lastVisible + 3).coerceAtMost(uiState.totalPages - 1)
+        val safeRange = (firstVisible - 2).coerceAtLeast(0)..(lastVisible + 2).coerceAtMost(uiState.totalPages - 1)
         viewModel.cancelRenderingOutsideRange(safeRange)
         viewModel.updateCurrentPage(firstVisible)
     }
