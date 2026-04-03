@@ -36,6 +36,11 @@ fun AnnotationTopBar(
 ) {
     var showStrokeSlider by remember { mutableStateOf(false) }
 
+    // Auto-show thickness slider when Pen or Highlighter is selected
+    LaunchedEffect(currentTool) {
+        showStrokeSlider = currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER
+    }
+
     Column {
         TopAppBar(
             title = {
