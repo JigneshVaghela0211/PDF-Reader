@@ -125,9 +125,20 @@ fun PdfReaderScreen(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
-    // Track scroll state
     val isScrolling by remember {
         derivedStateOf { scrollState.isScrollInProgress }
+    }
+
+    var isSliderVisible by remember { mutableStateOf(false) }
+    var sliderInteractionTime by remember { mutableLongStateOf(0L) }
+
+    // Auto-hide slider logic
+    LaunchedEffect(isScrolling, sliderInteractionTime) {
+        isSliderVisible = true
+        if (!isScrolling) {
+            delay(2500)
+            isSliderVisible = false
+        }
     }
 
     // Update current page and cancel far-off renders
@@ -316,34 +327,41 @@ fun PdfReaderScreen(
 
             // Page slider
             if (uiState.totalPages > 1) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                            RoundedCornerShape(24.dp)
-                        )
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                AnimatedVisibility(
+                    visible = isSliderVisible,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
                 ) {
-                    Slider(
-                        value = uiState.currentPage.toFloat(),
-                        onValueChange = { page ->
-                            viewModel.updateCurrentPage(page.toInt())
-                            coroutineScope.launch {
-                                scrollState.scrollToItem(page.toInt())
-                            }
-                        },
-                        valueRange = 0f..(uiState.totalPages - 1).coerceAtLeast(1).toFloat(),
-                        steps = if (uiState.totalPages > 2) uiState.totalPages - 2 else 0,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
+                    ) {
+                        Slider(
+                            value = uiState.currentPage.toFloat(),
+                            onValueChange = { page ->
+                                sliderInteractionTime = System.currentTimeMillis()
+                                viewModel.updateCurrentPage(page.toInt())
+                                coroutineScope.launch {
+                                    scrollState.scrollToItem(page.toInt())
+                                }
+                            },
+                            valueRange = 0f..(uiState.totalPages - 1).coerceAtLeast(1).toFloat(),
+                            steps = if (uiState.totalPages > 2) uiState.totalPages - 2 else 0,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
                         )
-                    )
+                    }
                 }
             }
 
