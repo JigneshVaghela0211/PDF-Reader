@@ -4,13 +4,16 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -18,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import com.pdf.pdfreader.BuildConfig
 import com.pdf.pdfreader.ui.components.*
 import com.pdf.pdfreader.ui.viewmodel.PdfViewModel
@@ -41,6 +45,7 @@ fun HomeScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
         viewModel.eventFlow.collect { event ->
@@ -95,62 +100,79 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             HomeTopAppBar(
-                isSearchExpanded = isSearchExpanded,
-                searchQuery = uiState.searchQuery,
-                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-                onSearchToggle = { isSearchExpanded = it },
-                onFilterClick = { showFilterSheet = true },
-                onSettingsClick = onNavigateToSettings,
-                scrollBehavior = scrollBehavior
+                onMenuClick = onNavigateToSettings,
+                onProfileClick = onNavigateToSettings
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { /* TODO: Create PDF logic */ },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp),
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Create PDF") }
-            )
+            FloatingActionButton(
+                onClick = { 
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Create PDF feature coming soon!")
+                    }
+                },
+                containerColor = Color.Transparent, 
+                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp),
+                modifier = Modifier.padding(bottom = 80.dp) // Offset above bottom navbar
+            ) {
+                Box(modifier = Modifier
+                    .size(64.dp)
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(Color(0xFF004591), Color(0xFF005CBD))
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create PDF", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
         }
     ) { padding ->
-        if (!hasPermission) {
-            PermissionDeniedContent(
-                modifier = Modifier.padding(padding),
-                onGrantClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                        intent.data = Uri.parse("package:${BuildConfig.APPLICATION_ID}")
-                        context.startActivity(intent)
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (!hasPermission) {
+                PermissionDeniedContent(
+                    modifier = Modifier,
+                    onGrantClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                            intent.data = Uri.parse("package:${BuildConfig.APPLICATION_ID}")
+                            context.startActivity(intent)
+                        }
                     }
-                }
-            )
-        } else {
-            HomeContent(
-                paddingValues = padding,
-                isLoading = uiState.isLoading,
-                isRefreshing = uiState.isRefreshing,
-                files = uiState.filteredFiles,
-                searchResults = uiState.searchResults,
-                viewMode = uiState.viewMode,
-                isSearching = uiState.searchQuery.isNotEmpty(),
-                thumbnailManager = viewModel.thumbnailManager,
-                onRefresh = { viewModel.loadPdfFiles(false) },
-                onPdfClick = { viewModel.onPdfClick(it, onNavigateToReader) },
-                onSearchResultClick = { result ->
-                    onNavigateToReaderWithSearch(result.pdfPath, result.pageIndex, uiState.searchQuery)
-                },
-                onRename = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
-                onDuplicate = { viewModel.duplicatePdf(it) },
-                onShare = { /* TODO: Share logic */ },
-                onFavorite = { viewModel.toggleFavorite(it) },
-                onDeleteConfirm = { viewModel.deletePdf(it) }
-            )
+                )
+            } else {
+                HomeContent(
+                    paddingValues = PaddingValues(0.dp), // Padding already handled by Box.padding(padding)
+                    isLoading = uiState.isLoading,
+                    isRefreshing = uiState.isRefreshing,
+                    files = uiState.filteredFiles,
+                    searchResults = uiState.searchResults,
+                    searchQuery = uiState.searchQuery,
+                    activeTab = uiState.activeTab,
+                    viewMode = uiState.viewMode,
+                    isSearching = uiState.searchQuery.isNotEmpty(),
+                    thumbnailManager = viewModel.thumbnailManager,
+                    onSearchQueryChange = viewModel::onSearchQueryChange,
+                    onTabSelected = viewModel::onTabSelected,
+                    onFilterClick = { showFilterSheet = true },
+                    onRefresh = { viewModel.loadPdfFiles(false) },
+                    onPdfClick = { viewModel.onPdfClick(it, onNavigateToReader) },
+                    onSearchResultClick = { result ->
+                        onNavigateToReaderWithSearch(result.pdfPath, result.pageIndex, uiState.searchQuery)
+                    },
+                    onRename = { pdf, newName -> viewModel.renamePdf(pdf, newName) },
+                    onDuplicate = { viewModel.duplicatePdf(it) },
+                    onShare = { /* TODO: Share logic */ },
+                    onFavorite = { viewModel.toggleFavorite(it) },
+                    onDeleteConfirm = { viewModel.deletePdf(it) }
+                )
+            }
         }
     }
 }

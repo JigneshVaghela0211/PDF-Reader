@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,12 +57,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.R
-import com.pdf.pdfreader.ui.components.AnnotationTopBar
+import com.pdf.pdfreader.ui.components.AnnotationBottomRail
 import com.pdf.pdfreader.ui.components.PdfAnnotationOverlay
 import com.pdf.pdfreader.ui.viewmodel.PageRenderState
 import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
@@ -134,10 +137,21 @@ fun PdfReaderScreen(
 
     // Auto-hide slider logic
     LaunchedEffect(isScrolling, sliderInteractionTime) {
-        isSliderVisible = true
-        if (!isScrolling) {
+        if (isScrolling || sliderInteractionTime > 0) {
+            isSliderVisible = true
             delay(2500)
             isSliderVisible = false
+        }
+    }
+
+    // Handle Scroll Events (Search navigation, Bookmarks, etc)
+    LaunchedEffect(viewModel.scrollEvents) {
+        viewModel.scrollEvents.collect { event ->
+            when (event) {
+                is ScrollEvent.ScrollToPage -> {
+                    scrollState.animateScrollToItem(event.pageIndex)
+                }
+            }
         }
     }
 
@@ -150,121 +164,21 @@ fun PdfReaderScreen(
         viewModel.updateCurrentPage(firstVisible)
     }
 
-    Scaffold(
-        topBar = {
-            var showMenu by remember { mutableStateOf(false) }
-            when {
-                uiState.isEditMode -> {
-                    AnnotationTopBar(
-                        currentTool = uiState.currentTool,
-                        currentColor = uiState.currentColor,
-                        currentStrokeWidth = uiState.currentStrokeWidth,
-                        onToolChange = viewModel::setAnnotationTool,
-                        onColorChange = viewModel::setAnnotationColor,
-                        onStrokeWidthChange = viewModel::setAnnotationStrokeWidth,
-                        onClose = { viewModel.setEditMode(false) },
-                        onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) }
-                    )
-                }
-                uiState.isSearchActive -> {
-                    SearchTopBar(
-                        query = uiState.searchQuery,
-                        matchCount = uiState.totalMatchCount,
-                        currentMatch = uiState.currentMatchIndex,
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onNext = viewModel::navigateToNextMatch,
-                        onPrevious = viewModel::navigateToPreviousMatch,
-                        onClose = viewModel::toggleSearch
-                    )
-                }
-                else -> {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    text = uiState.fileName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                                if (uiState.totalPages > 0) {
-                                    val percent = ((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()
-                                    Text(
-                                        text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}  •  $percent%",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.go_back))
-                            }
-                        },
-                        actions = {
-                            // Search button
-                            IconButton(onClick = viewModel::toggleSearch) {
-                                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
-                            }
-                            // Bookmark button
-                            IconButton(onClick = viewModel::toggleBookmark) {
-                                Icon(
-                                    imageVector = if (uiState.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = "Bookmark",
-                                    tint = if (uiState.isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            // Overflow menu
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                            }
-                            
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Edit / Annotate") },
-                                    onClick = { 
-                                        showMenu = false
-                                        viewModel.setEditMode(true) 
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (uiState.isNightMode) "Light Mode" else "Night Mode") },
-                                    onClick = { 
-                                        showMenu = false
-                                        viewModel.toggleNightMode() 
-                                    },
-                                    leadingIcon = { 
-                                        Icon(
-                                            imageVector = if (uiState.isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode, 
-                                            contentDescription = null
-                                        ) 
-                                    }
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (uiState.isNightMode) Color.Black else MaterialTheme.colorScheme.surface)
+    ) {
+        val topBarHeight = 100.dp
+        
+        // --- 1. PDF CONTENT LAYER ---
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .background(if (uiState.isNightMode) Color.Black else Color(0xFFF5F5F5)),
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
-                // Zoom content — NO gesture handlers here, just visual transform
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -278,7 +192,8 @@ fun PdfReaderScreen(
                     LazyColumn(
                         state = scrollState,
                         userScrollEnabled = (!uiState.isEditMode || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE) && scale <= 1f,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = topBarHeight, bottom = 120.dp)
                     ) {
                         items(uiState.totalPages, key = { it }) { pageIndex ->
                             PdfPage(
@@ -300,17 +215,13 @@ fun PdfReaderScreen(
                     }
                 }
 
-                // Pan + un-zoom overlay — only visible when zoomed
+                // Pan + un-zoom overlay
                 if (scale > 1f) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        scale = 1f; offsetX = 0f; offsetY = 0f
-                                    }
-                                )
+                                detectTapGestures(onDoubleTap = { scale = 1f; offsetX = 0f; offsetY = 0f })
                             }
                             .pointerInput(Unit) {
                                 detectDragGestures { change, dragAmount ->
@@ -325,6 +236,70 @@ fun PdfReaderScreen(
                 }
             }
 
+            // --- 2. FLOATING OVERLAYS ---
+            
+            // Top App Bar Overlay
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+            ) {
+                var showMenu by remember { mutableStateOf(false) }
+                when {
+                    uiState.isSearchActive -> {
+                        SearchTopBar(
+                            query = uiState.searchQuery,
+                            matchCount = uiState.totalMatchCount,
+                            currentMatch = uiState.currentMatchIndex,
+                            onQueryChange = viewModel::updateSearchQuery,
+                            onNext = viewModel::navigateToNextMatch,
+                            onPrevious = viewModel::navigateToPreviousMatch,
+                            onClose = viewModel::toggleSearch
+                        )
+                    }
+                    else -> {
+                        ReaderTopAppBar(
+                            title = uiState.fileName,
+                            pageInfo = if (uiState.totalPages > 0) "${uiState.currentPage + 1} / ${uiState.totalPages}" else "",
+                            isEditMode = uiState.isEditMode,
+                            isBookmarked = uiState.isBookmarked,
+                            onBack = onNavigateBack,
+                            onSearch = viewModel::toggleSearch,
+                            onBookmark = viewModel::toggleBookmark,
+                            onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) },
+                            onEditSessionToggle = { viewModel.setEditMode(!uiState.isEditMode) },
+                            onMoreClick = { showMenu = true }
+                        )
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.padding(end = 16.dp)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(if (uiState.isNightMode) "Light Mode" else "Night Mode") },
+                                onClick = { showMenu = false; viewModel.toggleNightMode() },
+                                leadingIcon = { Icon(if (uiState.isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode, null) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Annotation Tools (Floating)
+            if (uiState.isEditMode) {
+                AnnotationBottomRail(
+                    currentTool = uiState.currentTool,
+                    currentColor = uiState.currentColor,
+                    currentStrokeWidth = uiState.currentStrokeWidth,
+                    onToolChange = viewModel::setAnnotationTool,
+                    onColorChange = viewModel::setAnnotationColor,
+                    onStrokeWidthChange = viewModel::setAnnotationStrokeWidth,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+
+
             // Page slider
             if (uiState.totalPages > 1) {
                 AnimatedVisibility(
@@ -335,13 +310,14 @@ fun PdfReaderScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
-                            .fillMaxWidth()
+                            .padding(bottom = 40.dp, start = 32.dp, end = 32.dp)
+                            .widthIn(max = 400.dp)
                             .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                RoundedCornerShape(24.dp)
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                CircleShape
                             )
-                            .padding(horizontal = 20.dp, vertical = 8.dp)
+                            .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                            .padding(horizontal = 24.dp, vertical = 6.dp)
                     ) {
                         Slider(
                             value = uiState.currentPage.toFloat(),
@@ -358,7 +334,7 @@ fun PdfReaderScreen(
                             colors = SliderDefaults.colors(
                                 thumbColor = MaterialTheme.colorScheme.primary,
                                 activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                             )
                         )
                     }
@@ -654,20 +630,24 @@ private fun PagePlaceholder(isLoading: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f / 1.414f)
-            .background(Color.White),
+            .background(if (MaterialTheme.colorScheme.surface == Color.Black) Color.DarkGray.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainerLow),
         contentAlignment = Alignment.Center
     ) {
         if (isLoading) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(32.dp),
-                    strokeWidth = 3.dp
+                    modifier = Modifier.size(36.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = stringResource(R.string.rendering),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    text = "CURATING...", // Themed loading text
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                 )
             }
         }
@@ -722,7 +702,94 @@ private fun PageErrorView(
     }
 }
 
-// ─── Password Dialog ────────────────────────────────────────────
+// ─── Reader Top App Bar ────────────────────────────────────────
+
+@Composable
+fun ReaderTopAppBar(
+    title: String,
+    pageInfo: String,
+    isEditMode: Boolean,
+    isBookmarked: Boolean,
+    onBack: () -> Unit,
+    onSearch: () -> Unit,
+    onBookmark: () -> Unit,
+    onSave: () -> Unit,
+    onEditSessionToggle: () -> Unit,
+    onMoreClick: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+            .statusBarsPadding()
+            .clip(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.primary)
+                }
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                Column {
+                    Text(
+                        text = if (isEditMode) "EDITOR" else "CURATOR",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = if (isEditMode) "Annotation Mode" else title,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 140.dp)
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isEditMode) {
+                    IconButton(onClick = onSave) {
+                        Icon(Icons.Default.Save, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onEditSessionToggle) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onBookmark) {
+                        Icon(
+                            if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onEditSessionToggle) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onMoreClick) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun PasswordPromptDialog(

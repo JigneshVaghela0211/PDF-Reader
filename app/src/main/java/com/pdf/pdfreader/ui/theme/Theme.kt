@@ -18,33 +18,37 @@ import androidx.core.view.WindowCompat
 import com.pdf.pdfreader.data.local.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF897D), // Lighter red for dark mode
-    secondary = PurpleGrey80,
+    primary = LumenDarkPrimary,
+    primaryContainer = LumenDarkPrimaryContainer,
+    onPrimaryContainer = LumenDarkOnPrimaryContainer,
+    secondary = LumenDarkSecondary,
     tertiary = Pink80,
-    background = Color(0xFF0F0F0F),
-    surface = Color(0xFF1A1A1A),
-    onBackground = Color(0xFFE3E3E3),
-    onSurface = Color(0xFFE3E3E3),
-    surfaceVariant = Color(0xFF2B2B2B),
-    onSurfaceVariant = Color(0xFFC7C7C7)
+    background = LumenDarkBackground,
+    surface = LumenDarkSurface,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    surfaceVariant = LumenDarkSurfaceVariant,
+    onSurfaceVariant = Color.LightGray
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PDFRed,
-    secondary = PurpleGrey40,
+    primary = LumenPrimary,
+    primaryContainer = LumenPrimaryContainer,
+    onPrimaryContainer = LumenOnPrimaryContainer,
+    secondary = LumenSecondary,
     tertiary = Pink40,
-    background = BackgroundColor,
-    surface = SurfaceColor,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    surfaceVariant = Color(0xFFF0F0F0),
-    onSurfaceVariant = Color(0xFF49454F)
+    background = LumenBackground,
+    surface = LumenSurface,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    surfaceVariant = LumenSurfaceVariant,
+    onSurfaceVariant = Color.DarkGray
 )
 
 @Composable
 fun PDFReaderTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Disabled to enforce Lumen branding
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (appTheme) {

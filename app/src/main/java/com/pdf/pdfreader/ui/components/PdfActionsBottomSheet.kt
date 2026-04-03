@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,78 +46,89 @@ fun PdfActionsBottomSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 24.dp)
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        // --- 1. FILE PREVIEW ROW (HEADER) ---
-        Row(
+        // --- 1. FILE PREVIEW ROW (HEADER) with tonal background ---
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(bottom = 8.dp)
         ) {
-            // Left: Thumbnail
-            Surface(
-                modifier = Modifier.size(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                PdfThumbnail(
-                    pdf = pdf,
-                    thumbnailManager = thumbnailManager,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Center: File Info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = pdf.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = pdf.formattedDate,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Left: Thumbnail
+                Surface(
+                    modifier = Modifier.size(64.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shadowElevation = 0.dp
+                ) {
+                    PdfThumbnail(
+                        pdf = pdf,
+                        thumbnailManager = thumbnailManager,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp)
-                            .size(3.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
+                }
+
+                Spacer(modifier = Modifier.width(20.dp))
+
+                // Center: File Info
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = pdf.formattedSize,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = pdf.name,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = pdf.formattedDate,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .size(3.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                        )
+                        Text(
+                            text = pdf.formattedSize,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Right: Info Icon
+                IconButton(
+                    onClick = { showInfoDialog = true },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "File Info",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
-
-            // Right: Info Icon
-            IconButton(onClick = { showInfoDialog = true }) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "File Info",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
         }
 
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // --- 2. ACTION GRID ---
         val actions = listOf(
@@ -136,7 +148,8 @@ fun PdfActionsBottomSheet(
             columns = GridCells.Fixed(5),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(actions) { action ->
                 ActionButton(action)
@@ -157,24 +170,32 @@ fun PdfActionsBottomSheet(
 fun ActionButton(action: ActionItem) {
     Column(
         modifier = Modifier
-            .width(80.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { action.onClick() }
             .padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = action.icon,
-            contentDescription = action.label,
-            tint = action.tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(26.dp)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(action.tint?.copy(alpha = 0.1f) ?: MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = action.icon,
+                contentDescription = action.label,
+                tint = action.tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = action.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            textAlign = TextAlign.Center
         )
     }
 }

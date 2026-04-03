@@ -32,6 +32,7 @@ data class PdfUiState(
     val filteredFiles: List<PdfFile> = emptyList(),
     val searchResults: List<com.pdf.pdfreader.data.local.SearchResult> = emptyList(),
     val searchQuery: String = "",
+    val activeTab: String = "Home",
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
@@ -66,10 +67,19 @@ class PdfViewModel @Inject constructor(
                     _uiState.update { state -> 
                         state.copy(
                             pdfFiles = files,
-                            filteredFiles = processFiles(files, state.searchQuery, state.sortType, state.sortOrder)
+                            filteredFiles = processFiles(files, state.searchQuery, state.activeTab, state.sortType, state.sortOrder)
                         ) 
                     }
                 }
+        }
+    }
+
+    fun onTabSelected(tab: String) {
+        _uiState.update { state ->
+            state.copy(
+                activeTab = tab,
+                filteredFiles = processFiles(state.pdfFiles, state.searchQuery, tab, state.sortType, state.sortOrder)
+            )
         }
     }
 
@@ -77,7 +87,7 @@ class PdfViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 searchQuery = query,
-                filteredFiles = processFiles(state.pdfFiles, query, state.sortType, state.sortOrder)
+                filteredFiles = processFiles(state.pdfFiles, query, state.activeTab, state.sortType, state.sortOrder)
             )
         }
         
@@ -100,7 +110,7 @@ class PdfViewModel @Inject constructor(
             state.copy(
                 sortType = sortType,
                 sortOrder = sortOrder,
-                filteredFiles = processFiles(state.pdfFiles, state.searchQuery, sortType, sortOrder)
+                filteredFiles = processFiles(state.pdfFiles, state.searchQuery, state.activeTab, sortType, sortOrder)
             )
         }
     }
@@ -112,13 +122,21 @@ class PdfViewModel @Inject constructor(
     private fun processFiles(
         files: List<PdfFile>, 
         query: String, 
+        activeTab: String,
         sortType: SortType, 
         sortOrder: SortOrder
     ): List<PdfFile> {
-        val filtered = if (query.isEmpty()) {
+        var filtered = if (query.isEmpty()) {
             files
         } else {
             files.filter { it.name.contains(query, ignoreCase = true) }
+        }
+
+        // Apply Tab Filter
+        filtered = when (activeTab) {
+            "Recent" -> filtered.sortedByDescending { it.lastModified }.take(20)
+            "Favorites" -> filtered.filter { it.isFavorite }
+            else -> filtered // "Home" or others
         }
 
         return when (sortType) {

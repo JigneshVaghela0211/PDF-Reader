@@ -35,9 +35,14 @@ fun RecentScreen(
             isRefreshing = false,
             files = uiState.recentFiles,
             searchResults = emptyList(),
+            searchQuery = "",
             viewMode = ViewMode.LIST,
             isSearching = false,
+            activeTab = "Recent",
             thumbnailManager = viewModel.thumbnailManager,
+            onSearchQueryChange = {},
+            onTabSelected = {},
+            onFilterClick = {},
             onRefresh = { },
             onPdfClick = { 
                 viewModel.markAsOpened(it.path)
