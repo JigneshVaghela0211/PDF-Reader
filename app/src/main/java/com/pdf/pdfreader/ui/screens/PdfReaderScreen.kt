@@ -26,6 +26,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -136,6 +141,7 @@ fun PdfReaderScreen(
 
     Scaffold(
         topBar = {
+            var showMenu by remember { mutableStateOf(false) }
             when {
                 uiState.isEditMode -> {
                     AnnotationTopBar(
@@ -171,8 +177,9 @@ fun PdfReaderScreen(
                                     maxLines = 1
                                 )
                                 if (uiState.totalPages > 0) {
+                                    val percent = ((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()
                                     Text(
-                                        text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}",
+                                        text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}  •  $percent%",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -189,30 +196,43 @@ fun PdfReaderScreen(
                             IconButton(onClick = viewModel::toggleSearch) {
                                 Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
                             }
-                            IconButton(onClick = { viewModel.setEditMode(true) }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit")
-                            }
-                            IconButton(onClick = viewModel::toggleNightMode) {
-                                Icon(
-                                    imageVector = if (uiState.isNightMode) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Night Mode",
-                                    tint = if (uiState.isNightMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            // Bookmark button
                             IconButton(onClick = viewModel::toggleBookmark) {
                                 Icon(
-                                    imageVector = if (uiState.isBookmarked) Icons.Default.Highlight else Icons.Default.Close,
+                                    imageVector = if (uiState.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     contentDescription = "Bookmark",
-                                    tint = if (uiState.isBookmarked) Color.Red else MaterialTheme.colorScheme.onSurface
+                                    tint = if (uiState.isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            if (uiState.totalPages > 0) {
-                                Text(
-                                    text = "${((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()}%",
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                            // Overflow menu
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            }
+                            
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Edit / Annotate") },
+                                    onClick = { 
+                                        showMenu = false
+                                        viewModel.setEditMode(true) 
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (uiState.isNightMode) "Light Mode" else "Night Mode") },
+                                    onClick = { 
+                                        showMenu = false
+                                        viewModel.toggleNightMode() 
+                                    },
+                                    leadingIcon = { 
+                                        Icon(
+                                            imageVector = if (uiState.isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode, 
+                                            contentDescription = null
+                                        ) 
+                                    }
                                 )
                             }
                         },
