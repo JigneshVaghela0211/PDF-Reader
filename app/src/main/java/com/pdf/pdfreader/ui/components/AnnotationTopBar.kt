@@ -42,13 +42,11 @@ fun AnnotationTopBar(
     var showStrokeSlider by remember { mutableStateOf(false) }
 
     var showColorPicker by remember { mutableStateOf(false) }
-    var customColor by remember { mutableStateOf(Color(0xFF9C27B0)) } // Default custom is purple
 
     if (showColorPicker) {
-        CustomColorPickerDialog(
+        ColorSelectionDialog(
             initialColor = currentColor,
             onColorSelected = { 
-                customColor = it
                 onColorChange(it) 
             },
             onDismiss = { showColorPicker = false }
@@ -75,11 +73,9 @@ fun AnnotationTopBar(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    ColorPaletteMenu(
+                    ColorSelectionButton(
                         currentColor = currentColor,
-                        customColor = customColor,
-                        onColorChange = onColorChange,
-                        onCustomColorClick = { showColorPicker = true }
+                        onColorClick = { showColorPicker = true }
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -141,45 +137,26 @@ fun AnnotationToolButtons(
 }
 
 @Composable
-fun ColorPaletteMenu(
+fun ColorSelectionButton(
     currentColor: Color,
-    customColor: Color,
-    onColorChange: (Color) -> Unit,
-    onCustomColorClick: () -> Unit
+    onColorClick: () -> Unit
 ) {
-    val predefinedColors = listOf(Color.Red, Color.Blue, Color.Green, Color.Black, Color.Yellow)
-    predefinedColors.forEach { color ->
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .padding(2.dp)
-                .clip(CircleShape)
-                .background(color)
-                .then(
-                    if (color == currentColor) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    else Modifier.border(0.5.dp, Color.Gray.copy(alpha = 0.3f), CircleShape)
-                )
-                .clickable { onColorChange(color) }
-        )
-    }
-    
-    val isCustomSelected = currentColor !in predefinedColors
+    val isLight = (currentColor.red + currentColor.green + currentColor.blue) > 2f
     Box(
         modifier = Modifier
-            .size(28.dp)
-            .padding(2.dp)
+            .size(32.dp)
             .clip(CircleShape)
-            .background(customColor)
-            .then(
-                if (isCustomSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                else Modifier.border(0.5.dp, Color.Gray.copy(alpha = 0.3f), CircleShape)
-            )
-            .clickable {
-                if (isCustomSelected) onCustomColorClick() else onColorChange(customColor)
-            },
+            .background(currentColor)
+            .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+            .clickable(onClick = onColorClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Default.Palette, contentDescription = "Custom Color", tint = Color.White, modifier = Modifier.size(16.dp))
+        Icon(
+            Icons.Default.Palette,
+            contentDescription = "Color Picker",
+            tint = if (isLight) Color.Black else Color.White,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -249,51 +226,3 @@ fun StrokeWidthSliderExpandable(
     }
 }
 
-@Composable
-fun CustomColorPickerDialog(
-    initialColor: Color,
-    onColorSelected: (Color) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var red by remember { mutableFloatStateOf(initialColor.red) }
-    var green by remember { mutableFloatStateOf(initialColor.green) }
-    var blue by remember { mutableFloatStateOf(initialColor.blue) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Custom Color") },
-        text = {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .background(Color(red, green, blue), RoundedCornerShape(8.dp))
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text("Red", color = Color.Red, style = MaterialTheme.typography.labelMedium)
-                Slider(value = red, onValueChange = { red = it }, colors = SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red))
-                
-                Text("Green", color = Color(0xFF4CAF50), style = MaterialTheme.typography.labelMedium)
-                Slider(value = green, onValueChange = { green = it }, colors = SliderDefaults.colors(thumbColor = Color(0xFF4CAF50), activeTrackColor = Color(0xFF4CAF50)))
-                
-                Text("Blue", color = Color.Blue, style = MaterialTheme.typography.labelMedium)
-                Slider(value = blue, onValueChange = { blue = it }, colors = SliderDefaults.colors(thumbColor = Color.Blue, activeTrackColor = Color.Blue))
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { 
-                onColorSelected(Color(red, green, blue))
-                onDismiss()
-            }) {
-                Text("Select")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
