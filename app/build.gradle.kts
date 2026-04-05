@@ -97,6 +97,9 @@ dependencies {
     // PDFBox-Android for text extraction
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
+    // Gson for JSON serialization
+    implementation(libs.gson)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 

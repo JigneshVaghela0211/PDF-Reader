@@ -4,11 +4,16 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.util.Log
 import android.util.LruCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdf.pdfreader.data.local.CommandSerializer
+import com.pdf.pdfreader.domain.model.AnnotationCommand
 import com.pdf.pdfreader.domain.model.PdfAnnotation
+import com.pdf.pdfreader.domain.model.SerializableOffset
+import com.pdf.pdfreader.domain.usecase.UndoRedoManager
 import com.pdf.pdfreader.ui.components.AnnotationTool
 import com.pdf.pdfreader.utiles.PdfPageRenderer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -69,7 +74,10 @@ data class PdfReaderUiState(
     val searchQuery: String = "",
     val searchResults: List<SearchMatch> = emptyList(),
     val currentMatchIndex: Int = -1,
-    val totalMatchCount: Int = 0
+    val totalMatchCount: Int = 0,
+    // ─── Undo/Redo State ────────────────────────────────────
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false
 )
 
 sealed class ScrollEvent {
@@ -79,7 +87,8 @@ sealed class ScrollEvent {
 @HiltViewModel
 class PdfReaderViewModel @Inject constructor(
     application: Application,
-    private val pdfRepository: com.pdf.pdfreader.domain.repository.PdfRepository
+    private val pdfRepository: com.pdf.pdfreader.domain.repository.PdfRepository,
+    private val undoRedoManager: UndoRedoManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -107,9 +116,6 @@ class PdfReaderViewModel @Inject constructor(
         override fun sizeOf(key: String, bitmap: Bitmap): Int = bitmap.byteCount / 1024
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
             if (evicted && !oldValue.isRecycled) {
-                // Check if the bitmap is still in use by any page state.
-                // If yes, do not recycle it to avoid crash/infinite refresh loops.
-                // It will be garbage collected or recycled when removed from _pageStates.
                 val isInUse = _pageStates.value.values.any { 
                     it is PageRenderState.Success && it.bitmap === oldValue 
                 }
@@ -120,10 +126,22 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
-    // Per-page Job tracking — each page gets its own coroutine
     private val activeRenderJobs = ConcurrentHashMap<Int, Job>()
-    // Per-page failure count for auto-recovery
     private val failureCounts = ConcurrentHashMap<Int, Int>()
+
+    init {
+        // Observe undo/redo state changes and sync to UI
+        viewModelScope.launch {
+            undoRedoManager.canUndo.collect { canUndo ->
+                _uiState.update { it.copy(canUndo = canUndo) }
+            }
+        }
+        viewModelScope.launch {
+            undoRedoManager.canRedo.collect { canRedo ->
+                _uiState.update { it.copy(canRedo = canRedo) }
+            }
+        }
+    }
 
     // ─── Initialize ─────────────────────────────────────────────
 
@@ -140,6 +158,9 @@ class PdfReaderViewModel @Inject constructor(
                 it.copy(filePath = path, fileName = name, isLoading = true, errorMessage = null, currentPage = initialPage)
             }
             observeBookmarks(path)
+
+            // Restore undo/redo state from DB
+            restoreUndoRedoState(path)
 
             withContext(pdfDispatcher) {
                 try {
@@ -172,68 +193,73 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
-    // ─── Core Rendering (Per-Page Job Architecture) ─────────────
+    // ─── Undo/Redo State Restoration ────────────────────────────
 
     /**
-     * Request a page render. Each page gets its own coroutine.
-     * - Returns immediately from cache if available
-     * - Skips if this page already has an active render job
-     * - Launches a new Job on viewModelScope for rendering
+     * Restore undo/redo state from Room DB on app restart.
+     * Replays active commands to rebuild the annotation list.
      */
+    private suspend fun restoreUndoRedoState(pdfPath: String) {
+        try {
+            val activeCommands = withContext(Dispatchers.IO) {
+                undoRedoManager.restoreState(pdfPath)
+            }
+
+            if (activeCommands.isNotEmpty()) {
+                // Rebuild annotations from active commands
+                val restoredAnnotations = activeCommands.mapNotNull { command ->
+                    commandToAnnotation(command)
+                }
+
+                _uiState.update { it.copy(annotations = restoredAnnotations) }
+                Log.d(TAG, "Restored ${restoredAnnotations.size} annotations from ${activeCommands.size} commands")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore undo/redo state", e)
+        }
+    }
+
+    // ─── Core Rendering (Per-Page Job Architecture) ─────────────
+
     fun requestPageRender(pageIndex: Int, width: Int) {
         if (width <= 0) return
 
         val cacheKey = "${pageIndex}_${width}"
 
-        // Fast path: return from cache
         val cached = bitmapCache.get(cacheKey)
         if (cached != null && !cached.isRecycled) {
             updatePageState(pageIndex, PageRenderState.Success(cached, width))
             return
         }
 
-        // Skip if already actively rendering this page
         val existingJob = activeRenderJobs[pageIndex]
         if (existingJob != null && existingJob.isActive) return
 
-        // Launch a NEW coroutine for this page
         val job = viewModelScope.launch {
             renderPageInternal(pageIndex, width)
         }
         activeRenderJobs[pageIndex] = job
     }
 
-    /**
-     * Retry: cancels old job, clears error state, starts fresh render.
-     */
     fun retryPageRender(pageIndex: Int, width: Int) {
         Log.d(TAG, "retryPageRender: page=$pageIndex")
-        // Cancel any existing job for this page
         activeRenderJobs.remove(pageIndex)?.cancel()
-        // Force state to Loading (clears Error)
         updatePageState(pageIndex, PageRenderState.Loading)
-        // Launch a completely new job
         val job = viewModelScope.launch {
             renderPageInternal(pageIndex, width)
         }
         activeRenderJobs[pageIndex] = job
     }
 
-    /**
-     * The actual rendering logic. Runs as a coroutine per page.
-     * Handles: renderer health check, rendering, caching, error recovery.
-     */
     private suspend fun renderPageInternal(pageIndex: Int, width: Int, height: Int = 0) {
         val cacheKey = if (height > 0) "${pageIndex}_${width}x${height}" else "${pageIndex}_${width}"
 
-        // Double-check cache (another job might have rendered it)
         val cached = bitmapCache.get(cacheKey)
         if (cached != null && !cached.isRecycled) {
             updatePageState(pageIndex, PageRenderState.Success(cached, width))
             return
         }
 
-        // Only show Loading if page isn't already rendered (prevents blink during search navigation)
         val currentState = _pageStates.value[pageIndex]
         if (currentState !is PageRenderState.Success) {
             updatePageState(pageIndex, PageRenderState.Loading)
@@ -243,7 +269,6 @@ class PdfReaderViewModel @Inject constructor(
             withContext(pdfDispatcher) {
                 if (!isActive) return@withContext null
 
-                // Health check: ensure renderer is ready
                 val renderer = pdfRenderer
                 if (renderer == null || !renderer.isReady) {
                     Log.w(TAG, "Renderer not ready, attempting reinitialize")
@@ -273,7 +298,6 @@ class PdfReaderViewModel @Inject constructor(
             updatePageState(pageIndex, PageRenderState.Success(bitmap, width))
             failureCounts.remove(pageIndex)
         } else {
-            // Handle failure with auto-recovery
             val failures = (failureCounts[pageIndex] ?: 0) + 1
             failureCounts[pageIndex] = failures
             Log.w(TAG, "Render failed for page $pageIndex (attempt $failures)")
@@ -288,7 +312,6 @@ class PdfReaderViewModel @Inject constructor(
                     Log.e(TAG, "Reinitialize failed", e)
                 }
 
-                // One final retry after reinitialize
                 val retryBitmap = try {
                     withContext(pdfDispatcher) {
                         pdfRenderer?.renderPage(pageIndex, width, _uiState.value.isNightMode)
@@ -309,7 +332,6 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
-    /** Must be called on pdfDispatcher */
     private fun reinitializeRendererOnDispatcher() {
         val path = _uiState.value.filePath
         val password = _uiState.value.password
@@ -349,7 +371,6 @@ class PdfReaderViewModel @Inject constructor(
             }
         }
         
-        // Also prune pageStates so we don't hold references to Bitmaps forever.
         _pageStates.update { currentStates ->
             val keysToRemove = currentStates.keys.filter { it !in visibleRange }
             if (keysToRemove.isEmpty()) return@update currentStates
@@ -357,7 +378,6 @@ class PdfReaderViewModel @Inject constructor(
             for (k in keysToRemove) {
                 val state = newStates.remove(k)
                 if (state is PageRenderState.Success) {
-                    // Free the bitmap if it is no longer in cache
                     val cacheKeys = listOf("${k}_${state.renderedWidth}", "${k}_${state.renderedWidth}x")
                     if (!cacheKeys.any { key -> bitmapCache.get(key) === state.bitmap } && !state.bitmap.isRecycled) {
                         try { state.bitmap.recycle() } catch (e: Exception) { e.printStackTrace() }
@@ -477,11 +497,312 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
-    // ─── Annotations ────────────────────────────────────────────
+    // ─── Annotations with Undo/Redo ─────────────────────────────
 
-    fun addAnnotation(annotation: PdfAnnotation) { _uiState.update { it.copy(annotations = it.annotations + annotation) } }
-    fun removeAnnotation(id: String) { _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != id }) } }
-    fun updateAnnotation(annotation: PdfAnnotation) { _uiState.update { s -> s.copy(annotations = s.annotations.map { if (it.id == annotation.id) annotation else it }) } }
+    /**
+     * Add an annotation and register it as an undoable command.
+     */
+    fun addAnnotation(annotation: PdfAnnotation) {
+        _uiState.update { it.copy(annotations = it.annotations + annotation) }
+
+        // Create and execute command
+        viewModelScope.launch {
+            val command = annotationToCommand(annotation, _uiState.value.filePath)
+            if (command != null) {
+                undoRedoManager.execute(command)
+            }
+        }
+    }
+
+    /**
+     * Remove an annotation and register it as an undoable command.
+     * Stores a snapshot of the removed annotation for redo.
+     */
+    fun removeAnnotation(id: String) {
+        val removedAnnotation = _uiState.value.annotations.find { it.id == id }
+        _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != id }) }
+
+        if (removedAnnotation != null) {
+            viewModelScope.launch {
+                val snapshot = serializeAnnotation(removedAnnotation)
+                val command = AnnotationCommand.RemoveAnnotation(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = _uiState.value.filePath,
+                    pageIndex = removedAnnotation.pageIndex,
+                    timestamp = System.currentTimeMillis(),
+                    annotationId = removedAnnotation.id,
+                    removedAnnotationPayload = snapshot
+                )
+                undoRedoManager.execute(command)
+            }
+        }
+    }
+
+    /**
+     * Update an annotation and register it as an undoable command.
+     * Stores both previous and new snapshots for undo/redo.
+     */
+    fun updateAnnotation(annotation: PdfAnnotation) {
+        val previousAnnotation = _uiState.value.annotations.find { it.id == annotation.id }
+        _uiState.update { s -> s.copy(annotations = s.annotations.map { if (it.id == annotation.id) annotation else it }) }
+
+        if (previousAnnotation != null) {
+            viewModelScope.launch {
+                val prevSnapshot = serializeAnnotation(previousAnnotation)
+                val newSnapshot = serializeAnnotation(annotation)
+                val command = AnnotationCommand.UpdateAnnotation(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = _uiState.value.filePath,
+                    pageIndex = annotation.pageIndex,
+                    timestamp = System.currentTimeMillis(),
+                    annotationId = annotation.id,
+                    previousPayload = prevSnapshot,
+                    newPayload = newSnapshot
+                )
+                undoRedoManager.execute(command)
+            }
+        }
+    }
+
+    /**
+     * Undo the last annotation action.
+     */
+    fun undo() {
+        viewModelScope.launch {
+            val command = undoRedoManager.undo() ?: return@launch
+            applyUndoCommand(command)
+        }
+    }
+
+    /**
+     * Redo the last undone action.
+     */
+    fun redo() {
+        viewModelScope.launch {
+            val command = undoRedoManager.redo() ?: return@launch
+            applyRedoCommand(command)
+        }
+    }
+
+    /**
+     * Apply the reverse of a command (undo).
+     */
+    private fun applyUndoCommand(command: AnnotationCommand) {
+        when (command) {
+            is AnnotationCommand.AddPath -> {
+                // Undo add = remove
+                _uiState.update { s ->
+                    s.copy(annotations = s.annotations.filter { it.id != command.annotationId })
+                }
+            }
+            is AnnotationCommand.AddTextNote -> {
+                // Undo add = remove
+                _uiState.update { s ->
+                    s.copy(annotations = s.annotations.filter { it.id != command.annotationId })
+                }
+            }
+            is AnnotationCommand.RemoveAnnotation -> {
+                // Undo remove = re-add the removed annotation
+                val snapshot = CommandSerializer.deserializeSnapshot(command.removedAnnotationPayload)
+                val annotation = snapshotToAnnotation(snapshot)
+                if (annotation != null) {
+                    _uiState.update { it.copy(annotations = it.annotations + annotation) }
+                }
+            }
+            is AnnotationCommand.UpdateAnnotation -> {
+                // Undo update = restore previous state
+                val snapshot = CommandSerializer.deserializeSnapshot(command.previousPayload)
+                val previousAnnotation = snapshotToAnnotation(snapshot)
+                if (previousAnnotation != null) {
+                    _uiState.update { s ->
+                        s.copy(annotations = s.annotations.map {
+                            if (it.id == command.annotationId) previousAnnotation else it
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Re-apply a command (redo).
+     */
+    private fun applyRedoCommand(command: AnnotationCommand) {
+        when (command) {
+            is AnnotationCommand.AddPath -> {
+                // Redo add = re-add
+                val annotation = PdfAnnotation.Path(
+                    id = command.annotationId,
+                    pageIndex = command.pageIndex,
+                    points = command.points.map { Offset(it.x, it.y) },
+                    color = Color(command.color.toULong()),
+                    strokeWidth = command.strokeWidth,
+                    isHighlighter = command.isHighlighter
+                )
+                _uiState.update { it.copy(annotations = it.annotations + annotation) }
+            }
+            is AnnotationCommand.AddTextNote -> {
+                // Redo add = re-add
+                val annotation = PdfAnnotation.TextNote(
+                    id = command.annotationId,
+                    pageIndex = command.pageIndex,
+                    text = command.text,
+                    position = Offset(command.positionX, command.positionY),
+                    color = Color(command.color.toULong()),
+                    fontSize = command.fontSize
+                )
+                _uiState.update { it.copy(annotations = it.annotations + annotation) }
+            }
+            is AnnotationCommand.RemoveAnnotation -> {
+                // Redo remove = remove again
+                _uiState.update { s ->
+                    s.copy(annotations = s.annotations.filter { it.id != command.annotationId })
+                }
+            }
+            is AnnotationCommand.UpdateAnnotation -> {
+                // Redo update = apply new state
+                val snapshot = CommandSerializer.deserializeSnapshot(command.newPayload)
+                val newAnnotation = snapshotToAnnotation(snapshot)
+                if (newAnnotation != null) {
+                    _uiState.update { s ->
+                        s.copy(annotations = s.annotations.map {
+                            if (it.id == command.annotationId) newAnnotation else it
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    // ─── Annotation ↔ Command Conversion Helpers ────────────────
+
+    /**
+     * Convert a PdfAnnotation to an AnnotationCommand for the undo/redo system.
+     */
+    private fun annotationToCommand(annotation: PdfAnnotation, pdfPath: String): AnnotationCommand? {
+        return when (annotation) {
+            is PdfAnnotation.Path -> {
+                AnnotationCommand.AddPath(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = pdfPath,
+                    pageIndex = annotation.pageIndex,
+                    timestamp = System.currentTimeMillis(),
+                    annotationId = annotation.id,
+                    points = annotation.points.map { SerializableOffset(it.x, it.y) },
+                    color = annotation.color.value.toLong(),
+                    strokeWidth = annotation.strokeWidth,
+                    isHighlighter = annotation.isHighlighter
+                )
+            }
+            is PdfAnnotation.TextNote -> {
+                AnnotationCommand.AddTextNote(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = pdfPath,
+                    pageIndex = annotation.pageIndex,
+                    timestamp = System.currentTimeMillis(),
+                    annotationId = annotation.id,
+                    text = annotation.text,
+                    positionX = annotation.position.x,
+                    positionY = annotation.position.y,
+                    color = annotation.color.value.toLong(),
+                    fontSize = annotation.fontSize
+                )
+            }
+        }
+    }
+
+    /**
+     * Convert an AnnotationCommand back to a PdfAnnotation for rendering.
+     * Used during state restoration from DB.
+     */
+    private fun commandToAnnotation(command: AnnotationCommand): PdfAnnotation? {
+        return when (command) {
+            is AnnotationCommand.AddPath -> {
+                PdfAnnotation.Path(
+                    id = command.annotationId,
+                    pageIndex = command.pageIndex,
+                    points = command.points.map { Offset(it.x, it.y) },
+                    color = Color(command.color.toULong()),
+                    strokeWidth = command.strokeWidth,
+                    isHighlighter = command.isHighlighter
+                )
+            }
+            is AnnotationCommand.AddTextNote -> {
+                PdfAnnotation.TextNote(
+                    id = command.annotationId,
+                    pageIndex = command.pageIndex,
+                    text = command.text,
+                    position = Offset(command.positionX, command.positionY),
+                    color = Color(command.color.toULong()),
+                    fontSize = command.fontSize
+                )
+            }
+            is AnnotationCommand.RemoveAnnotation -> null // Remove commands don't create annotations
+            is AnnotationCommand.UpdateAnnotation -> null // Update commands are handled during state replay
+        }
+    }
+
+    /**
+     * Serialize a PdfAnnotation to a JSON snapshot string.
+     */
+    private fun serializeAnnotation(annotation: PdfAnnotation): String {
+        return when (annotation) {
+            is PdfAnnotation.Path -> {
+                CommandSerializer.serializePathAnnotation(
+                    annotationId = annotation.id,
+                    pageIndex = annotation.pageIndex,
+                    points = annotation.points.map { SerializableOffset(it.x, it.y) },
+                    color = annotation.color.value.toLong(),
+                    strokeWidth = annotation.strokeWidth,
+                    isHighlighter = annotation.isHighlighter
+                )
+            }
+            is PdfAnnotation.TextNote -> {
+                CommandSerializer.serializeTextAnnotation(
+                    annotationId = annotation.id,
+                    pageIndex = annotation.pageIndex,
+                    text = annotation.text,
+                    positionX = annotation.position.x,
+                    positionY = annotation.position.y,
+                    color = annotation.color.value.toLong(),
+                    fontSize = annotation.fontSize
+                )
+            }
+        }
+    }
+
+    /**
+     * Deserialize an annotation snapshot back to a PdfAnnotation.
+     */
+    private fun snapshotToAnnotation(snapshot: CommandSerializer.AnnotationSnapshot): PdfAnnotation? {
+        return when (snapshot.type) {
+            CommandSerializer.TYPE_ADD_PATH -> {
+                val data = snapshot.pathData ?: return null
+                PdfAnnotation.Path(
+                    id = snapshot.annotationId,
+                    pageIndex = snapshot.pageIndex,
+                    points = data.points.map { Offset(it.x, it.y) },
+                    color = Color(data.color.toULong()),
+                    strokeWidth = data.strokeWidth,
+                    isHighlighter = data.isHighlighter
+                )
+            }
+            CommandSerializer.TYPE_ADD_TEXT -> {
+                val data = snapshot.textData ?: return null
+                PdfAnnotation.TextNote(
+                    id = snapshot.annotationId,
+                    pageIndex = snapshot.pageIndex,
+                    text = data.text,
+                    position = Offset(data.positionX, data.positionY),
+                    color = Color(data.color.toULong()),
+                    fontSize = data.fontSize
+                )
+            }
+            else -> null
+        }
+    }
+
+    // ─── Save Annotations with Undo/Redo Cleanup ────────────────
 
     fun saveAnnotationsToPdf(viewWidth: Int) {
         val path = uiState.value.filePath
@@ -530,6 +851,9 @@ class PdfReaderViewModel @Inject constructor(
                     pdfRenderer = PdfPageRenderer(getApplication(), path, uiState.value.password)
                 }
                 _uiState.update { it.copy(annotations = emptyList(), reloadTrigger = it.reloadTrigger + 1) }
+
+                // Clear all undo/redo history — annotations are now baked into the PDF
+                undoRedoManager.clearAll(path)
             } catch (e: Exception) { Log.e(TAG, "saveAnnotations failed", e)
             } finally { _uiState.update { it.copy(isLoading = false, isEditMode = false) } }
         }

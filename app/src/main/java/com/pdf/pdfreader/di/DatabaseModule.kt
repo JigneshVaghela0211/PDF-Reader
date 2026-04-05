@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.pdf.pdfreader.data.local.AppDatabase
 import com.pdf.pdfreader.data.local.PdfDao
+import com.pdf.pdfreader.data.local.AnnotationCommandDao
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.Provides
@@ -29,8 +30,44 @@ object DatabaseModule {
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_pdfPath` ON `bookmarks` (`pdfPath`)")
             }
         }
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `annotation_commands` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `pdfPath` TEXT NOT NULL,
+                        `pageIndex` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `payload` TEXT NOT NULL,
+                        `isUndone` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Drop the incorrectly-created table from v6 and recreate cleanly
+                database.execSQL("DROP TABLE IF EXISTS `annotation_commands`")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `annotation_commands` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `pdfPath` TEXT NOT NULL,
+                        `pageIndex` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `payload` TEXT NOT NULL,
+                        `isUndone` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
         return Room.databaseBuilder(context, AppDatabase::class.java, "pdf_reader_db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -43,5 +80,10 @@ object DatabaseModule {
     @Provides
     fun provideBookmarkDao(database: AppDatabase): com.pdf.pdfreader.data.local.BookmarkDao {
         return database.bookmarkDao()
+    }
+
+    @Provides
+    fun provideAnnotationCommandDao(database: AppDatabase): AnnotationCommandDao {
+        return database.annotationCommandDao()
     }
 }

@@ -17,6 +17,7 @@ pdfViewer = "3.2.0-beta.1"
 googleServices = "4.4.2"
 firebaseCrashlyticsPlugin = "3.0.2"
 firebaseBom = "33.7.0"
+gson = "2.11.0"
 
 
 
@@ -51,6 +52,7 @@ android-pdf-viewer = { module = "com.github.mhiew:android-pdf-viewer", version.r
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 
 

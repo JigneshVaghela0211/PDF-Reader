@@ -159,9 +159,13 @@ fun PdfReaderScreen(
                         currentTool = uiState.currentTool,
                         currentColor = uiState.currentColor,
                         currentStrokeWidth = uiState.currentStrokeWidth,
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
                         onToolChange = viewModel::setAnnotationTool,
                         onColorChange = viewModel::setAnnotationColor,
                         onStrokeWidthChange = viewModel::setAnnotationStrokeWidth,
+                        onUndo = viewModel::undo,
+                        onRedo = viewModel::redo,
                         onClose = { viewModel.setEditMode(false) },
                         onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) }
                     )

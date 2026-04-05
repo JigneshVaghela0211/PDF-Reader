@@ -15,8 +15,8 @@ import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,9 +32,13 @@ fun AnnotationTopBar(
     currentTool: AnnotationTool,
     currentColor: Color,
     currentStrokeWidth: Float,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onToolChange: (AnnotationTool) -> Unit,
     onColorChange: (Color) -> Unit,
     onStrokeWidthChange: (Float) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onClose: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -68,7 +71,43 @@ fun AnnotationTopBar(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Extracted components for better codebase management
+                    // Undo button
+                    IconButton(
+                        onClick = onUndo,
+                        enabled = canUndo
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Undo,
+                            contentDescription = "Undo",
+                            tint = if (canUndo) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    // Redo button
+                    IconButton(
+                        onClick = onRedo,
+                        enabled = canRedo
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Redo,
+                            contentDescription = "Redo",
+                            tint = if (canRedo) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    // Vertical divider
+                    Box(
+                        modifier = Modifier
+                            .height(24.dp)
+                            .width(1.dp)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Tool buttons
                     AnnotationToolButtons(currentTool, onToolChange)
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -191,4 +230,3 @@ fun StrokeWidthSliderExpandable(
         }
     }
 }
-
