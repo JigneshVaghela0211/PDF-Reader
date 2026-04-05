@@ -28,7 +28,8 @@ data class ManagePagesState(
     val errorMessage: String? = null,
     val isSaving: Boolean = false,
     val saveProgress: Float = 0f,
-    val hasModifications: Boolean = false
+    val hasModifications: Boolean = false,
+    val reloadTrigger: Int = 0
 )
 
 @HiltViewModel
@@ -56,7 +57,7 @@ class ManagePagesViewModel @Inject constructor(
                     val pages = pdfRenderer?.pageCount ?: 0
                     
                     if (pages > 0) {
-                        _uiState.update { it.copy(totalPages = pages, isLoading = false) }
+                        _uiState.update { it.copy(totalPages = pages, isLoading = false, reloadTrigger = it.reloadTrigger + 1) }
                     } else {
                         _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load PDF or PDF is empty") }
                     }
@@ -196,10 +197,11 @@ class ManagePagesViewModel @Inject constructor(
                 val newFilePath = withContext(Dispatchers.IO) {
                     val srcFile = File(sourcePath)
                     val baseName = srcFile.nameWithoutExtension
-                    val newFile = File(destFolder, "${baseName}_extracted.pdf")
+                    val timestamp = System.currentTimeMillis()
+                    val newFile = File(destFolder, "${baseName}_extracted_$timestamp.pdf")
                     
-                    PDDocument().use { newDoc ->
-                        PDDocument.load(srcFile).use { srcDoc ->
+                    PDDocument.load(srcFile).use { srcDoc ->
+                        PDDocument().use { newDoc ->
                             for (pageIndex in pagesToExtract) {
                                 if (pageIndex in 0 until srcDoc.numberOfPages) {
                                     val page = srcDoc.getPage(pageIndex)
@@ -208,8 +210,9 @@ class ManagePagesViewModel @Inject constructor(
                                     imported.resources = page.resources
                                 }
                             }
+                            // Save newDoc BEFORE srcDoc is closed, as the streams are read lazily
+                            newDoc.save(newFile)
                         }
-                        newDoc.save(newFile)
                     }
                     newFile.absolutePath
                 }

@@ -150,7 +150,7 @@ fun ManagePagesScreen(
                     items(uiState.totalPages, key = { it }) { pageIndex ->
                         var thumb by remember { mutableStateOf<Bitmap?>(null) }
                         
-                        LaunchedEffect(pageIndex) {
+                        LaunchedEffect(pageIndex, uiState.reloadTrigger) {
                             thumb = viewModel.getThumbnail(pageIndex, thumbWidthPx)
                         }
                         
