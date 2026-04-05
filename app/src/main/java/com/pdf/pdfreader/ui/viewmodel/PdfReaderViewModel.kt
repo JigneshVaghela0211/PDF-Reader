@@ -206,6 +206,41 @@ class PdfReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Called when the underlying PDF file was modified (e.g. by ManagePagesScreen).
+     * Clears caches and forces a full reload of the existing file path.
+     */
+    fun refreshCurrentPdf() {
+        val path = _uiState.value.filePath
+        if (path.isNotEmpty()) {
+            _uiState.update { it.copy(isLoading = true) }
+            viewModelScope.launch {
+                clearBitmapCache()
+                _pageStates.value = emptyMap()
+                
+                withContext(pdfDispatcher) {
+                    try {
+                        pdfRenderer?.close()
+                        pdfRenderer = PdfPageRenderer(getApplication(), path, _uiState.value.password.takeIf { it.isNotEmpty() })
+                        val pages = pdfRenderer?.pageCount ?: 0
+                        Log.d(TAG, "Refreshed renderer: new pages=$pages")
+                        
+                        if (pages > 0) {
+                            _uiState.update {
+                                it.copy(totalPages = pages, isLoading = false, reloadTrigger = it.reloadTrigger + 1)
+                            }
+                        } else {
+                            _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load PDF or PDF is empty") }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to refresh", e)
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.localizedMessage) }
+                    }
+                }
+            }
+        }
+    }
+
     // ─── Undo/Redo State Restoration ────────────────────────────
 
     /**

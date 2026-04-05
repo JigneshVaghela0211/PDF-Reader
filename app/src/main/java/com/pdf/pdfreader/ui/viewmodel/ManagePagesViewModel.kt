@@ -27,7 +27,8 @@ data class ManagePagesState(
     val selectedPages: Set<Int> = emptySet(),
     val errorMessage: String? = null,
     val isSaving: Boolean = false,
-    val saveProgress: Float = 0f
+    val saveProgress: Float = 0f,
+    val hasModifications: Boolean = false
 )
 
 @HiltViewModel
@@ -127,7 +128,7 @@ class ManagePagesViewModel @Inject constructor(
                 }
                 
                 thumbnailCache.evictAll()
-                _uiState.update { it.copy(isSaving = false, selectedPages = emptySet()) }
+                _uiState.update { it.copy(isSaving = false, selectedPages = emptySet(), hasModifications = true) }
                 initialize(path)
                 onComplete(true)
             } catch (e: Exception) {
@@ -169,7 +170,7 @@ class ManagePagesViewModel @Inject constructor(
                 }
                 
                 pagesToRotate.forEach { thumbnailCache.remove(it) }
-                _uiState.update { it.copy(isSaving = false, selectedPages = emptySet()) }
+                _uiState.update { it.copy(isSaving = false, selectedPages = emptySet(), hasModifications = true) }
                 initialize(path)
                 onComplete(true)
             } catch (e: Exception) {

@@ -80,6 +80,18 @@ class MainActivity : AppCompatActivity() {
                             val pageIndex = backStackEntry.arguments?.getInt("pageIndex") ?: -1
                             val searchQuery = backStackEntry.arguments?.getString("searchQuery")?.let { Uri.decode(it) }
                             val readerViewModel: PdfReaderViewModel = hiltViewModel()
+                            
+                            val refreshResult = backStackEntry.savedStateHandle
+                                .getStateFlow<Boolean>("refresh_pdf", false)
+                                .collectAsState()
+                                
+                            androidx.compose.runtime.LaunchedEffect(refreshResult.value) {
+                                if (refreshResult.value == true) {
+                                    backStackEntry.savedStateHandle.set("refresh_pdf", false)
+                                    readerViewModel.refreshCurrentPdf()
+                                }
+                            }
+                            
                             PdfReaderScreen(
                                 viewModel = readerViewModel,
                                 path = Uri.decode(path),
@@ -99,6 +111,7 @@ class MainActivity : AppCompatActivity() {
                         ) { backStackEntry ->
                             val path = backStackEntry.arguments?.getString("path") ?: ""
                             val managePagesViewModel: com.pdf.pdfreader.ui.viewmodel.ManagePagesViewModel = hiltViewModel()
+                            val uiState by managePagesViewModel.uiState.collectAsState()
                             
                             androidx.compose.runtime.LaunchedEffect(path) {
                                 managePagesViewModel.initialize(Uri.decode(path))
@@ -106,7 +119,14 @@ class MainActivity : AppCompatActivity() {
                             
                             com.pdf.pdfreader.ui.screens.ManagePagesScreen(
                                 viewModel = managePagesViewModel,
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { 
+                                    if (uiState.hasModifications) {
+                                        navController.previousBackStackEntry
+                                            ?.savedStateHandle
+                                            ?.set("refresh_pdf", true)
+                                    }
+                                    navController.popBackStack() 
+                                }
                             )
                         }
                     }
