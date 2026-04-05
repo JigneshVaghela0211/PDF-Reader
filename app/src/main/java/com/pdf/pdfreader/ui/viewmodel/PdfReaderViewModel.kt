@@ -77,7 +77,10 @@ data class PdfReaderUiState(
     val totalMatchCount: Int = 0,
     // ─── Undo/Redo State ────────────────────────────────────
     val canUndo: Boolean = false,
-    val canRedo: Boolean = false
+    val canRedo: Boolean = false,
+    
+    // ─── Selection State ────────────────────────────────────
+    val selectedAnnotationId: String? = null
 )
 
 sealed class ScrollEvent {
@@ -503,6 +506,12 @@ class PdfReaderViewModel @Inject constructor(
      * Add an annotation and register it as an undoable command.
      */
     fun addAnnotation(annotation: PdfAnnotation) {
+        if (annotation is PdfAnnotation.TextNote) {
+            // New TextNotes start as drafts. Do NOT create an undo command immediately.
+            addDraftTextAnnotation(annotation)
+            return
+        }
+        
         _uiState.update { it.copy(annotations = it.annotations + annotation) }
 
         // Create and execute command
@@ -511,6 +520,83 @@ class PdfReaderViewModel @Inject constructor(
             if (command != null) {
                 undoRedoManager.execute(command)
             }
+        }
+    }
+
+    /**
+     * Adds an empty TextNote as a draft without recording an Undo command.
+     */
+    private fun addDraftTextAnnotation(annotation: PdfAnnotation.TextNote) {
+        _uiState.update { it.copy(annotations = it.annotations + annotation) }
+    }
+
+    /**
+     * Converts PdfAnnotation.TextNote to TextState
+     */
+    fun textNoteToState(note: PdfAnnotation.TextNote): AnnotationCommand.TextState {
+        return AnnotationCommand.TextState(
+            id = note.id,
+            text = note.text,
+            color = note.color.value.toLong(),
+            fontSize = note.fontSize,
+            positionX = note.position.x,
+            positionY = note.position.y
+        )
+    }
+
+    private fun stateToTextNote(state: AnnotationCommand.TextState, pageIndex: Int): PdfAnnotation.TextNote {
+        return PdfAnnotation.TextNote(
+            id = state.id,
+            pageIndex = pageIndex,
+            text = state.text,
+            position = androidx.compose.ui.geometry.Offset(state.positionX, state.positionY),
+            color = androidx.compose.ui.graphics.Color(state.color.toULong()),
+            fontSize = state.fontSize
+        )
+    }
+
+    /**
+     * Commits a text annotation that has completed editing.
+     * Generates a TextCommand if the note has valid text.
+     */
+    fun commitTextAnnotation(before: AnnotationCommand.TextState?, after: AnnotationCommand.TextState, pageIndex: Int) {
+        // If blank text, do not create command, just remove draft if it was new
+        if (after.text.isBlank()) {
+            if (before == null) {
+                // Was a draft, user typed nothing. Delete from view.
+                _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != after.id }) }
+            } else {
+                // Edit made it blank, revert it to before
+                val revertedNote = stateToTextNote(before, pageIndex)
+                _uiState.update { s ->
+                    s.copy(annotations = s.annotations.map { if (it.id == after.id) revertedNote else it })
+                }
+            }
+            return
+        }
+
+        // Apply updated state to UI
+        val newNote = stateToTextNote(after, pageIndex)
+        _uiState.update { s ->
+            val existing = s.annotations.find { it.id == after.id }
+            if (existing != null) {
+                s.copy(annotations = s.annotations.map { if (it.id == after.id) newNote else it })
+            } else {
+                s.copy(annotations = s.annotations + newNote)
+            }
+        }
+
+        // Add to UndoManager
+        viewModelScope.launch {
+            val command = AnnotationCommand.TextCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = pageIndex,
+                timestamp = System.currentTimeMillis(),
+                before = before,
+                after = after
+            )
+            undoRedoManager.execute(command)
         }
     }
 
@@ -562,6 +648,13 @@ class PdfReaderViewModel @Inject constructor(
                 undoRedoManager.execute(command)
             }
         }
+    }
+
+    /**
+     * Set the currently selected annotation (e.g. to show the floating styling toolbar)
+     */
+    fun selectAnnotation(id: String?) {
+        _uiState.update { it.copy(selectedAnnotationId = id) }
     }
 
     /**
@@ -621,6 +714,23 @@ class PdfReaderViewModel @Inject constructor(
                     }
                 }
             }
+            is AnnotationCommand.TextCommand -> {
+                // Undo means restoring "before"
+                if (command.before == null) {
+                    // Was newly created, so undo means removing it
+                    _uiState.update { s ->
+                        s.copy(annotations = s.annotations.filter { it.id != command.after.id })
+                    }
+                } else {
+                    // It was an edit, restore previous state
+                    val restoredNote = stateToTextNote(command.before, command.pageIndex)
+                    _uiState.update { s ->
+                        s.copy(annotations = s.annotations.map {
+                            if (it.id == restoredNote.id) restoredNote else it
+                        })
+                    }
+                }
+            }
         }
     }
 
@@ -668,6 +778,18 @@ class PdfReaderViewModel @Inject constructor(
                         s.copy(annotations = s.annotations.map {
                             if (it.id == command.annotationId) newAnnotation else it
                         })
+                    }
+                }
+            }
+            is AnnotationCommand.TextCommand -> {
+                // Redo means applying "after"
+                val afterNote = stateToTextNote(command.after, command.pageIndex)
+                _uiState.update { s ->
+                    val existing = s.annotations.find { it.id == afterNote.id }
+                    if (existing != null) {
+                        s.copy(annotations = s.annotations.map { if (it.id == afterNote.id) afterNote else it })
+                    } else {
+                        s.copy(annotations = s.annotations + afterNote)
                     }
                 }
             }
@@ -739,6 +861,16 @@ class PdfReaderViewModel @Inject constructor(
             }
             is AnnotationCommand.RemoveAnnotation -> null // Remove commands don't create annotations
             is AnnotationCommand.UpdateAnnotation -> null // Update commands are handled during state replay
+            is AnnotationCommand.TextCommand -> {
+                PdfAnnotation.TextNote(
+                    id = command.after.id,
+                    pageIndex = command.pageIndex,
+                    text = command.after.text,
+                    position = Offset(command.after.positionX, command.after.positionY),
+                    color = Color(command.after.color.toULong()),
+                    fontSize = command.after.fontSize
+                )
+            }
         }
     }
 

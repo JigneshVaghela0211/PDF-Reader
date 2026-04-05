@@ -557,7 +557,10 @@ fun PdfPage(
             .padding(vertical = 4.dp)
             .background(if (isNightMode) Color.Black else Color.White)
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { onDoubleTap() })
+                detectTapGestures(
+                    onDoubleTap = { onDoubleTap() },
+                    onTap = { viewModel.selectAnnotation(null) }
+                )
             },
         contentAlignment = Alignment.Center
     ) {
@@ -621,8 +624,16 @@ fun PdfPage(
                                     com.pdf.pdfreader.ui.components.MovableTextNote(
                                         note = textNote,
                                         isEditMode = uiState.isEditMode,
-                                        onUpdate = viewModel::updateAnnotation,
-                                        onDelete = { viewModel.removeAnnotation(textNote.id) }
+                                        isSelected = uiState.selectedAnnotationId == textNote.id,
+                                        onSelect = { viewModel.selectAnnotation(textNote.id) },
+                                        onDeselect = { viewModel.selectAnnotation(null) },
+                                        onCommit = { before, after -> viewModel.commitTextAnnotation(before, after, pageIndex) },
+                                        onDelete = { 
+                                            viewModel.removeAnnotation(textNote.id)
+                                            if (uiState.selectedAnnotationId == textNote.id) {
+                                                viewModel.selectAnnotation(null)
+                                            }
+                                        }
                                     )
                                 }
                             }

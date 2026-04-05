@@ -23,6 +23,7 @@ object CommandSerializer {
     const val TYPE_ADD_TEXT = "ADD_TEXT"
     const val TYPE_REMOVE = "REMOVE"
     const val TYPE_UPDATE = "UPDATE"
+    const val TYPE_TEXT_COMMAND = "TEXT_COMMAND"
 
     // ─── Serialize: AnnotationCommand → (type, payload JSON) ────
 
@@ -31,6 +32,7 @@ object CommandSerializer {
         is AnnotationCommand.AddTextNote -> TYPE_ADD_TEXT
         is AnnotationCommand.RemoveAnnotation -> TYPE_REMOVE
         is AnnotationCommand.UpdateAnnotation -> TYPE_UPDATE
+        is AnnotationCommand.TextCommand -> TYPE_TEXT_COMMAND
     }
 
     fun toPayload(command: AnnotationCommand): String = when (command) {
@@ -69,6 +71,8 @@ object CommandSerializer {
                 newPayload = command.newPayload
             )
         )
+
+        is AnnotationCommand.TextCommand -> gson.toJson(command)
     }
 
     // ─── Deserialize: (type, payload JSON) → AnnotationCommand ──
@@ -129,6 +133,10 @@ object CommandSerializer {
                     previousPayload = p.previousPayload,
                     newPayload = p.newPayload
                 )
+            }
+
+            TYPE_TEXT_COMMAND -> {
+                gson.fromJson(entity.payload, AnnotationCommand.TextCommand::class.java)
             }
 
             else -> throw IllegalArgumentException("Unknown command type: ${entity.type}")

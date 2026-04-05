@@ -1,26 +1,28 @@
 package com.pdf.pdfreader.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.TextDecrease
+import androidx.compose.material.icons.filled.TextIncrease
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,95 +37,204 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.domain.model.PdfAnnotation
 
-/**
- * Movable text annotation with inline style controls:
- * - Color picker (dots)
- * - Font size +/- buttons
- * - Drag to reposition
- * - Delete button
- */
+import com.pdf.pdfreader.domain.model.AnnotationCommand
+
 @Composable
 fun MovableTextNote(
     note: PdfAnnotation.TextNote,
     isEditMode: Boolean,
-    onUpdate: (PdfAnnotation.TextNote) -> Unit,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDeselect: () -> Unit,
+    onCommit: (AnnotationCommand.TextState?, AnnotationCommand.TextState) -> Unit,
     onDelete: () -> Unit
 ) {
-    var text by remember(note.id) { mutableStateOf(note.text) }
-    var offset by remember(note.id) { mutableStateOf(note.position) }
-    var color by remember(note.id) { mutableStateOf(note.color) }
-    var fontSize by remember(note.id) { mutableStateOf(note.fontSize) }
-    val focusRequester = remember { FocusRequester() }
+    // True source of truth from ViewModel
+    val textToDisplay = note.text
+    val color = note.color
+    val fontSize = note.fontSize
+    var currentOffset by remember(note.id) { mutableStateOf(note.position) }
 
-    // Available colors for quick-pick
-    val colorOptions = remember {
-        listOf(Color.Red, Color.Blue, Color.Green, Color.Black, Color(0xFFFF9800), Color(0xFF9C27B0))
+    // Transient typing state
+    var isTyping by remember { mutableStateOf(note.text.isEmpty()) }
+    var transientText by remember { mutableStateOf(note.text) }
+
+    // Store the state right before an editing session begins
+    var beforeState by remember { mutableStateOf<AnnotationCommand.TextState?>(null) }
+    
+    val currentState = remember(note) {
+        AnnotationCommand.TextState(note.id, note.text, note.color.value.toLong(), note.fontSize, note.position.x, note.position.y)
     }
 
-    LaunchedEffect(note.id) {
-        if (note.text.isEmpty() && isEditMode) {
-            try {
-                focusRequester.requestFocus()
-            } catch (_: Exception) {}
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Keep transient text in sync with global text if external changes happen (like Undo/Redo) while not typing
+    LaunchedEffect(note.text) {
+        if (!isTyping) {
+            transientText = note.text
         }
     }
 
+    LaunchedEffect(isTyping) {
+        if (isTyping) {
+            beforeState = if (note.text.isEmpty()) null else currentState
+            try { focusRequester.requestFocus() } catch (e: Exception) {}
+            onSelect()
+        } else {
+            keyboardController?.hide()
+            // If finished typing and text is empty, and it was a draft, delete happens from commit.
+            if (transientText != note.text || beforeState == null) {
+                // Publish update for undo/redo exactly ONCE at the end of typing
+                val afterState = currentState.copy(text = transientText, positionX = currentOffset.x, positionY = currentOffset.y)
+                onCommit(beforeState, afterState)
+            }
+        }
+    }
+
+    // Available colors for quick-pick
+    val colorOptions = remember {
+        listOf(
+            Color.Red, Color.Blue, Color.Green, Color.Black,
+            Color.White, Color(0xFFFF9800), Color(0xFF9C27B0)
+        )
+    }
+    
+    // Toggle for color palette visibility in toolbar
+    var showColors by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
-            .offset { IntOffset(offset.x.toInt(), offset.y.toInt()) }
-            .pointerInput(isEditMode) {
-                if (isEditMode) {
+            .offset { IntOffset(currentOffset.x.toInt(), currentOffset.y.toInt()) }
+            .pointerInput(isEditMode && !isTyping) {
+                if (isEditMode && !isTyping) {
                     detectDragGestures(
                         onDragEnd = {
-                            onUpdate(note.copy(text = text, position = offset, color = color, fontSize = fontSize))
+                            if (currentOffset != note.position) {
+                                val afterState = currentState.copy(positionX = currentOffset.x, positionY = currentOffset.y)
+                                onCommit(currentState, afterState)
+                            }
                         }
                     ) { change, dragAmount ->
                         change.consume()
-                        offset += dragAmount
+                        currentOffset += dragAmount
+                        onSelect() // select while dragging
                     }
                 }
             }
+            .pointerInput(isEditMode) {
+                if (isEditMode) {
+                    detectTapGestures(
+                        onTap = { 
+                            if (!isTyping) onSelect()
+                        }
+                    )
+                }
+            }
     ) {
-        Column {
-            // Text field with styling
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Floating Toolbar (Shows above the text when selected but NOT actively typing)
+            AnimatedVisibility(
+                visible = isSelected && !isTyping && isEditMode,
+                enter = fadeIn() + scaleIn(initialScale = 0.9f),
+                exit = fadeOut() + scaleOut(targetScale = 0.9f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+                        .shadow(4.dp, RoundedCornerShape(24.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (showColors) {
+                        // Inline Color Picker
+                        colorOptions.forEach { c ->
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(2.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(if (c == color) 2.dp else 0.5.dp, if (c == color) MaterialTheme.colorScheme.primary else Color.LightGray, CircleShape)
+                                    .clickable {
+                                        onCommit(currentState, currentState.copy(color = c.value.toLong()))
+                                        showColors = false
+                                    }
+                            )
+                        }
+                        IconButton(onClick = { showColors = false }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Colors", modifier = Modifier.size(18.dp))
+                        }
+                    } else {
+                        // Standard Toolbar Tools
+                        IconButton(onClick = { isTyping = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Text", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(onClick = { showColors = true }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Palette, contentDescription = "Change Color", tint = color, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = { onCommit(currentState, currentState.copy(fontSize = (fontSize - 2f).coerceAtLeast(10f))) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.TextDecrease, contentDescription = "Decrease Font Size", modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = { onCommit(currentState, currentState.copy(fontSize = (fontSize + 2f).coerceAtMost(72f))) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.TextIncrease, contentDescription = "Increase Font Size", modifier = Modifier.size(20.dp))
+                        }
+                        // Delete Button
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Delete Text", tint = Color.Red, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+
+            // Text Rendering / Input Field
             Box(
                 modifier = Modifier
                     .background(
-                        if (isEditMode) Color.White.copy(alpha = 0.92f) else Color.Transparent,
-                        RoundedCornerShape(8.dp)
+                        color = if (isTyping) Color(0xAAFFFFFF) else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
                     )
                     .then(
-                        if (isEditMode) Modifier
-                            .shadow(2.dp, RoundedCornerShape(8.dp))
-                            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        if (isSelected && !isTyping) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         else Modifier
                     )
                     .padding(8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     BasicTextField(
-                        value = text,
-                        onValueChange = {
-                            text = it
-                            onUpdate(note.copy(text = it, position = offset, color = color, fontSize = fontSize))
-                        },
+                        value = if (isTyping) transientText else textToDisplay,
+                        onValueChange = { if (isTyping) transientText = it },
                         textStyle = TextStyle(
                             color = color,
                             fontSize = with(LocalDensity.current) { fontSize.toSp() },
                             fontWeight = FontWeight.Normal
                         ),
-                        enabled = isEditMode,
+                        enabled = isTyping,
                         modifier = Modifier.focusRequester(focusRequester),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { isTyping = false }),
                         decorationBox = { innerTextField ->
                             Box {
-                                if (text.isEmpty() && isEditMode) {
+                                if (transientText.isEmpty() && textToDisplay.isEmpty() && isTyping) {
                                     Text(
                                         text = "Type here…",
                                         color = Color.Gray.copy(alpha = 0.5f),
@@ -135,97 +246,22 @@ fun MovableTextNote(
                         }
                     )
 
-                    if (isEditMode) {
-                        Spacer(modifier = Modifier.width(4.dp))
+                    // "Done" checkmark when actively typing
+                    if (isTyping) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(24.dp)
+                            onClick = { isTyping = false },
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
                         ) {
                             Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Delete Note",
-                                tint = Color.Red.copy(alpha = 0.7f),
+                                Icons.Default.Check,
+                                contentDescription = "Done Editing",
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-                    }
-                }
-            }
-
-            // Inline style controls (only visible in edit mode)
-            if (isEditMode) {
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier
-                        .background(
-                            Color.White.copy(alpha = 0.92f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .shadow(1.dp, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    // Color picker dots
-                    colorOptions.forEach { c ->
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .padding(1.dp)
-                                .clip(CircleShape)
-                                .background(c)
-                                .then(
-                                    if (c == color) Modifier.border(2.dp, Color.DarkGray, CircleShape)
-                                    else Modifier.border(0.5.dp, Color.LightGray, CircleShape)
-                                )
-                                .clickable {
-                                    color = c
-                                    onUpdate(note.copy(text = text, position = offset, color = c, fontSize = fontSize))
-                                }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Font size controls
-                    IconButton(
-                        onClick = {
-                            val newSize = (fontSize - 2f).coerceAtLeast(10f)
-                            fontSize = newSize
-                            onUpdate(note.copy(text = text, position = offset, color = color, fontSize = newSize))
-                        },
-                        modifier = Modifier.size(22.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Remove,
-                            contentDescription = "Decrease font",
-                            modifier = Modifier.size(14.dp),
-                            tint = Color.DarkGray
-                        )
-                    }
-
-                    Text(
-                        text = "${fontSize.toInt()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.DarkGray,
-                        modifier = Modifier.padding(horizontal = 2.dp)
-                    )
-
-                    IconButton(
-                        onClick = {
-                            val newSize = (fontSize + 2f).coerceAtMost(72f)
-                            fontSize = newSize
-                            onUpdate(note.copy(text = text, position = offset, color = color, fontSize = newSize))
-                        },
-                        modifier = Modifier.size(22.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Increase font",
-                            modifier = Modifier.size(14.dp),
-                            tint = Color.DarkGray
-                        )
                     }
                 }
             }

@@ -69,6 +69,24 @@ sealed class AnnotationCommand {
         val previousPayload: String,
         val newPayload: String
     ) : AnnotationCommand()
+
+    data class TextState(
+        val id: String,
+        val text: String,
+        val color: Long,
+        val fontSize: Float,
+        val positionX: Float,
+        val positionY: Float
+    )
+
+    data class TextCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val before: TextState?,
+        val after: TextState
+    ) : AnnotationCommand()
 }
 
 /**
