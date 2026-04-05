@@ -76,12 +76,14 @@ fun SmartSwipeRefresh(
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 isPulling = false
-                if (pullDistance.value >= refreshThreshold && !isRefreshing) {
+                
+                val shouldRefresh = pullDistance.value >= refreshThreshold && !isRefreshing
+                if (shouldRefresh) {
                     onRefresh()
                 }
                 
                 // Final snap back
-                val target = if (isRefreshing) refreshThreshold else 0f
+                val target = if (shouldRefresh || isRefreshing) refreshThreshold else 0f
                 pullDistance.animateTo(
                     targetValue = target,
                     animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy)

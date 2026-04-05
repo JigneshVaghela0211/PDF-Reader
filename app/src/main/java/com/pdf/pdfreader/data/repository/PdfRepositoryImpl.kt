@@ -88,7 +88,11 @@ class PdfRepositoryImpl @Inject constructor(
                     // If file not in DB, scan it. If it is, only update if modified OR just keep it.
                     if (dbEntity == null || dbEntity.lastModified != date) {
                         val name = cursor.getString(idName)
-                        val size = cursor.getLong(idSize)
+                        var size = cursor.getLong(idSize)
+                        if (size == 0L && path != null) {
+                            val f = File(path)
+                            if (f.exists()) size = f.length()
+                        }
                         val type = cursor.getString(idType)
                         val isTrashed = if (idTrashed != -1) cursor.getInt(idTrashed) == 1 else false
                         
