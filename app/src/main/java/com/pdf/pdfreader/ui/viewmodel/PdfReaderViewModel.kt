@@ -4,6 +4,9 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.util.Log
 import android.util.LruCache
+import com.pdf.pdfreader.data.local.PreferenceManager
+import com.pdf.pdfreader.domain.model.BackgroundMode
+import com.pdf.pdfreader.domain.model.ViewSettings
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -69,7 +72,8 @@ data class PdfReaderUiState(
     val annotations: List<PdfAnnotation> = emptyList(),
     val isBookmarked: Boolean = false,
     val bookmarks: List<com.pdf.pdfreader.data.local.BookmarkEntity> = emptyList(),
-    val isNightMode: Boolean = false,
+    // ─── View Settings ─────────────────────────────────────
+    val viewSettings: ViewSettings = ViewSettings(),
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
     val searchResults: List<SearchMatch> = emptyList(),
@@ -81,7 +85,10 @@ data class PdfReaderUiState(
     
     // ─── Selection State ────────────────────────────────────
     val selectedAnnotationId: String? = null
-)
+) {
+    /** Convenience: true when background mode is INVERT */
+    val isNightMode: Boolean get() = viewSettings.backgroundMode == BackgroundMode.INVERT
+}
 
 sealed class ScrollEvent {
     data class ScrollToPage(val pageIndex: Int) : ScrollEvent()
@@ -91,7 +98,8 @@ sealed class ScrollEvent {
 class PdfReaderViewModel @Inject constructor(
     application: Application,
     private val pdfRepository: com.pdf.pdfreader.domain.repository.PdfRepository,
-    private val undoRedoManager: UndoRedoManager
+    private val undoRedoManager: UndoRedoManager,
+    private val preferenceManager: PreferenceManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -157,8 +165,10 @@ class PdfReaderViewModel @Inject constructor(
                 if (existing != null) initialPage = existing.lastOpenedPage
             } catch (e: Exception) { e.printStackTrace() }
 
+            // Load persisted view settings
+            val savedSettings = preferenceManager.viewSettingsFlow.first()
             _uiState.update {
-                it.copy(filePath = path, fileName = name, isLoading = true, errorMessage = null, currentPage = initialPage)
+                it.copy(filePath = path, fileName = name, isLoading = true, errorMessage = null, currentPage = initialPage, viewSettings = savedSettings)
             }
             observeBookmarks(path)
 
@@ -1026,10 +1036,31 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun toggleNightMode() {
-        _uiState.update { it.copy(isNightMode = !it.isNightMode, isLoading = true) }
-        viewModelScope.launch {
-            clearBitmapCache(); _pageStates.value = emptyMap()
-            _uiState.update { it.copy(isLoading = false, reloadTrigger = it.reloadTrigger + 1) }
+        val newMode = if (_uiState.value.isNightMode) BackgroundMode.ORIGINAL else BackgroundMode.INVERT
+        updateViewSettings(_uiState.value.viewSettings.copy(backgroundMode = newMode))
+    }
+
+    /**
+     * Update the centralized view settings. Persists to DataStore.
+     * If the background mode changes to/from INVERT, triggers a full re-render.
+     */
+    fun updateViewSettings(newSettings: ViewSettings) {
+        val oldSettings = _uiState.value.viewSettings
+        val needsReRender = oldSettings.backgroundMode != newSettings.backgroundMode &&
+            (oldSettings.backgroundMode == BackgroundMode.INVERT || newSettings.backgroundMode == BackgroundMode.INVERT)
+
+        if (needsReRender) {
+            _uiState.update { it.copy(viewSettings = newSettings, isLoading = true) }
+            viewModelScope.launch {
+                clearBitmapCache(); _pageStates.value = emptyMap()
+                _uiState.update { it.copy(isLoading = false, reloadTrigger = it.reloadTrigger + 1) }
+                preferenceManager.saveViewSettings(newSettings)
+            }
+        } else {
+            _uiState.update { it.copy(viewSettings = newSettings) }
+            viewModelScope.launch {
+                preferenceManager.saveViewSettings(newSettings)
+            }
         }
     }
 

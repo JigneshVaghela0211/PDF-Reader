@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -66,6 +68,9 @@ import com.pdf.pdfreader.ui.components.PdfAnnotationOverlay
 import com.pdf.pdfreader.ui.viewmodel.PageRenderState
 import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
 import com.pdf.pdfreader.ui.viewmodel.ScrollEvent
+import com.pdf.pdfreader.domain.model.BackgroundMode
+import com.pdf.pdfreader.domain.model.ReadingMode
+import com.pdf.pdfreader.ui.components.ViewOptionsSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -76,7 +81,8 @@ fun PdfReaderScreen(
     path: String,
     initialPageIndex: Int = -1,
     searchQuery: String? = null,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToManagePages: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pageStates by viewModel.pageStates.collectAsStateWithLifecycle()
@@ -131,6 +137,9 @@ fun PdfReaderScreen(
 
     var isSliderVisible by remember { mutableStateOf(false) }
     var sliderInteractionTime by remember { mutableLongStateOf(0L) }
+    var showViewOptions by remember { mutableStateOf(false) }
+
+    val viewSettings = uiState.viewSettings
 
     // Auto-hide slider logic
     LaunchedEffect(isScrolling, sliderInteractionTime) {
@@ -237,16 +246,13 @@ fun PdfReaderScreen(
                                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(if (uiState.isNightMode) "Light Mode" else "Night Mode") },
+                                    text = { Text("View Options") },
                                     onClick = { 
                                         showMenu = false
-                                        viewModel.toggleNightMode() 
+                                        showViewOptions = true
                                     },
                                     leadingIcon = { 
-                                        Icon(
-                                            imageVector = if (uiState.isNightMode) Icons.Default.LightMode else Icons.Default.DarkMode, 
-                                            contentDescription = null
-                                        ) 
+                                        Icon(Icons.Default.Settings, contentDescription = null)
                                     }
                                 )
                             }
@@ -260,15 +266,37 @@ fun PdfReaderScreen(
             }
         }
     ) { paddingValues ->
+        val pageBgColor = when (viewSettings.backgroundMode) {
+            BackgroundMode.ORIGINAL -> Color(0xFFF5F5F5)
+            BackgroundMode.PAPER -> Color(0xFFF5F0E1)
+            BackgroundMode.EYE_COMFORT -> Color(0xFFF8E8C8)
+            BackgroundMode.INVERT -> Color.Black
+        }
+        val pageContentColorMatrix = remember(viewSettings.backgroundMode) {
+            when (viewSettings.backgroundMode) {
+                BackgroundMode.PAPER -> androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+                    1f, 0f, 0f, 0f, 10f,
+                    0f, 0.97f, 0f, 0f, 5f,
+                    0f, 0f, 0.90f, 0f, -10f,
+                    0f, 0f, 0f, 1f, 0f
+                ))
+                BackgroundMode.EYE_COMFORT -> androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+                    1f, 0f, 0f, 0f, 20f,
+                    0f, 0.93f, 0f, 0f, 10f,
+                    0f, 0f, 0.80f, 0f, -20f,
+                    0f, 0f, 0f, 1f, 0f
+                ))
+                else -> null
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(if (uiState.isNightMode) Color.Black else Color(0xFFF5F5F5)),
+                .background(pageBgColor),
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
-                // Zoom content — NO gesture handlers here, just visual transform
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -279,27 +307,61 @@ fun PdfReaderScreen(
                             translationY = offsetY
                         )
                 ) {
-                    LazyColumn(
-                        state = scrollState,
-                        userScrollEnabled = (!uiState.isEditMode || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE) && scale <= 1f,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(uiState.totalPages, key = { it }) { pageIndex ->
-                            PdfPage(
-                                pageIndex = pageIndex,
-                                viewModel = viewModel,
-                                width = screenWidthPx,
-                                pageStates = pageStates,
-                                isScrolling = isScrolling,
-                                reloadTrigger = uiState.reloadTrigger,
-                                onDoubleTap = {
-                                    if (scale > 1f) {
-                                        scale = 1f; offsetX = 0f; offsetY = 0f
-                                    } else {
-                                        scale = 2.5f
+                    val userScrollEnabled = (!uiState.isEditMode || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE) && scale <= 1f
+
+                    val pageContent: @Composable (Int) -> Unit = { pageIndex ->
+                        PdfPage(
+                            pageIndex = pageIndex,
+                            viewModel = viewModel,
+                            width = screenWidthPx,
+                            pageStates = pageStates,
+                            isScrolling = isScrolling,
+                            reloadTrigger = uiState.reloadTrigger,
+                            pageContentColorMatrix = pageContentColorMatrix,
+                            onDoubleTap = {
+                                if (scale > 1f) {
+                                    scale = 1f; offsetX = 0f; offsetY = 0f
+                                } else {
+                                    scale = 2.5f
+                                }
+                            }
+                        )
+                    }
+
+                    when (viewSettings.readingMode) {
+                        ReadingMode.VERTICAL -> {
+                            LazyColumn(
+                                state = scrollState,
+                                userScrollEnabled = userScrollEnabled,
+                                flingBehavior = if (viewSettings.isPageSnap) {
+                                    androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(scrollState)
+                                } else {
+                                    androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(uiState.totalPages, key = { it }) { pageIndex ->
+                                    pageContent(pageIndex)
+                                }
+                            }
+                        }
+                        ReadingMode.HORIZONTAL -> {
+                            LazyRow(
+                                state = scrollState,
+                                userScrollEnabled = userScrollEnabled,
+                                flingBehavior = if (viewSettings.isPageSnap) {
+                                    androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(scrollState)
+                                } else {
+                                    androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(uiState.totalPages, key = { it }) { pageIndex ->
+                                    Box(modifier = Modifier.fillParentMaxSize()) {
+                                        pageContent(pageIndex)
                                     }
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -394,6 +456,32 @@ fun PdfReaderScreen(
                     onExit = onNavigateBack
                 )
             }
+        }
+
+        // ─── Keep Screen On ─────────────────────────────────────
+        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+        DisposableEffect(viewSettings.keepScreenOn) {
+            if (viewSettings.keepScreenOn) {
+                activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            onDispose {
+                activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+
+        // ─── View Options Bottom Sheet ──────────────────────────
+        if (showViewOptions) {
+            ViewOptionsSheet(
+                viewSettings = viewSettings,
+                onSettingsChange = { viewModel.updateViewSettings(it) },
+                onManagePages = { 
+                    showViewOptions = false
+                    onNavigateToManagePages(uiState.filePath)
+                },
+                onDismiss = { showViewOptions = false }
+            )
         }
     }
 }
@@ -526,6 +614,7 @@ fun PdfPage(
     pageStates: Map<Int, PageRenderState>,
     isScrolling: Boolean = false,
     reloadTrigger: Int = 0,
+    pageContentColorMatrix: androidx.compose.ui.graphics.ColorMatrix? = null,
     onDoubleTap: () -> Unit = {}
 ) {
     val renderState = pageStates[pageIndex]
@@ -549,13 +638,18 @@ fun PdfPage(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isNightMode = uiState.isNightMode
+    val pageBg = when (uiState.viewSettings.backgroundMode) {
+        BackgroundMode.ORIGINAL -> Color.White
+        BackgroundMode.PAPER -> Color(0xFFF5F0E1)
+        BackgroundMode.EYE_COMFORT -> Color(0xFFF8E8C8)
+        BackgroundMode.INVERT -> Color.Black
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .background(if (isNightMode) Color.Black else Color.White)
+            .background(pageBg)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { onDoubleTap() },
@@ -579,7 +673,8 @@ fun PdfPage(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = "Page ${pageIndex + 1}",
                             modifier = Modifier.fillMaxWidth(),
-                            contentScale = ContentScale.FillWidth
+                            contentScale = ContentScale.FillWidth,
+                            colorFilter = if (pageContentColorMatrix != null) androidx.compose.ui.graphics.ColorFilter.colorMatrix(pageContentColorMatrix) else null
                         )
 
                         // Search highlights overlay

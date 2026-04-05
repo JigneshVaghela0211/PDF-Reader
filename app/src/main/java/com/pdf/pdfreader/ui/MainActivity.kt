@@ -85,6 +85,27 @@ class MainActivity : AppCompatActivity() {
                                 path = Uri.decode(path),
                                 initialPageIndex = pageIndex,
                                 searchQuery = searchQuery,
+                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateToManagePages = { p ->
+                                    navController.navigate("manage_pages/${Uri.encode(p)}")
+                                }
+                            )
+                        }
+                        composable(
+                            route = "manage_pages/{path}",
+                            arguments = listOf(
+                                navArgument("path") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val path = backStackEntry.arguments?.getString("path") ?: ""
+                            val managePagesViewModel: com.pdf.pdfreader.ui.viewmodel.ManagePagesViewModel = hiltViewModel()
+                            
+                            androidx.compose.runtime.LaunchedEffect(path) {
+                                managePagesViewModel.initialize(Uri.decode(path))
+                            }
+                            
+                            com.pdf.pdfreader.ui.screens.ManagePagesScreen(
+                                viewModel = managePagesViewModel,
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
