@@ -103,6 +103,9 @@ data class PdfReaderUiState(
     val imageElements: List<ImageElement> = emptyList(),
     val selectedImageId: String? = null,
 
+    // ─── Interaction State ───────────────────────────────────
+    val isOverlayInteracting: Boolean = false,
+
     // ─── Export State ───────────────────────────────────────
     val isExporting: Boolean = false,
     val exportResult: String? = null
@@ -1523,6 +1526,14 @@ class PdfReaderViewModel @Inject constructor(
         if (tool == AnnotationTool.EDIT_TEXT) {
             extractTextBlocks()
         }
+    }
+
+    /**
+     * Set overlay interaction state (drag/resize in progress).
+     * Used to disable parent scroll during image/text manipulation.
+     */
+    fun setOverlayInteracting(interacting: Boolean) {
+        _uiState.update { it.copy(isOverlayInteracting = interacting) }
     }
 
     // ─── Export Edited PDF ──────────────────────────────────────

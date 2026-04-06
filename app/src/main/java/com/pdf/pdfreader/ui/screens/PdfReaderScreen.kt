@@ -342,7 +342,14 @@ fun PdfReaderScreen(
                             translationY = offsetY
                         )
                 ) {
-                    val userScrollEnabled = (!uiState.isEditMode || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE) && scale <= 1f
+                    // Disable scroll when:
+                    // - User is actively interacting with image/text overlays
+                    // - Edit mode is active with an interactive tool
+                    // - Zoomed in (handled by existing pan gesture)
+                    val userScrollEnabled = (!uiState.isEditMode
+                            || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE)
+                            && scale <= 1f
+                            && !uiState.isOverlayInteracting
 
                     val pageContent: @Composable (Int) -> Unit = { pageIndex ->
                         PdfPage(
@@ -679,18 +686,32 @@ fun PdfPage(
         BackgroundMode.EYE_COMFORT -> Color(0xFFF8E8C8)
         BackgroundMode.INVERT -> Color.Black
     }
+    // Only intercept taps for annotation deselect when NOT in text/image editing mode
+    val isInteractiveEditMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT
+            || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+            || uiState.selectedImageId != null
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .background(pageBg)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { onDoubleTap() },
-                    onTap = { viewModel.selectAnnotation(null) }
-                )
-            },
+            .then(
+                if (!isInteractiveEditMode) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onDoubleTap() },
+                            onTap = { viewModel.selectAnnotation(null) }
+                        )
+                    }
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onDoubleTap() }
+                        )
+                    }
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         when (renderState) {
@@ -813,7 +834,9 @@ fun PdfPage(
                                 onMoveImage = { id, delta -> viewModel.moveImage(id, delta) },
                                 onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
                                 onResizeEnd = { id -> viewModel.onResizeEnd(id) },
-                                onMoveEnd = { id -> viewModel.onMoveEnd(id) }
+                                onMoveEnd = { id -> viewModel.onMoveEnd(id) },
+                                onInteractionStart = { viewModel.setOverlayInteracting(true) },
+                                onInteractionEnd = { viewModel.setOverlayInteracting(false) }
                             )
 
                             // Image edit toolbar for selected image

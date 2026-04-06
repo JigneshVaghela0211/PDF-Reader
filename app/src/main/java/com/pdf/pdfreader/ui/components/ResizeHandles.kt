@@ -1,5 +1,6 @@
 package com.pdf.pdfreader.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,29 +17,34 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.pdf.pdfreader.domain.model.ResizeHandle
+
+private const val TAG = "ResizeHandles"
 
 /**
  * Draws 8 resize handles around a selected image element.
  *
- * Handles are positioned at:
- * - 4 corners: top-left, top-right, bottom-left, bottom-right
- * - 4 edge midpoints: top-center, bottom-center, left-center, right-center
- *
- * Each handle is a draggable circle that reports drag deltas back to the parent.
+ * Each handle:
+ * - Has a large 32dp touch target (only 6dp visible circle)
+ * - Uses its own pointerInput to avoid gesture conflicts
+ * - Is at zIndex(10f) to stay above the image body
+ * - Fully consumes drag events to prevent parent scroll
  */
 @Composable
 fun ResizeHandles(
     elementWidth: Float,
     elementHeight: Float,
     onResizeByHandle: (ResizeHandle, Offset) -> Unit,
-    onResizeEnd: () -> Unit
+    onResizeEnd: () -> Unit,
+    onInteractionStart: () -> Unit = {},
+    onInteractionEnd: () -> Unit = {}
 ) {
-    val handleRadius = 6.dp
-    val handleRadiusPx = with(LocalDensity.current) { handleRadius.toPx() }
-    val hitAreaSize = 24.dp
+    val handleVisualRadius = 7.dp
+    val handleVisualRadiusPx = with(LocalDensity.current) { handleVisualRadius.toPx() }
+    // Large touch target — easy to grab
+    val hitAreaSize = 32.dp
 
-    // Define handle positions relative to the element (0,0 = top-left)
     val handles = listOf(
         ResizeHandle.TOP_LEFT to Offset(0f, 0f),
         ResizeHandle.TOP_CENTER to Offset(elementWidth / 2f, 0f),
@@ -50,12 +56,11 @@ fun ResizeHandles(
         ResizeHandle.BOTTOM_RIGHT to Offset(elementWidth, elementHeight)
     )
 
-    // Draw selection border
+    // Selection border
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawBehind {
-                // Dashed selection border
                 drawRect(
                     color = Color(0xFF2196F3),
                     style = Stroke(width = 2f)
@@ -63,12 +68,13 @@ fun ResizeHandles(
             }
     )
 
-    // Draw individual handles
+    // Individual resize handles
     handles.forEach { (handle, position) ->
         val hitAreaSizePx = with(LocalDensity.current) { hitAreaSize.toPx() }
 
         Box(
             modifier = Modifier
+                .zIndex(10f) // Above image body and selection border
                 .offset {
                     IntOffset(
                         (position.x - hitAreaSizePx / 2).toInt(),
@@ -79,26 +85,38 @@ fun ResizeHandles(
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
 
-                    // White fill
+                    // White fill circle
                     drawCircle(
                         color = Color.White,
-                        radius = handleRadiusPx,
+                        radius = handleVisualRadiusPx,
                         center = center,
                         style = Fill
                     )
-                    // Blue border
+                    // Blue border circle
                     drawCircle(
                         color = Color(0xFF2196F3),
-                        radius = handleRadiusPx,
+                        radius = handleVisualRadiusPx,
                         center = center,
-                        style = Stroke(width = 2f)
+                        style = Stroke(width = 2.5f)
                     )
                 }
                 .pointerInput(handle) {
                     detectDragGestures(
-                        onDragEnd = { onResizeEnd() }
+                        onDragStart = {
+                            Log.d(TAG, "Handle drag start: $handle")
+                            onInteractionStart()
+                        },
+                        onDragEnd = {
+                            Log.d(TAG, "Handle drag end: $handle")
+                            onResizeEnd()
+                            onInteractionEnd()
+                        },
+                        onDragCancel = {
+                            onResizeEnd()
+                            onInteractionEnd()
+                        }
                     ) { change, dragAmount ->
-                        change.consume()
+                        change.consume() // CRITICAL: prevents parent scroll
                         onResizeByHandle(handle, dragAmount)
                     }
                 }

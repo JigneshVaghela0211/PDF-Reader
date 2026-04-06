@@ -1,11 +1,9 @@
 package com.pdf.pdfreader.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -24,6 +22,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -32,15 +31,21 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.TextBlock
 
+private const val TAG = "TextEditOverlay"
+
 /**
- * Overlay composable that renders extracted text blocks as interactive regions
- * on top of the PDF page bitmap. When EDIT_TEXT tool is active, users can:
- * - See all detected text blocks highlighted
- * - Tap a block to select it
- * - Edit the selected block's content via a floating editor
+ * Overlay composable that renders extracted text blocks as interactive regions.
+ *
+ * Fix notes:
+ * - Uses pointerInput + detectTapGestures instead of clickable modifier
+ *   (clickable doesn't propagate correctly in overlay stacks)
+ * - Each text block is a separate composable with its own tap handler
+ * - Tap targets have zIndex(5) to be above the highlight canvas
+ * - Editor popup has zIndex(50) to be above everything
  */
 @Composable
 fun TextEditOverlay(
@@ -58,14 +63,20 @@ fun TextEditOverlay(
 
     val pageWidth = pageSize.width.toFloat()
     val pageHeight = pageSize.height.toFloat()
+    val density = LocalDensity.current
+
+    val pageBlocks = remember(textBlocks, pageIndex) {
+        textBlocks.filter { it.pageIndex == pageIndex }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Draw highlight rectangles for all text blocks
+        // ─── Layer 1: Highlight rectangles (visual only, no interaction) ───
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .zIndex(1f)
                 .drawBehind {
-                    textBlocks.filter { it.pageIndex == pageIndex }.forEach { block ->
+                    pageBlocks.forEach { block ->
                         val editedBlock = editedTextBlocks.find { it.originalBlock.id == block.id }
                         val isSelected = block.id == selectedTextBlockId
 
@@ -74,7 +85,7 @@ fun TextEditOverlay(
                         val rectW = block.width * pageWidth
                         val rectH = block.height * pageHeight
 
-                        // Draw highlight rectangle
+                        // Fill
                         drawRect(
                             color = when {
                                 isSelected -> Color(0xFF2196F3).copy(alpha = 0.2f)
@@ -85,7 +96,7 @@ fun TextEditOverlay(
                             size = Size(rectW, rectH)
                         )
 
-                        // Draw border
+                        // Border
                         drawRect(
                             color = when {
                                 isSelected -> Color(0xFF2196F3)
@@ -100,26 +111,32 @@ fun TextEditOverlay(
                 }
         )
 
-        // Render clickable tap targets for each text block
-        textBlocks.filter { it.pageIndex == pageIndex }.forEach { block ->
+        // ─── Layer 2: Tap targets for each text block (zIndex 5) ───
+        pageBlocks.forEach { block ->
             val rectX = (block.x * pageWidth).toInt()
             val rectY = (block.y * pageHeight).toInt()
-            val rectW = (block.width * pageWidth).toInt()
-            val rectH = (block.height * pageHeight).toInt()
+            val rectW = (block.width * pageWidth).toInt().coerceAtLeast(20)
+            val rectH = (block.height * pageHeight).toInt().coerceAtLeast(20)
 
             Box(
                 modifier = Modifier
+                    .zIndex(5f)
                     .offset { IntOffset(rectX, rectY) }
                     .size(
-                        width = with(LocalDensity.current) { rectW.toDp() },
-                        height = with(LocalDensity.current) { rectH.toDp() }
+                        width = with(density) { rectW.toDp() },
+                        height = with(density) { rectH.toDp() }
                     )
-                    .clickable { onSelectTextBlock(block.id) }
+                    .pointerInput(block.id) {
+                        detectTapGestures {
+                            Log.d(TAG, "Text block tapped: id=${block.id} text='${block.text.take(30)}'")
+                            onSelectTextBlock(block.id)
+                        }
+                    }
             )
         }
 
-        // Show inline edit dialog for selected text block
-        val selectedBlock = textBlocks.find { it.id == selectedTextBlockId && it.pageIndex == pageIndex }
+        // ─── Layer 3: Inline editor popup (zIndex 50) ───
+        val selectedBlock = pageBlocks.find { it.id == selectedTextBlockId }
         if (selectedBlock != null) {
             val editedVersion = editedTextBlocks.find { it.originalBlock.id == selectedBlock.id }
 
@@ -127,24 +144,32 @@ fun TextEditOverlay(
             val blockY = (selectedBlock.y * pageHeight).toInt()
             val blockH = (selectedBlock.height * pageHeight).toInt()
 
-            TextEditInlineEditor(
-                block = selectedBlock,
-                editedBlock = editedVersion,
-                offsetX = blockX,
-                offsetY = blockY + blockH + 8,
-                onConfirm = { newText, newFontSize, newColor ->
-                    onEditTextBlock(selectedBlock.id, newText, newFontSize, newColor)
-                    onSelectTextBlock(null)
-                },
-                onDismiss = { onSelectTextBlock(null) }
-            )
+            Log.d(TAG, "Showing editor for: ${selectedBlock.id} at ($blockX, ${blockY + blockH + 8})")
+
+            Box(modifier = Modifier.zIndex(50f)) {
+                TextEditInlineEditor(
+                    block = selectedBlock,
+                    editedBlock = editedVersion,
+                    offsetX = blockX,
+                    offsetY = blockY + blockH + 8,
+                    pageWidth = pageWidth.toInt(),
+                    onConfirm = { newText, newFontSize, newColor ->
+                        Log.d(TAG, "Text edit confirmed: $newText")
+                        onEditTextBlock(selectedBlock.id, newText, newFontSize, newColor)
+                        onSelectTextBlock(null)
+                    },
+                    onDismiss = {
+                        Log.d(TAG, "Text edit dismissed")
+                        onSelectTextBlock(null)
+                    }
+                )
+            }
         }
     }
 }
 
 /**
- * Inline editor that appears below the selected text block,
- * allowing the user to modify text content, font size, and color.
+ * Inline editor that appears below the selected text block.
  */
 @Composable
 private fun TextEditInlineEditor(
@@ -152,6 +177,7 @@ private fun TextEditInlineEditor(
     editedBlock: EditedTextBlock?,
     offsetX: Int,
     offsetY: Int,
+    pageWidth: Int,
     onConfirm: (String, Float, Color) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -172,9 +198,12 @@ private fun TextEditInlineEditor(
         try { focusRequester.requestFocus() } catch (_: Exception) {}
     }
 
+    // Clamp offset so editor doesn't overflow page
+    val clampedX = offsetX.coerceIn(8, (pageWidth - 320).coerceAtLeast(8))
+
     Box(
         modifier = Modifier
-            .offset { IntOffset(offsetX.coerceAtLeast(8), offsetY) }
+            .offset { IntOffset(clampedX, offsetY) }
             .widthIn(min = 200.dp, max = 320.dp)
             .background(
                 MaterialTheme.colorScheme.surface,
@@ -186,6 +215,10 @@ private fun TextEditInlineEditor(
                 RoundedCornerShape(12.dp)
             )
             .padding(12.dp)
+            // Consume taps so they don't propagate to parent
+            .pointerInput(Unit) {
+                detectTapGestures { /* consume tap */ }
+            }
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Text input
