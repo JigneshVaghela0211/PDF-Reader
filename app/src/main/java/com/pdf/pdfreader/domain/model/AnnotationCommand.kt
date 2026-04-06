@@ -87,6 +87,122 @@ sealed class AnnotationCommand {
         val before: TextState?,
         val after: TextState
     ) : AnnotationCommand()
+
+    // ─── PDF Text Edit Commands ─────────────────────────────────
+
+    /**
+     * Snapshot of an edited text block for undo/redo.
+     */
+    data class EditTextState(
+        val blockId: String,
+        val originalText: String,
+        val newText: String,
+        val originalFontSize: Float,
+        val newFontSize: Float,
+        val newColor: Long,
+        val x: Float,
+        val y: Float,
+        val width: Float,
+        val height: Float
+    )
+
+    /**
+     * Command for editing existing PDF text.
+     */
+    data class EditTextCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val before: EditTextState?,
+        val after: EditTextState
+    ) : AnnotationCommand()
+
+    // ─── Image Commands ─────────────────────────────────────────
+
+    /**
+     * Snapshot of an image element state for undo/redo.
+     */
+    data class ImageState(
+        val elementId: String,
+        val uri: String,
+        val positionX: Float,
+        val positionY: Float,
+        val width: Float,
+        val height: Float,
+        val scale: Float,
+        val rotation: Float
+    )
+
+    /**
+     * Command for adding an image to a PDF page.
+     */
+    data class AddImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val imageState: ImageState
+    ) : AnnotationCommand()
+
+    /**
+     * Command for moving an image on a PDF page.
+     */
+    data class MoveImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeX: Float,
+        val beforeY: Float,
+        val afterX: Float,
+        val afterY: Float
+    ) : AnnotationCommand()
+
+    /**
+     * Command for resizing an image.
+     */
+    data class ResizeImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeWidth: Float,
+        val beforeHeight: Float,
+        val afterWidth: Float,
+        val afterHeight: Float,
+        val beforeX: Float,
+        val beforeY: Float,
+        val afterX: Float,
+        val afterY: Float
+    ) : AnnotationCommand()
+
+    /**
+     * Command for rotating an image.
+     */
+    data class RotateImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeRotation: Float,
+        val afterRotation: Float
+    ) : AnnotationCommand()
+
+    /**
+     * Command for deleting an image from a PDF page.
+     * Stores full state so the image can be restored on undo.
+     */
+    data class DeleteImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val deletedImageState: ImageState
+    ) : AnnotationCommand()
 }
 
 /**

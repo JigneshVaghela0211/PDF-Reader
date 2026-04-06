@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +42,10 @@ fun AnnotationTopBar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onClose: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    hasEditableOverlays: Boolean = false,
+    isExporting: Boolean = false,
+    onExport: () -> Unit = {}
 ) {
     var showStrokeSlider by remember { mutableStateOf(false) }
 
@@ -125,8 +130,28 @@ fun AnnotationTopBar(
                 }
             },
             actions = {
+                // Export button (visible when text/image overlays exist)
+                if (hasEditableOverlays) {
+                    IconButton(
+                        onClick = onExport,
+                        enabled = !isExporting
+                    ) {
+                        if (isExporting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = "Export Edited PDF",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = onSave) {
-                    Icon(Icons.Default.Save, contentDescription = "Save to PDF")
+                    Icon(Icons.Default.Save, contentDescription = "Save Annotations")
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -162,6 +187,23 @@ fun AnnotationToolButtons(
     }
     IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.ERASER) AnnotationTool.NONE else AnnotationTool.ERASER) }) {
         Icon(Icons.Default.CleaningServices, contentDescription = "Eraser", tint = if (currentTool == AnnotationTool.ERASER) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    }
+    // Vertical divider between annotation tools and editor tools
+    Spacer(modifier = Modifier.width(2.dp))
+    Box(
+        modifier = Modifier
+            .height(24.dp)
+            .width(1.dp)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+    )
+    Spacer(modifier = Modifier.width(2.dp))
+    // Edit existing text
+    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.EDIT_TEXT) AnnotationTool.NONE else AnnotationTool.EDIT_TEXT) }) {
+        Icon(Icons.Default.EditNote, contentDescription = "Edit Text", tint = if (currentTool == AnnotationTool.EDIT_TEXT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    }
+    // Insert image
+    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE else AnnotationTool.INSERT_IMAGE) }) {
+        Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Insert Image", tint = if (currentTool == AnnotationTool.INSERT_IMAGE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }
 

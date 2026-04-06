@@ -66,8 +66,15 @@ object DatabaseModule {
                 )
             }
         }
+        // Migration 7→8: Support new command types (EditText, Image commands).
+        // No schema change — the annotation_commands table already stores type+payload as JSON.
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // No-op: new command types are stored using existing columns (type, payload)
+            }
+        }
         return Room.databaseBuilder(context, AppDatabase::class.java, "pdf_reader_db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .fallbackToDestructiveMigration()
             .build()
     }

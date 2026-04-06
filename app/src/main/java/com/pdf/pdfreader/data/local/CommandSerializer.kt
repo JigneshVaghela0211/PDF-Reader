@@ -24,6 +24,12 @@ object CommandSerializer {
     const val TYPE_REMOVE = "REMOVE"
     const val TYPE_UPDATE = "UPDATE"
     const val TYPE_TEXT_COMMAND = "TEXT_COMMAND"
+    const val TYPE_EDIT_TEXT = "EDIT_TEXT"
+    const val TYPE_ADD_IMAGE = "ADD_IMAGE"
+    const val TYPE_MOVE_IMAGE = "MOVE_IMAGE"
+    const val TYPE_RESIZE_IMAGE = "RESIZE_IMAGE"
+    const val TYPE_ROTATE_IMAGE = "ROTATE_IMAGE"
+    const val TYPE_DELETE_IMAGE = "DELETE_IMAGE"
 
     // ─── Serialize: AnnotationCommand → (type, payload JSON) ────
 
@@ -33,6 +39,12 @@ object CommandSerializer {
         is AnnotationCommand.RemoveAnnotation -> TYPE_REMOVE
         is AnnotationCommand.UpdateAnnotation -> TYPE_UPDATE
         is AnnotationCommand.TextCommand -> TYPE_TEXT_COMMAND
+        is AnnotationCommand.EditTextCommand -> TYPE_EDIT_TEXT
+        is AnnotationCommand.AddImageCommand -> TYPE_ADD_IMAGE
+        is AnnotationCommand.MoveImageCommand -> TYPE_MOVE_IMAGE
+        is AnnotationCommand.ResizeImageCommand -> TYPE_RESIZE_IMAGE
+        is AnnotationCommand.RotateImageCommand -> TYPE_ROTATE_IMAGE
+        is AnnotationCommand.DeleteImageCommand -> TYPE_DELETE_IMAGE
     }
 
     fun toPayload(command: AnnotationCommand): String = when (command) {
@@ -73,6 +85,12 @@ object CommandSerializer {
         )
 
         is AnnotationCommand.TextCommand -> gson.toJson(command)
+        is AnnotationCommand.EditTextCommand -> gson.toJson(command)
+        is AnnotationCommand.AddImageCommand -> gson.toJson(command)
+        is AnnotationCommand.MoveImageCommand -> gson.toJson(command)
+        is AnnotationCommand.ResizeImageCommand -> gson.toJson(command)
+        is AnnotationCommand.RotateImageCommand -> gson.toJson(command)
+        is AnnotationCommand.DeleteImageCommand -> gson.toJson(command)
     }
 
     // ─── Deserialize: (type, payload JSON) → AnnotationCommand ──
@@ -137,6 +155,30 @@ object CommandSerializer {
 
             TYPE_TEXT_COMMAND -> {
                 gson.fromJson(entity.payload, AnnotationCommand.TextCommand::class.java)
+            }
+
+            TYPE_EDIT_TEXT -> {
+                gson.fromJson(entity.payload, AnnotationCommand.EditTextCommand::class.java)
+            }
+
+            TYPE_ADD_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.AddImageCommand::class.java)
+            }
+
+            TYPE_MOVE_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.MoveImageCommand::class.java)
+            }
+
+            TYPE_RESIZE_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.ResizeImageCommand::class.java)
+            }
+
+            TYPE_ROTATE_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.RotateImageCommand::class.java)
+            }
+
+            TYPE_DELETE_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.DeleteImageCommand::class.java)
             }
 
             else -> throw IllegalArgumentException("Unknown command type: ${entity.type}")

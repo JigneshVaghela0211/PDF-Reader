@@ -2,10 +2,15 @@ package com.pdf.pdfreader.ui.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.net.Uri
 import android.util.Log
 import android.util.LruCache
 import com.pdf.pdfreader.data.local.PreferenceManager
 import com.pdf.pdfreader.domain.model.BackgroundMode
+import com.pdf.pdfreader.domain.model.EditedTextBlock
+import com.pdf.pdfreader.domain.model.ImageElement
+import com.pdf.pdfreader.domain.model.ResizeHandle
+import com.pdf.pdfreader.domain.model.TextBlock
 import com.pdf.pdfreader.domain.model.ViewSettings
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -18,7 +23,9 @@ import com.pdf.pdfreader.domain.model.PdfAnnotation
 import com.pdf.pdfreader.domain.model.SerializableOffset
 import com.pdf.pdfreader.domain.usecase.UndoRedoManager
 import com.pdf.pdfreader.ui.components.AnnotationTool
+import com.pdf.pdfreader.utiles.PdfExportManager
 import com.pdf.pdfreader.utiles.PdfPageRenderer
+import com.pdf.pdfreader.utiles.PdfTextBlockExtractor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlin.coroutines.coroutineContext
@@ -84,10 +91,27 @@ data class PdfReaderUiState(
     val canRedo: Boolean = false,
     
     // ─── Selection State ────────────────────────────────────
-    val selectedAnnotationId: String? = null
+    val selectedAnnotationId: String? = null,
+
+    // ─── Text Edit State ────────────────────────────────────
+    val textBlocks: Map<Int, List<TextBlock>> = emptyMap(),
+    val editedTextBlocks: List<EditedTextBlock> = emptyList(),
+    val selectedTextBlockId: String? = null,
+    val isTextBlocksLoading: Boolean = false,
+
+    // ─── Image Element State ────────────────────────────────
+    val imageElements: List<ImageElement> = emptyList(),
+    val selectedImageId: String? = null,
+
+    // ─── Export State ───────────────────────────────────────
+    val isExporting: Boolean = false,
+    val exportResult: String? = null
 ) {
     /** Convenience: true when background mode is INVERT */
     val isNightMode: Boolean get() = viewSettings.backgroundMode == BackgroundMode.INVERT
+
+    /** True when any editable overlay exists (text edits or images) */
+    val hasEditableOverlays: Boolean get() = editedTextBlocks.isNotEmpty() || imageElements.isNotEmpty()
 }
 
 sealed class ScrollEvent {
@@ -99,7 +123,9 @@ class PdfReaderViewModel @Inject constructor(
     application: Application,
     private val pdfRepository: com.pdf.pdfreader.domain.repository.PdfRepository,
     private val undoRedoManager: UndoRedoManager,
-    private val preferenceManager: PreferenceManager
+    private val preferenceManager: PreferenceManager,
+    private val textBlockExtractor: PdfTextBlockExtractor,
+    private val pdfExportManager: PdfExportManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -709,6 +735,7 @@ class PdfReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val command = undoRedoManager.undo() ?: return@launch
             applyUndoCommand(command)
+            applyUndoForEditCommands(command)
         }
     }
 
@@ -719,6 +746,7 @@ class PdfReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val command = undoRedoManager.redo() ?: return@launch
             applyRedoCommand(command)
+            applyRedoForEditCommands(command)
         }
     }
 
@@ -776,6 +804,8 @@ class PdfReaderViewModel @Inject constructor(
                     }
                 }
             }
+            // New command types handled by applyUndoForEditCommands()
+            else -> {}
         }
     }
 
@@ -838,6 +868,8 @@ class PdfReaderViewModel @Inject constructor(
                     }
                 }
             }
+            // New command types handled by applyRedoForEditCommands()
+            else -> {}
         }
     }
 
@@ -916,6 +948,8 @@ class PdfReaderViewModel @Inject constructor(
                     fontSize = command.after.fontSize
                 )
             }
+            // New command types don't produce PdfAnnotation objects
+            else -> null
         }
     }
 
@@ -1101,6 +1135,611 @@ class PdfReaderViewModel @Inject constructor(
 
     private fun clearBitmapCache() { bitmapCache.evictAll() }
 
+    // ─── Text Block Extraction & Editing ────────────────────────
+
+    /**
+     * Extract text blocks from the PDF using PdfBox.
+     * Called automatically when EDIT_TEXT tool is activated.
+     */
+    fun extractTextBlocks() {
+        val path = _uiState.value.filePath
+        if (path.isEmpty()) return
+        if (_uiState.value.textBlocks.isNotEmpty()) return // Already extracted
+
+        _uiState.update { it.copy(isTextBlocksLoading = true) }
+        viewModelScope.launch {
+            val blocks = textBlockExtractor.extractTextBlocks(path)
+            _uiState.update { it.copy(textBlocks = blocks, isTextBlocksLoading = false) }
+            Log.d(TAG, "Extracted text blocks: ${blocks.values.sumOf { it.size }} blocks across ${blocks.size} pages")
+        }
+    }
+
+    /**
+     * Select a text block for editing.
+     */
+    fun selectTextBlock(id: String?) {
+        _uiState.update { it.copy(selectedTextBlockId = id) }
+    }
+
+    /**
+     * Apply an edit to a detected text block.
+     * Creates an undo-able command.
+     */
+    fun editTextBlock(blockId: String, newText: String, newFontSize: Float, newColor: Color) {
+        val allBlocks = _uiState.value.textBlocks.values.flatten()
+        val originalBlock = allBlocks.find { it.id == blockId } ?: return
+
+        // Check if there's already an edit for this block
+        val existingEdit = _uiState.value.editedTextBlocks.find { it.originalBlock.id == blockId }
+
+        val newEditedBlock = EditedTextBlock(
+            originalBlock = originalBlock,
+            newText = newText,
+            newFontSize = newFontSize,
+            newColor = newColor
+        )
+
+        _uiState.update { state ->
+            val updatedEdits = if (existingEdit != null) {
+                state.editedTextBlocks.map { if (it.originalBlock.id == blockId) newEditedBlock else it }
+            } else {
+                state.editedTextBlocks + newEditedBlock
+            }
+            state.copy(editedTextBlocks = updatedEdits, selectedTextBlockId = null)
+        }
+
+        // Register undo command
+        viewModelScope.launch {
+            val beforeState = existingEdit?.let {
+                AnnotationCommand.EditTextState(
+                    blockId = blockId,
+                    originalText = it.originalBlock.text,
+                    newText = it.newText,
+                    originalFontSize = it.originalBlock.fontSize,
+                    newFontSize = it.newFontSize,
+                    newColor = it.newColor.value.toLong(),
+                    x = it.originalBlock.x,
+                    y = it.originalBlock.y,
+                    width = it.originalBlock.width,
+                    height = it.originalBlock.height
+                )
+            }
+
+            val afterState = AnnotationCommand.EditTextState(
+                blockId = blockId,
+                originalText = originalBlock.text,
+                newText = newText,
+                originalFontSize = originalBlock.fontSize,
+                newFontSize = newFontSize,
+                newColor = newColor.value.toLong(),
+                x = originalBlock.x,
+                y = originalBlock.y,
+                width = originalBlock.width,
+                height = originalBlock.height
+            )
+
+            val command = AnnotationCommand.EditTextCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = originalBlock.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                before = beforeState,
+                after = afterState
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    // ─── Image Manipulation ─────────────────────────────────────
+
+    /** Stores the image position before a drag begins (for move undo) */
+    private var imageMoveStartPosition: Offset? = null
+    /** Stores the image bounds before a resize begins */
+    private var imageResizeStartState: ImageElement? = null
+
+    /**
+     * Add an image from the given URI onto the current page.
+     */
+    fun addImage(uri: Uri, pageIndex: Int, viewWidth: Int) {
+        val context = getApplication<Application>()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Get image dimensions
+                val options = android.graphics.BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                context.contentResolver.openInputStream(uri)?.use {
+                    android.graphics.BitmapFactory.decodeStream(it, null, options)
+                }
+
+                val imgWidth = options.outWidth.toFloat()
+                val imgHeight = options.outHeight.toFloat()
+                if (imgWidth <= 0 || imgHeight <= 0) return@launch
+
+                // Scale image to fit reasonably on the page (max 50% of view width)
+                val maxWidth = viewWidth * 0.5f
+                val scale = if (imgWidth > maxWidth) maxWidth / imgWidth else 1f
+                val displayWidth = imgWidth * scale
+                val displayHeight = imgHeight * scale
+
+                // Place at center of visible area
+                val posX = (viewWidth - displayWidth) / 2f
+                val posY = 100f // Near top of page
+
+                val element = ImageElement(
+                    pageIndex = pageIndex,
+                    uri = uri.toString(),
+                    position = Offset(posX, posY),
+                    width = displayWidth,
+                    height = displayHeight
+                )
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(
+                        imageElements = it.imageElements + element,
+                        selectedImageId = element.id
+                    )}
+                }
+
+                // Register undo command
+                val command = AnnotationCommand.AddImageCommand(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = _uiState.value.filePath,
+                    pageIndex = pageIndex,
+                    timestamp = System.currentTimeMillis(),
+                    imageState = AnnotationCommand.ImageState(
+                        elementId = element.id,
+                        uri = uri.toString(),
+                        positionX = posX,
+                        positionY = posY,
+                        width = displayWidth,
+                        height = displayHeight,
+                        scale = 1f,
+                        rotation = 0f
+                    )
+                )
+                undoRedoManager.execute(command)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add image", e)
+            }
+        }
+    }
+
+    /**
+     * Select an image element.
+     */
+    fun selectImage(id: String?) {
+        _uiState.update { it.copy(selectedImageId = id) }
+    }
+
+    /**
+     * Move an image by a delta offset during drag.
+     */
+    fun moveImage(id: String, delta: Offset) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+
+        // Capture start position on first move
+        if (imageMoveStartPosition == null) {
+            imageMoveStartPosition = element.position
+        }
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(position = it.position + delta) else it
+            })
+        }
+    }
+
+    /**
+     * Finalize a move operation — create undo command.
+     */
+    fun onMoveEnd(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val startPos = imageMoveStartPosition ?: return
+        imageMoveStartPosition = null
+
+        if (startPos == element.position) return // No actual move
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.MoveImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeX = startPos.x,
+                beforeY = startPos.y,
+                afterX = element.position.x,
+                afterY = element.position.y
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Resize an image via a resize handle drag delta.
+     */
+    fun resizeImage(id: String, handle: ResizeHandle, delta: Offset) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+
+        // Capture start state on first resize delta
+        if (imageResizeStartState == null) {
+            imageResizeStartState = element
+        }
+
+        val minSize = 30f
+        var newX = element.position.x
+        var newY = element.position.y
+        var newW = element.width
+        var newH = element.height
+
+        when (handle) {
+            ResizeHandle.BOTTOM_RIGHT -> {
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.BOTTOM_LEFT -> {
+                newX += delta.x
+                newW = (newW - delta.x).coerceAtLeast(minSize)
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_RIGHT -> {
+                newY += delta.y
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+                newH = (newH - delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_LEFT -> {
+                newX += delta.x
+                newY += delta.y
+                newW = (newW - delta.x).coerceAtLeast(minSize)
+                newH = (newH - delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_CENTER -> {
+                newY += delta.y
+                newH = (newH - delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.BOTTOM_CENTER -> {
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.LEFT_CENTER -> {
+                newX += delta.x
+                newW = (newW - delta.x).coerceAtLeast(minSize)
+            }
+            ResizeHandle.RIGHT_CENTER -> {
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+            }
+        }
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(
+                    position = Offset(newX, newY),
+                    width = newW,
+                    height = newH
+                ) else it
+            })
+        }
+    }
+
+    /**
+     * Finalize a resize operation — create undo command.
+     */
+    fun onResizeEnd(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val startState = imageResizeStartState ?: return
+        imageResizeStartState = null
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.ResizeImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeWidth = startState.width,
+                beforeHeight = startState.height,
+                afterWidth = element.width,
+                afterHeight = element.height,
+                beforeX = startState.position.x,
+                beforeY = startState.position.y,
+                afterX = element.position.x,
+                afterY = element.position.y
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Rotate an image by the given degrees (typically ±90).
+     */
+    fun rotateImage(id: String, degrees: Float) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val oldRotation = element.rotation
+        val newRotation = (oldRotation + degrees) % 360f
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(rotation = newRotation) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.RotateImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeRotation = oldRotation,
+                afterRotation = newRotation
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Delete an image element. Stores full state for undo.
+     */
+    fun deleteImage(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+
+        _uiState.update { state ->
+            state.copy(
+                imageElements = state.imageElements.filter { it.id != id },
+                selectedImageId = if (state.selectedImageId == id) null else state.selectedImageId
+            )
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.DeleteImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                deletedImageState = AnnotationCommand.ImageState(
+                    elementId = element.id,
+                    uri = element.uri,
+                    positionX = element.position.x,
+                    positionY = element.position.y,
+                    width = element.width,
+                    height = element.height,
+                    scale = element.scale,
+                    rotation = element.rotation
+                )
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    // ─── Enhanced Tool Change ───────────────────────────────────
+
+    /**
+     * Override setAnnotationTool to auto-trigger text extraction when
+     * EDIT_TEXT mode is activated.
+     */
+    fun setAnnotationToolWithAutoExtract(tool: AnnotationTool) {
+        _uiState.update { it.copy(currentTool = tool) }
+        if (tool == AnnotationTool.EDIT_TEXT) {
+            extractTextBlocks()
+        }
+    }
+
+    // ─── Export Edited PDF ──────────────────────────────────────
+
+    /**
+     * Export the edited PDF with all text edits and image overlays.
+     * Saves as `<name>_edited.pdf`. Does NOT modify original.
+     */
+    fun exportEditedPdf(viewWidth: Int) {
+        val state = _uiState.value
+        if (!state.hasEditableOverlays) return
+
+        _uiState.update { it.copy(isExporting = true) }
+
+        viewModelScope.launch {
+            val result = pdfExportManager.exportEditedPdf(
+                context = getApplication(),
+                originalPath = state.filePath,
+                editedTextBlocks = state.editedTextBlocks,
+                imageElements = state.imageElements,
+                viewWidth = viewWidth
+            )
+
+            _uiState.update { it.copy(
+                isExporting = false,
+                exportResult = result
+            )}
+
+            if (result != null) {
+                Log.d(TAG, "Export successful: $result")
+            } else {
+                Log.e(TAG, "Export failed")
+            }
+        }
+    }
+
+    /**
+     * Clear the export result message.
+     */
+    fun clearExportResult() {
+        _uiState.update { it.copy(exportResult = null) }
+    }
+
+    // ─── Enhanced Undo/Redo for New Commands ────────────────────
+
+    /**
+     * Extended undo handler that also handles text edit and image commands.
+     */
+    private fun applyUndoForEditCommands(command: AnnotationCommand) {
+        when (command) {
+            is AnnotationCommand.EditTextCommand -> {
+                if (command.before == null) {
+                    // Was a new edit — undo means remove it
+                    _uiState.update { state ->
+                        state.copy(editedTextBlocks = state.editedTextBlocks.filter {
+                            it.originalBlock.id != command.after.blockId
+                        })
+                    }
+                } else {
+                    // Restore previous edit state
+                    _uiState.update { state ->
+                        state.copy(editedTextBlocks = state.editedTextBlocks.map {
+                            if (it.originalBlock.id == command.before.blockId) {
+                                it.copy(
+                                    newText = command.before.newText,
+                                    newFontSize = command.before.newFontSize,
+                                    newColor = Color(command.before.newColor.toULong())
+                                )
+                            } else it
+                        })
+                    }
+                }
+            }
+            is AnnotationCommand.AddImageCommand -> {
+                // Undo add = remove
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.filter {
+                        it.id != command.imageState.elementId
+                    })
+                }
+            }
+            is AnnotationCommand.MoveImageCommand -> {
+                // Undo move = restore previous position
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(position = Offset(command.beforeX, command.beforeY))
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.ResizeImageCommand -> {
+                // Undo resize = restore previous dimensions
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(
+                                position = Offset(command.beforeX, command.beforeY),
+                                width = command.beforeWidth,
+                                height = command.beforeHeight
+                            )
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.RotateImageCommand -> {
+                // Undo rotate = restore previous rotation
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(rotation = command.beforeRotation)
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.DeleteImageCommand -> {
+                // Undo delete = re-add the image
+                val imgState = command.deletedImageState
+                val element = ImageElement(
+                    id = imgState.elementId,
+                    pageIndex = command.pageIndex,
+                    uri = imgState.uri,
+                    position = Offset(imgState.positionX, imgState.positionY),
+                    width = imgState.width,
+                    height = imgState.height,
+                    scale = imgState.scale,
+                    rotation = imgState.rotation
+                )
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements + element)
+                }
+            }
+            else -> {} // handled by existing applyUndoCommand
+        }
+    }
+
+    /**
+     * Extended redo handler for new command types.
+     */
+    private fun applyRedoForEditCommands(command: AnnotationCommand) {
+        when (command) {
+            is AnnotationCommand.EditTextCommand -> {
+                val allBlocks = _uiState.value.textBlocks.values.flatten()
+                val original = allBlocks.find { it.id == command.after.blockId } ?: return
+                val newEdit = EditedTextBlock(
+                    originalBlock = original,
+                    newText = command.after.newText,
+                    newFontSize = command.after.newFontSize,
+                    newColor = Color(command.after.newColor.toULong())
+                )
+                _uiState.update { state ->
+                    val existing = state.editedTextBlocks.find { it.originalBlock.id == command.after.blockId }
+                    if (existing != null) {
+                        state.copy(editedTextBlocks = state.editedTextBlocks.map {
+                            if (it.originalBlock.id == command.after.blockId) newEdit else it
+                        })
+                    } else {
+                        state.copy(editedTextBlocks = state.editedTextBlocks + newEdit)
+                    }
+                }
+            }
+            is AnnotationCommand.AddImageCommand -> {
+                val imgState = command.imageState
+                val element = ImageElement(
+                    id = imgState.elementId,
+                    pageIndex = command.pageIndex,
+                    uri = imgState.uri,
+                    position = Offset(imgState.positionX, imgState.positionY),
+                    width = imgState.width,
+                    height = imgState.height,
+                    scale = imgState.scale,
+                    rotation = imgState.rotation
+                )
+                _uiState.update { it.copy(imageElements = it.imageElements + element) }
+            }
+            is AnnotationCommand.MoveImageCommand -> {
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(position = Offset(command.afterX, command.afterY))
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.ResizeImageCommand -> {
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(
+                                position = Offset(command.afterX, command.afterY),
+                                width = command.afterWidth,
+                                height = command.afterHeight
+                            )
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.RotateImageCommand -> {
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) {
+                            it.copy(rotation = command.afterRotation)
+                        } else it
+                    })
+                }
+            }
+            is AnnotationCommand.DeleteImageCommand -> {
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.filter {
+                        it.id != command.deletedImageState.elementId
+                    })
+                }
+            }
+            else -> {} // handled by existing applyRedoCommand
+        }
+    }
+
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override fun onCleared() {
         super.onCleared()
@@ -1114,3 +1753,4 @@ class PdfReaderViewModel @Inject constructor(
         searchJob?.cancel(); pdfRenderer?.close(); clearBitmapCache()
     }
 }
+

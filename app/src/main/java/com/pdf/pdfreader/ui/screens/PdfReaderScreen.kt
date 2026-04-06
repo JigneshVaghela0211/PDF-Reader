@@ -73,6 +73,9 @@ import com.pdf.pdfreader.domain.model.ReadingMode
 import com.pdf.pdfreader.ui.components.ViewOptionsSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,7 +162,36 @@ fun PdfReaderScreen(
         viewModel.updateCurrentPage(firstVisible)
     }
 
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.addImage(it, uiState.currentPage, screenWidthPx)
+        }
+    }
+
+    // Launch image picker when INSERT_IMAGE tool is selected
+    LaunchedEffect(uiState.currentTool) {
+        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE) {
+            imagePickerLauncher.launch("image/*")
+        }
+    }
+
+    // Show snackbar for export result
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(uiState.exportResult) {
+        uiState.exportResult?.let { result ->
+            snackbarHostState.showSnackbar(
+                message = "Saved: ${java.io.File(result).name}",
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearExportResult()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             var showMenu by remember { mutableStateOf(false) }
             when {
@@ -170,13 +202,16 @@ fun PdfReaderScreen(
                         currentStrokeWidth = uiState.currentStrokeWidth,
                         canUndo = uiState.canUndo,
                         canRedo = uiState.canRedo,
-                        onToolChange = viewModel::setAnnotationTool,
+                        onToolChange = viewModel::setAnnotationToolWithAutoExtract,
                         onColorChange = viewModel::setAnnotationColor,
                         onStrokeWidthChange = viewModel::setAnnotationStrokeWidth,
                         onUndo = viewModel::undo,
                         onRedo = viewModel::redo,
                         onClose = { viewModel.setEditMode(false) },
-                        onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) }
+                        onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) },
+                        hasEditableOverlays = uiState.hasEditableOverlays,
+                        isExporting = uiState.isExporting,
+                        onExport = { viewModel.exportEditedPdf(screenWidthPx) }
                     )
                 }
                 uiState.isSearchActive -> {
@@ -732,6 +767,68 @@ fun PdfPage(
                                     )
                                 }
                             }
+
+                        // ─── Text Edit Overlay (Edit existing PDF text) ────
+                        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT && pageSize != IntSize.Zero) {
+                            val pageTextBlocks = uiState.textBlocks[pageIndex] ?: emptyList()
+                            com.pdf.pdfreader.ui.components.TextEditOverlay(
+                                modifier = Modifier.matchParentSize(),
+                                pageIndex = pageIndex,
+                                pageSize = pageSize,
+                                textBlocks = pageTextBlocks,
+                                editedTextBlocks = uiState.editedTextBlocks.filter { it.originalBlock.pageIndex == pageIndex },
+                                selectedTextBlockId = uiState.selectedTextBlockId,
+                                isEditTextMode = true,
+                                onSelectTextBlock = { viewModel.selectTextBlock(it) },
+                                onEditTextBlock = { blockId, newText, newFontSize, newColor ->
+                                    viewModel.editTextBlock(blockId, newText, newFontSize, newColor)
+                                }
+                            )
+
+                            // Show loading indicator while extracting text
+                            if (uiState.isTextBlocksLoading) {
+                                Box(
+                                    modifier = Modifier.matchParentSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(36.dp),
+                                        strokeWidth = 3.dp
+                                    )
+                                }
+                            }
+                        }
+
+                        // ─── Image Overlay (Inserted images) ───────────
+                        if (uiState.imageElements.any { it.pageIndex == pageIndex } && pageSize != IntSize.Zero) {
+                            com.pdf.pdfreader.ui.components.ImageOverlay(
+                                modifier = Modifier.matchParentSize(),
+                                pageIndex = pageIndex,
+                                pageSize = pageSize,
+                                imageElements = uiState.imageElements,
+                                selectedImageId = uiState.selectedImageId,
+                                isImageMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+                                        || uiState.selectedImageId != null,
+                                onSelectImage = { viewModel.selectImage(it) },
+                                onMoveImage = { id, delta -> viewModel.moveImage(id, delta) },
+                                onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
+                                onResizeEnd = { id -> viewModel.onResizeEnd(id) },
+                                onMoveEnd = { id -> viewModel.onMoveEnd(id) }
+                            )
+
+                            // Image edit toolbar for selected image
+                            val selectedImage = uiState.imageElements.find { it.id == uiState.selectedImageId && it.pageIndex == pageIndex }
+                            if (selectedImage != null) {
+                                com.pdf.pdfreader.ui.components.ImageEditToolbar(
+                                    visible = true,
+                                    offsetX = selectedImage.position.x.toInt(),
+                                    offsetY = (selectedImage.position.y - 56).toInt().coerceAtLeast(0),
+                                    onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
+                                    onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
+                                    onDelete = { viewModel.deleteImage(selectedImage.id) }
+                                )
+                            }
+                        }
                     }
                 } else {
                     // Bitmap was recycled — re-request
