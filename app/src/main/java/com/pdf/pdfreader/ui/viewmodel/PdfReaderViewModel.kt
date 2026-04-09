@@ -1177,6 +1177,10 @@ class PdfReaderViewModel @Inject constructor(
         val existingEdit = _uiState.value.editedTextBlocks.find { it.originalBlock.id == blockId }
 
         val newEditedBlock = EditedTextBlock(
+            // CRITICAL FIX: Preserve the ID across repeated edits to the same block.
+            // Previously, a new UUID was generated on every edit, which could cause
+            // identity drift during serialization/undo-redo cycles.
+            id = existingEdit?.id ?: java.util.UUID.randomUUID().toString(),
             originalBlock = originalBlock,
             newText = newText,
             newFontSize = newFontSize,
@@ -1359,6 +1363,79 @@ class PdfReaderViewModel @Inject constructor(
                 afterY = element.position.y
             )
             undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Detect if an image has been dragged across a page boundary.
+     * Uses the LazyListState to determine page positions in the viewport.
+     *
+     * When the image center crosses into a different page:
+     * 1. Update pageIndex to the new page
+     * 2. Recalculate position relative to the new page's top-left
+     *
+     * This enables cross-page image movement in the global overlay system.
+     */
+    fun detectPageBoundaryAfterMove(
+        id: String,
+        scrollState: androidx.compose.foundation.lazy.LazyListState
+    ) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val layoutInfo = scrollState.layoutInfo
+        val visibleItems = layoutInfo.visibleItemsInfo
+        if (visibleItems.isEmpty()) return
+
+        // Compute the image center in global (viewport) coordinates
+        val scaledH = element.height * element.scale
+        val imageCenterY = element.position.y + scaledH / 2f
+
+        // Find which page the image center falls in by checking if
+        // the center position (relative to current page) has gone
+        // above or below the page boundaries
+        val currentPageItem = visibleItems.find { it.index == element.pageIndex }
+            ?: return // Current page not visible, skip detection
+
+        val currentPageHeight = currentPageItem.size.toFloat()
+
+        // Check if image has moved BELOW the current page
+        if (imageCenterY > currentPageHeight) {
+            // Moved into the next page
+            val nextPageIndex = element.pageIndex + 1
+            if (nextPageIndex < _uiState.value.totalPages) {
+                val nextPageItem = visibleItems.find { it.index == nextPageIndex }
+                val nextPageHeight = nextPageItem?.size?.toFloat() ?: currentPageHeight
+                val newY = imageCenterY - currentPageHeight - scaledH / 2f
+
+                Log.d(TAG, "Image $id crossed to page $nextPageIndex (below), newY=$newY")
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == id) it.copy(
+                            pageIndex = nextPageIndex,
+                            position = Offset(element.position.x, newY.coerceAtLeast(0f))
+                        ) else it
+                    })
+                }
+            }
+        }
+        // Check if image has moved ABOVE the current page
+        else if (imageCenterY < 0f) {
+            // Moved into the previous page
+            val prevPageIndex = element.pageIndex - 1
+            if (prevPageIndex >= 0) {
+                val prevPageItem = visibleItems.find { it.index == prevPageIndex }
+                val prevPageHeight = prevPageItem?.size?.toFloat() ?: currentPageHeight
+                val newY = prevPageHeight + imageCenterY - scaledH / 2f
+
+                Log.d(TAG, "Image $id crossed to page $prevPageIndex (above), newY=$newY")
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == id) it.copy(
+                            pageIndex = prevPageIndex,
+                            position = Offset(element.position.x, newY.coerceAtLeast(0f))
+                        ) else it
+                    })
+                }
+            }
         }
     }
 

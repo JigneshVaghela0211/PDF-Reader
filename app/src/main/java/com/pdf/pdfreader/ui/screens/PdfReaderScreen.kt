@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.R
 import com.pdf.pdfreader.ui.components.AnnotationTopBar
@@ -402,6 +403,67 @@ fun PdfReaderScreen(
                                     Box(modifier = Modifier.fillParentMaxSize()) {
                                         pageContent(pageIndex)
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // ─── GLOBAL Image Overlay (ABOVE all pages) ───────
+                    // This is the architectural fix: images render in a SINGLE
+                    // layer ABOVE the LazyColumn, so they never go behind
+                    // subsequent pages when dragged across page boundaries.
+                    if (uiState.imageElements.isNotEmpty()) {
+                        com.pdf.pdfreader.ui.components.GlobalImageOverlay(
+                            modifier = Modifier.fillMaxSize(),
+                            scrollState = scrollState,
+                            imageElements = uiState.imageElements,
+                            selectedImageId = uiState.selectedImageId,
+                            isImageMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+                                    || uiState.selectedImageId != null,
+                            onSelectImage = { viewModel.selectImage(it) },
+                            onMoveImage = { id, delta -> viewModel.moveImage(id, delta) },
+                            onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
+                            onResizeEnd = { id -> viewModel.onResizeEnd(id) },
+                            onMoveEnd = { id ->
+                                // On move end, detect page boundary crossing
+                                viewModel.detectPageBoundaryAfterMove(id, scrollState)
+                                viewModel.onMoveEnd(id)
+                            },
+                            onInteractionStart = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.DRAG) },
+                            onInteractionEnd = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.NONE) }
+                        )
+
+                        // Global image edit toolbar for selected image
+                        val selectedImage = uiState.imageElements.find { it.id == uiState.selectedImageId }
+                        if (selectedImage != null) {
+                            // Compute toolbar global position from scroll state
+                            val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
+                            val pageLayout = pageLayouts.find { it.pageIndex == selectedImage.pageIndex }
+                            if (pageLayout != null) {
+                                val toolbarGlobalY = pageLayout.offsetInViewport + selectedImage.position.y.toInt() - 60
+                                Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
+                                    com.pdf.pdfreader.ui.components.ImageEditToolbar(
+                                        visible = true,
+                                        offsetX = selectedImage.position.x.toInt(),
+                                        offsetY = toolbarGlobalY.coerceAtLeast(0),
+                                        isLocked = selectedImage.isLocked,
+                                        opacity = selectedImage.opacity,
+                                        onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
+                                        onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
+                                        onDelete = { viewModel.deleteImage(selectedImage.id) },
+                                        onDuplicate = { viewModel.duplicateImage(selectedImage.id) },
+                                        onBringToFront = { viewModel.bringToFront(selectedImage.id) },
+                                        onSendToBack = { viewModel.sendToBack(selectedImage.id) },
+                                        onToggleLock = { viewModel.toggleImageLock(selectedImage.id) },
+                                        onOpacityChange = { viewModel.setImageOpacity(selectedImage.id, it) },
+                                        onSnapToCenter = {
+                                            viewModel.snapImageToCenter(
+                                                selectedImage.id,
+                                                screenWidthPx,
+                                                pageLayout.height
+                                            )
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -829,47 +891,9 @@ fun PdfPage(
                             }
                         }
 
-                        // ─── Image Overlay (Inserted images) ───────────
-                        if (uiState.imageElements.any { it.pageIndex == pageIndex } && pageSize != IntSize.Zero) {
-                            com.pdf.pdfreader.ui.components.ImageOverlay(
-                                modifier = Modifier.matchParentSize(),
-                                pageIndex = pageIndex,
-                                pageSize = pageSize,
-                                imageElements = uiState.imageElements,
-                                selectedImageId = uiState.selectedImageId,
-                                isImageMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
-                                        || uiState.selectedImageId != null,
-                                onSelectImage = { viewModel.selectImage(it) },
-                                onMoveImage = { id, delta -> viewModel.moveImage(id, delta) },
-                                onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
-                                onResizeEnd = { id -> viewModel.onResizeEnd(id) },
-                                onMoveEnd = { id -> viewModel.onMoveEnd(id) },
-                                onInteractionStart = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.DRAG) },
-                                onInteractionEnd = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.NONE) }
-                            )
-
-                            // Image edit toolbar for selected image
-                            val selectedImage = uiState.imageElements.find { it.id == uiState.selectedImageId && it.pageIndex == pageIndex }
-                            if (selectedImage != null) {
-                                val scaledH = selectedImage.height * selectedImage.scale
-                                com.pdf.pdfreader.ui.components.ImageEditToolbar(
-                                    visible = true,
-                                    offsetX = selectedImage.position.x.toInt(),
-                                    offsetY = (selectedImage.position.y - 60).toInt().coerceAtLeast(0),
-                                    isLocked = selectedImage.isLocked,
-                                    opacity = selectedImage.opacity,
-                                    onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
-                                    onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
-                                    onDelete = { viewModel.deleteImage(selectedImage.id) },
-                                    onDuplicate = { viewModel.duplicateImage(selectedImage.id) },
-                                    onBringToFront = { viewModel.bringToFront(selectedImage.id) },
-                                    onSendToBack = { viewModel.sendToBack(selectedImage.id) },
-                                    onToggleLock = { viewModel.toggleImageLock(selectedImage.id) },
-                                    onOpacityChange = { viewModel.setImageOpacity(selectedImage.id, it) },
-                                    onSnapToCenter = { viewModel.snapImageToCenter(selectedImage.id, pageSize.width, pageSize.height) }
-                                )
-                            }
-                        }
+                        // NOTE: Image overlay has been moved to GlobalImageOverlay
+                        // (rendered ABOVE the LazyColumn, not inside per-page containers)
+                        // This prevents images from going behind subsequent pages.
                     }
                 } else {
                     // Bitmap was recycled — re-request

@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -143,6 +144,13 @@ fun TextEditOverlay(
                 TextAlignment.RIGHT -> TextAlign.End
             }
 
+            // Animate appearance so it feels like in-place update, not a new overlay
+            val alpha by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+                label = "editedTextFadeIn"
+            )
+
             Box(
                 modifier = Modifier
                     .zIndex(3f)
@@ -152,10 +160,11 @@ fun TextEditOverlay(
                         height = with(density) { rectH.toDp() }
                     )
                     // White background to hide original PDF text underneath
+                    // NO border — this should look like the text was modified in-place,
+                    // not like a new element was added on top.
                     .background(Color.White)
-                    // Green border to indicate edited
-                    .border(1.dp, Color(0xFF4CAF50).copy(alpha = 0.6f))
-                    .padding(2.dp)
+                    .graphicsLayer { this.alpha = alpha }
+                    .padding(1.dp)
             ) {
                 Text(
                     text = editedBlock.newText,
