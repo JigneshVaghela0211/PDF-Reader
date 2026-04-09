@@ -1322,6 +1322,7 @@ class PdfReaderViewModel @Inject constructor(
      */
     fun moveImage(id: String, delta: Offset) {
         val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        if (element.isLocked) return // Locked elements cannot be moved
 
         // Capture start position on first move
         if (imageMoveStartPosition == null) {
@@ -1366,6 +1367,7 @@ class PdfReaderViewModel @Inject constructor(
      */
     fun resizeImage(id: String, handle: ResizeHandle, delta: Offset) {
         val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        if (element.isLocked) return // Locked elements cannot be resized
 
         // Capture start state on first resize delta
         if (imageResizeStartState == null) {
@@ -1378,37 +1380,45 @@ class PdfReaderViewModel @Inject constructor(
         var newW = element.width
         var newH = element.height
 
+        // Now receiving INCREMENTAL deltas from the fixed ResizeHandles,
+        // so applying to current element state is correct.
         when (handle) {
             ResizeHandle.BOTTOM_RIGHT -> {
                 newW = (newW + delta.x).coerceAtLeast(minSize)
                 newH = (newH + delta.y).coerceAtLeast(minSize)
             }
             ResizeHandle.BOTTOM_LEFT -> {
-                newX += delta.x
-                newW = (newW - delta.x).coerceAtLeast(minSize)
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                newX += (newW - dw)
+                newW = dw
                 newH = (newH + delta.y).coerceAtLeast(minSize)
             }
             ResizeHandle.TOP_RIGHT -> {
-                newY += delta.y
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                newY += (newH - dh)
+                newH = dh
                 newW = (newW + delta.x).coerceAtLeast(minSize)
-                newH = (newH - delta.y).coerceAtLeast(minSize)
             }
             ResizeHandle.TOP_LEFT -> {
-                newX += delta.x
-                newY += delta.y
-                newW = (newW - delta.x).coerceAtLeast(minSize)
-                newH = (newH - delta.y).coerceAtLeast(minSize)
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                newX += (newW - dw)
+                newY += (newH - dh)
+                newW = dw
+                newH = dh
             }
             ResizeHandle.TOP_CENTER -> {
-                newY += delta.y
-                newH = (newH - delta.y).coerceAtLeast(minSize)
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                newY += (newH - dh)
+                newH = dh
             }
             ResizeHandle.BOTTOM_CENTER -> {
                 newH = (newH + delta.y).coerceAtLeast(minSize)
             }
             ResizeHandle.LEFT_CENTER -> {
-                newX += delta.x
-                newW = (newW - delta.x).coerceAtLeast(minSize)
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                newX += (newW - dw)
+                newW = dw
             }
             ResizeHandle.RIGHT_CENTER -> {
                 newW = (newW + delta.x).coerceAtLeast(minSize)
@@ -1509,8 +1519,204 @@ class PdfReaderViewModel @Inject constructor(
                     width = element.width,
                     height = element.height,
                     scale = element.scale,
-                    rotation = element.rotation
+                    rotation = element.rotation,
+                    opacity = element.opacity,
+                    isLocked = element.isLocked,
+                    zIndex = element.zIndex
                 )
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    // ─── New Features: Duplicate, Layer, Lock, Opacity ────────────
+
+    /**
+     * Duplicate an image element with a small offset.
+     */
+    fun duplicateImage(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val newElement = element.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            position = Offset(element.position.x + 20f, element.position.y + 20f)
+        )
+
+        _uiState.update { it.copy(
+            imageElements = it.imageElements + newElement,
+            selectedImageId = newElement.id
+        )}
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.DuplicateImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = newElement.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                duplicatedImageState = AnnotationCommand.ImageState(
+                    elementId = newElement.id,
+                    uri = newElement.uri,
+                    positionX = newElement.position.x,
+                    positionY = newElement.position.y,
+                    width = newElement.width,
+                    height = newElement.height,
+                    scale = newElement.scale,
+                    rotation = newElement.rotation,
+                    opacity = newElement.opacity,
+                    isLocked = newElement.isLocked,
+                    zIndex = newElement.zIndex
+                )
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Bring an image to the front (highest zIndex).
+     */
+    fun bringToFront(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val maxZ = _uiState.value.imageElements.maxOfOrNull { it.zIndex } ?: 0
+        if (element.zIndex >= maxZ && maxZ > 0) return // Already on top
+
+        val newZ = maxZ + 1
+        val oldZ = element.zIndex
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(zIndex = newZ) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.ChangeLayerCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeZIndex = oldZ,
+                afterZIndex = newZ
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Send an image to the back (lowest zIndex).
+     */
+    fun sendToBack(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val minZ = _uiState.value.imageElements.minOfOrNull { it.zIndex } ?: 0
+        if (element.zIndex <= minZ && minZ < 0) return // Already at back
+
+        val newZ = minZ - 1
+        val oldZ = element.zIndex
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(zIndex = newZ) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.ChangeLayerCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeZIndex = oldZ,
+                afterZIndex = newZ
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Toggle lock state of an image element.
+     */
+    fun toggleImageLock(id: String) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val newLocked = !element.isLocked
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(isLocked = newLocked) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.LockImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeLocked = element.isLocked,
+                afterLocked = newLocked
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Set the opacity of an image element.
+     */
+    fun setImageOpacity(id: String, opacity: Float) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        val clampedOpacity = opacity.coerceIn(0.1f, 1f)
+        val oldOpacity = element.opacity
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(opacity = clampedOpacity) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.ChangeImageOpacityCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeOpacity = oldOpacity,
+                afterOpacity = clampedOpacity
+            )
+            undoRedoManager.execute(command)
+        }
+    }
+
+    /**
+     * Snap image to center of the page.
+     */
+    fun snapImageToCenter(id: String, pageWidth: Int, pageHeight: Int) {
+        val element = _uiState.value.imageElements.find { it.id == id } ?: return
+        if (element.isLocked) return
+
+        val startPos = element.position
+        val scaledW = element.width * element.scale
+        val scaledH = element.height * element.scale
+        val centerX = (pageWidth - scaledW) / 2f
+        val centerY = (pageHeight - scaledH) / 2f
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map {
+                if (it.id == id) it.copy(position = Offset(centerX, centerY)) else it
+            })
+        }
+
+        viewModelScope.launch {
+            val command = AnnotationCommand.MoveImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = element.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeX = startPos.x,
+                beforeY = startPos.y,
+                afterX = centerX,
+                afterY = centerY
             )
             undoRedoManager.execute(command)
         }
@@ -1661,10 +1867,45 @@ class PdfReaderViewModel @Inject constructor(
                     width = imgState.width,
                     height = imgState.height,
                     scale = imgState.scale,
-                    rotation = imgState.rotation
+                    rotation = imgState.rotation,
+                    opacity = imgState.opacity,
+                    isLocked = imgState.isLocked,
+                    zIndex = imgState.zIndex
                 )
                 _uiState.update { state ->
                     state.copy(imageElements = state.imageElements + element)
+                }
+            }
+            is AnnotationCommand.DuplicateImageCommand -> {
+                // Undo duplicate = remove the duplicated element
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.filter {
+                        it.id != command.duplicatedImageState.elementId
+                    })
+                }
+            }
+            is AnnotationCommand.ChangeLayerCommand -> {
+                // Undo layer change = restore previous zIndex
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(zIndex = command.beforeZIndex) else it
+                    })
+                }
+            }
+            is AnnotationCommand.ChangeImageOpacityCommand -> {
+                // Undo opacity change = restore previous opacity
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(opacity = command.beforeOpacity) else it
+                    })
+                }
+            }
+            is AnnotationCommand.LockImageCommand -> {
+                // Undo lock = restore previous lock state
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(isLocked = command.beforeLocked) else it
+                    })
                 }
             }
             else -> {} // handled by existing applyUndoCommand
@@ -1706,7 +1947,10 @@ class PdfReaderViewModel @Inject constructor(
                     width = imgState.width,
                     height = imgState.height,
                     scale = imgState.scale,
-                    rotation = imgState.rotation
+                    rotation = imgState.rotation,
+                    opacity = imgState.opacity,
+                    isLocked = imgState.isLocked,
+                    zIndex = imgState.zIndex
                 )
                 _uiState.update { it.copy(imageElements = it.imageElements + element) }
             }
@@ -1745,6 +1989,48 @@ class PdfReaderViewModel @Inject constructor(
                 _uiState.update { state ->
                     state.copy(imageElements = state.imageElements.filter {
                         it.id != command.deletedImageState.elementId
+                    })
+                }
+            }
+            is AnnotationCommand.DuplicateImageCommand -> {
+                // Redo duplicate = re-add the duplicated element
+                val imgState = command.duplicatedImageState
+                val element = ImageElement(
+                    id = imgState.elementId,
+                    pageIndex = command.pageIndex,
+                    uri = imgState.uri,
+                    position = Offset(imgState.positionX, imgState.positionY),
+                    width = imgState.width,
+                    height = imgState.height,
+                    scale = imgState.scale,
+                    rotation = imgState.rotation,
+                    opacity = imgState.opacity,
+                    isLocked = imgState.isLocked,
+                    zIndex = imgState.zIndex
+                )
+                _uiState.update { it.copy(imageElements = it.imageElements + element) }
+            }
+            is AnnotationCommand.ChangeLayerCommand -> {
+                // Redo layer change = apply new zIndex
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(zIndex = command.afterZIndex) else it
+                    })
+                }
+            }
+            is AnnotationCommand.ChangeImageOpacityCommand -> {
+                // Redo opacity change = apply new opacity
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(opacity = command.afterOpacity) else it
+                    })
+                }
+            }
+            is AnnotationCommand.LockImageCommand -> {
+                // Redo lock = apply new lock state
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == command.elementId) it.copy(isLocked = command.afterLocked) else it
                     })
                 }
             }

@@ -20,7 +20,13 @@ data class ImageElement(
     /** Uniform scale factor (1.0 = original) */
     val scale: Float = 1f,
     /** Rotation in degrees (0, 90, 180, 270) */
-    val rotation: Float = 0f
+    val rotation: Float = 0f,
+    /** Opacity from 0f (transparent) to 1f (fully opaque) */
+    val opacity: Float = 1f,
+    /** When true, element cannot be moved or resized */
+    val isLocked: Boolean = false,
+    /** Layer ordering index. Higher values render on top. */
+    val zIndex: Int = 0
 )
 
 /**

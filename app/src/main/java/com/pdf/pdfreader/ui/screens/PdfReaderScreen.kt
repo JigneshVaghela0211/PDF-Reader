@@ -851,13 +851,22 @@ fun PdfPage(
                             // Image edit toolbar for selected image
                             val selectedImage = uiState.imageElements.find { it.id == uiState.selectedImageId && it.pageIndex == pageIndex }
                             if (selectedImage != null) {
+                                val scaledH = selectedImage.height * selectedImage.scale
                                 com.pdf.pdfreader.ui.components.ImageEditToolbar(
                                     visible = true,
                                     offsetX = selectedImage.position.x.toInt(),
-                                    offsetY = (selectedImage.position.y - 56).toInt().coerceAtLeast(0),
+                                    offsetY = (selectedImage.position.y - 60).toInt().coerceAtLeast(0),
+                                    isLocked = selectedImage.isLocked,
+                                    opacity = selectedImage.opacity,
                                     onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
                                     onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
-                                    onDelete = { viewModel.deleteImage(selectedImage.id) }
+                                    onDelete = { viewModel.deleteImage(selectedImage.id) },
+                                    onDuplicate = { viewModel.duplicateImage(selectedImage.id) },
+                                    onBringToFront = { viewModel.bringToFront(selectedImage.id) },
+                                    onSendToBack = { viewModel.sendToBack(selectedImage.id) },
+                                    onToggleLock = { viewModel.toggleImageLock(selectedImage.id) },
+                                    onOpacityChange = { viewModel.setImageOpacity(selectedImage.id, it) },
+                                    onSnapToCenter = { viewModel.snapImageToCenter(selectedImage.id, pageSize.width, pageSize.height) }
                                 )
                             }
                         }

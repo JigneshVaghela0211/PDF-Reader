@@ -33,5 +33,19 @@ data class EditedTextBlock(
     val originalBlock: TextBlock,
     val newText: String,
     val newFontSize: Float,
-    val newColor: Color = Color.Black
+    val newColor: Color = Color.Black,
+    /** Opacity from 0f (transparent) to 1f (fully opaque) */
+    val opacity: Float = 1f,
+    /** When true, element cannot be moved or edited */
+    val isLocked: Boolean = false,
+    /** Text alignment within the block */
+    val alignment: TextAlignment = TextAlignment.LEFT
 )
+
+/**
+ * Text alignment options for edited text blocks.
+ */
+enum class TextAlignment {
+    LEFT, CENTER, RIGHT
+}
+

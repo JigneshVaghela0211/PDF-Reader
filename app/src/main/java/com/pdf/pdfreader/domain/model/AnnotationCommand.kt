@@ -103,7 +103,10 @@ sealed class AnnotationCommand {
         val x: Float,
         val y: Float,
         val width: Float,
-        val height: Float
+        val height: Float,
+        val opacity: Float = 1f,
+        val isLocked: Boolean = false,
+        val alignment: String = "LEFT"
     )
 
     /**
@@ -131,7 +134,10 @@ sealed class AnnotationCommand {
         val width: Float,
         val height: Float,
         val scale: Float,
-        val rotation: Float
+        val rotation: Float,
+        val opacity: Float = 1f,
+        val isLocked: Boolean = false,
+        val zIndex: Int = 0
     )
 
     /**
@@ -203,9 +209,68 @@ sealed class AnnotationCommand {
         override val timestamp: Long,
         val deletedImageState: ImageState
     ) : AnnotationCommand()
+
+    // ─── Duplicate Commands ─────────────────────────────────────
+
+    /**
+     * Command for duplicating an image element.
+     */
+    data class DuplicateImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val duplicatedImageState: ImageState
+    ) : AnnotationCommand()
+
+    // ─── Layer Commands ─────────────────────────────────────────
+
+    /**
+     * Command for changing the layer order of an image element.
+     */
+    data class ChangeLayerCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeZIndex: Int,
+        val afterZIndex: Int
+    ) : AnnotationCommand()
+
+    // ─── Opacity Commands ───────────────────────────────────────
+
+    /**
+     * Command for changing the opacity of an image element.
+     */
+    data class ChangeImageOpacityCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeOpacity: Float,
+        val afterOpacity: Float
+    ) : AnnotationCommand()
+
+    // ─── Lock Commands ──────────────────────────────────────────
+
+    /**
+     * Command for toggling the lock state of an image element.
+     */
+    data class LockImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeLocked: Boolean,
+        val afterLocked: Boolean
+    ) : AnnotationCommand()
 }
 
 /**
  * Lightweight serializable offset without Compose dependency.
  */
 data class SerializableOffset(val x: Float, val y: Float)
+

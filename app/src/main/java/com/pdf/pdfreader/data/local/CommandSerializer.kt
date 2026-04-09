@@ -30,6 +30,10 @@ object CommandSerializer {
     const val TYPE_RESIZE_IMAGE = "RESIZE_IMAGE"
     const val TYPE_ROTATE_IMAGE = "ROTATE_IMAGE"
     const val TYPE_DELETE_IMAGE = "DELETE_IMAGE"
+    const val TYPE_DUPLICATE_IMAGE = "DUPLICATE_IMAGE"
+    const val TYPE_CHANGE_LAYER = "CHANGE_LAYER"
+    const val TYPE_CHANGE_OPACITY = "CHANGE_OPACITY"
+    const val TYPE_LOCK_IMAGE = "LOCK_IMAGE"
 
     // ─── Serialize: AnnotationCommand → (type, payload JSON) ────
 
@@ -45,6 +49,10 @@ object CommandSerializer {
         is AnnotationCommand.ResizeImageCommand -> TYPE_RESIZE_IMAGE
         is AnnotationCommand.RotateImageCommand -> TYPE_ROTATE_IMAGE
         is AnnotationCommand.DeleteImageCommand -> TYPE_DELETE_IMAGE
+        is AnnotationCommand.DuplicateImageCommand -> TYPE_DUPLICATE_IMAGE
+        is AnnotationCommand.ChangeLayerCommand -> TYPE_CHANGE_LAYER
+        is AnnotationCommand.ChangeImageOpacityCommand -> TYPE_CHANGE_OPACITY
+        is AnnotationCommand.LockImageCommand -> TYPE_LOCK_IMAGE
     }
 
     fun toPayload(command: AnnotationCommand): String = when (command) {
@@ -91,6 +99,10 @@ object CommandSerializer {
         is AnnotationCommand.ResizeImageCommand -> gson.toJson(command)
         is AnnotationCommand.RotateImageCommand -> gson.toJson(command)
         is AnnotationCommand.DeleteImageCommand -> gson.toJson(command)
+        is AnnotationCommand.DuplicateImageCommand -> gson.toJson(command)
+        is AnnotationCommand.ChangeLayerCommand -> gson.toJson(command)
+        is AnnotationCommand.ChangeImageOpacityCommand -> gson.toJson(command)
+        is AnnotationCommand.LockImageCommand -> gson.toJson(command)
     }
 
     // ─── Deserialize: (type, payload JSON) → AnnotationCommand ──
@@ -179,6 +191,22 @@ object CommandSerializer {
 
             TYPE_DELETE_IMAGE -> {
                 gson.fromJson(entity.payload, AnnotationCommand.DeleteImageCommand::class.java)
+            }
+
+            TYPE_DUPLICATE_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.DuplicateImageCommand::class.java)
+            }
+
+            TYPE_CHANGE_LAYER -> {
+                gson.fromJson(entity.payload, AnnotationCommand.ChangeLayerCommand::class.java)
+            }
+
+            TYPE_CHANGE_OPACITY -> {
+                gson.fromJson(entity.payload, AnnotationCommand.ChangeImageOpacityCommand::class.java)
+            }
+
+            TYPE_LOCK_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.LockImageCommand::class.java)
             }
 
             else -> throw IllegalArgumentException("Unknown command type: ${entity.type}")

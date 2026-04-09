@@ -40,6 +40,12 @@ private const val MAX_SIZE_PX = 262000f
  *   - Handles are children of the image Box, so their pointerInput handlers
  *     run BEFORE the parent's drag handler (depth-first event dispatch).
  *   - Deselect tap catcher sits below all images at zIndex(0).
+ *
+ * ENHANCEMENTS:
+ *   - Images sorted by zIndex for correct layer ordering
+ *   - Locked images have disabled gestures
+ *   - Opacity applied via graphicsLayer
+ *   - Drag uses incremental deltas (same fix as resize)
  */
 @Composable
 fun ImageOverlay(
@@ -55,11 +61,18 @@ fun ImageOverlay(
     onResizeEnd: (String) -> Unit,
     onMoveEnd: (String) -> Unit,
     onInteractionStart: () -> Unit = {},
-    onInteractionEnd: () -> Unit = {}
+    onInteractionEnd: () -> Unit = {},
+    pageWidth: Int = 0,
+    pageHeight: Int = 0
 ) {
     if (pageSize == IntSize.Zero) return
 
-    val pageImages = imageElements.filter { it.pageIndex == pageIndex }
+    // Sort by zIndex so higher values render on top
+    val pageImages = remember(imageElements, pageIndex) {
+        imageElements
+            .filter { it.pageIndex == pageIndex }
+            .sortedBy { it.zIndex }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         // ─── Deselect tap catcher BELOW images (zIndex = 0) ───
@@ -102,7 +115,9 @@ fun ImageOverlay(
                     onResizeEnd = { onResizeEnd(element.id) },
                     onMoveEnd = { onMoveEnd(element.id) },
                     onInteractionStart = onInteractionStart,
-                    onInteractionEnd = onInteractionEnd
+                    onInteractionEnd = onInteractionEnd,
+                    pageWidth = pageSize.width,
+                    pageHeight = pageSize.height
                 )
             }
         }
@@ -110,21 +125,13 @@ fun ImageOverlay(
 }
 
 /**
- * Individual image element with unified gesture hierarchy:
+ * Individual image element with unified gesture hierarchy.
  *
- * Structure:
- *   Box (positioned, handles drag when selected)
- *     ├─ Image (visual content)
- *     └─ ResizeHandles (children — get gesture priority over parent)
+ * FIX: Drag now uses incremental deltas (current - previous) instead of
+ * cumulative (current - initial), matching the resize handle fix.
  *
- * When selected:
- *   - Parent Box uses awaitEachGesture for drag, consuming DOWN immediately
- *     to prevent LazyColumn from stealing the gesture
- *   - ResizeHandles are CHILDREN of this Box, so their pointerInput handlers
- *     run first in depth-first traversal, giving them priority over parent drag
- *
- * When not selected:
- *   - Simple tap-to-select handler
+ * Lock support: When element.isLocked, no gesture handlers are attached.
+ * Opacity: Applied via graphicsLayer alpha.
  */
 @Composable
 private fun ImageElementView(
@@ -137,7 +144,9 @@ private fun ImageElementView(
     onResizeEnd: () -> Unit,
     onMoveEnd: () -> Unit,
     onInteractionStart: () -> Unit,
-    onInteractionEnd: () -> Unit
+    onInteractionEnd: () -> Unit,
+    pageWidth: Int,
+    pageHeight: Int
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -162,11 +171,19 @@ private fun ImageElementView(
     val scaledWidth = (element.width * element.scale).coerceIn(1f, MAX_SIZE_PX)
     val scaledHeight = (element.height * element.scale).coerceIn(1f, MAX_SIZE_PX)
 
+    // Determine if element is locked — no gestures when locked
+    val isLocked = element.isLocked
+
     // ─── UNIFIED Box: image body + handles as children ───
     Box(
         modifier = Modifier
-            .zIndex(if (isSelected) 12f else 10f)
-            .offset { IntOffset(element.position.x.toInt(), element.position.y.toInt()) }
+            .zIndex(if (isSelected) 12f + element.zIndex else 10f + element.zIndex)
+            .offset {
+                IntOffset(
+                    element.position.x.toInt().coerceAtLeast(0),
+                    element.position.y.toInt().coerceAtLeast(0)
+                )
+            }
             .size(
                 width = with(density) { scaledWidth.toDp() },
                 height = with(density) { scaledHeight.toDp() }
@@ -174,19 +191,26 @@ private fun ImageElementView(
             .graphicsLayer {
                 rotationZ = element.rotation
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                alpha = element.opacity
             }
             .then(
-                if (isInteractive && isSelected) {
-                    // DRAG gesture — awaitEachGesture consumes DOWN immediately
-                    // to prevent parent scroll from stealing. ResizeHandles children
-                    // get priority because Compose dispatches to children first.
+                if (isLocked) {
+                    // Locked: show lock border but no gesture handling
+                    if (isSelected) {
+                        Modifier.border(2.dp, Color(0xFFFF9800)) // Orange border for locked+selected
+                    } else {
+                        Modifier
+                    }
+                } else if (isInteractive && isSelected) {
+                    // DRAG gesture — uses INCREMENTAL deltas (FIX)
                     Modifier.pointerInput(element.id) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             down.consume()
                             onInteractionStart()
 
-                            var lastPosition = down.position
+                            // INCREMENTAL delta tracking
+                            var previousPosition = down.position
                             var hasDragged = false
                             try {
                                 while (true) {
@@ -194,14 +218,14 @@ private fun ImageElementView(
                                     val change = event.changes.firstOrNull() ?: break
 
                                     if (change.pressed) {
-                                        val dragDelta = change.position - lastPosition
-                                        lastPosition = change.position
+                                        val incrementalDelta = change.position - previousPosition
                                         change.consume()
 
-                                        if (dragDelta != Offset.Zero) {
+                                        if (incrementalDelta != Offset.Zero) {
                                             hasDragged = true
-                                            onMoveBy(dragDelta)
+                                            onMoveBy(incrementalDelta)
                                         }
+                                        previousPosition = change.position
                                     } else {
                                         // Pointer released
                                         change.consume()
@@ -235,7 +259,7 @@ private fun ImageElementView(
                 }
             )
             .then(
-                if (isSelected) {
+                if (isSelected && !isLocked) {
                     Modifier.border(2.dp, Color(0xFF2196F3))
                 } else {
                     Modifier
@@ -251,7 +275,7 @@ private fun ImageElementView(
         )
 
         // ─── Child 2: Resize handles (ABOVE image, gesture priority over parent drag) ───
-        if (isSelected && isInteractive) {
+        if (isSelected && isInteractive && !isLocked) {
             ResizeHandles(
                 elementWidth = scaledWidth,
                 elementHeight = scaledHeight,

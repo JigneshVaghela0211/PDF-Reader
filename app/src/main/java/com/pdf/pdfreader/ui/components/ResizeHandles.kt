@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +33,10 @@ private const val TAG = "ResizeHandles"
  *   — this prevents parent scroll from stealing the gesture
  * - Is at zIndex(10f) to stay above the image body
  * - Signals InteractionMode.RESIZE on initial touch
+ *
+ * FIX: Uses incremental deltas (current - previous) instead of
+ * cumulative (current - initial). This prevents the feedback loop where
+ * the coordinate space shifts as the element resizes.
  */
 @Composable
 fun ResizeHandles(
@@ -45,8 +49,13 @@ fun ResizeHandles(
 ) {
     val handleVisualRadius = 7.dp
     val handleVisualRadiusPx = with(LocalDensity.current) { handleVisualRadius.toPx() }
+    // Active handle visual radius (larger when dragging)
+    val activeHandleVisualRadiusPx = with(LocalDensity.current) { 9.dp.toPx() }
     // 44dp — Android accessibility minimum touch target
     val hitAreaSize = 44.dp
+
+    // Track which handle is currently being dragged for visual feedback
+    var activeHandle by remember { mutableStateOf<ResizeHandle?>(null) }
 
     val handles = listOf(
         ResizeHandle.TOP_LEFT to Offset(0f, 0f),
@@ -74,6 +83,7 @@ fun ResizeHandles(
     // Individual resize handles
     handles.forEach { (handle, position) ->
         val hitAreaSizePx = with(LocalDensity.current) { hitAreaSize.toPx() }
+        val isActive = activeHandle == handle
 
         Box(
             modifier = Modifier
@@ -87,47 +97,55 @@ fun ResizeHandles(
                 .size(hitAreaSize)
                 .drawBehind {
                     val center = Offset(size.width / 2f, size.height / 2f)
+                    val radius = if (isActive) activeHandleVisualRadiusPx else handleVisualRadiusPx
+                    val borderColor = if (isActive) Color(0xFF1565C0) else Color(0xFF2196F3)
+                    val fillColor = if (isActive) Color(0xFFBBDEFB) else Color.White
 
-                    // White fill circle
+                    // Fill circle
                     drawCircle(
-                        color = Color.White,
-                        radius = handleVisualRadiusPx,
+                        color = fillColor,
+                        radius = radius,
                         center = center,
                         style = Fill
                     )
-                    // Blue border circle
+                    // Border circle
                     drawCircle(
-                        color = Color(0xFF2196F3),
-                        radius = handleVisualRadiusPx,
+                        color = borderColor,
+                        radius = radius,
                         center = center,
-                        style = Stroke(width = 2.5f)
+                        style = Stroke(width = if (isActive) 3f else 2.5f)
                     )
                 }
-                // CRITICAL: Use awaitEachGesture to consume DOWN event immediately.
-                // This prevents the parent (LazyColumn scroll) from stealing the gesture.
+                // CRITICAL FIX: Use incremental deltas instead of cumulative.
+                // Track previousPosition and compute (current - previous) each frame.
+                // This eliminates the feedback loop where coordinate space shifts
+                // during resize caused jumpy/inaccurate behavior.
                 .pointerInput(handle) {
                     awaitEachGesture {
                         // 1. Await initial touch-down — consume it immediately
                         val down = awaitFirstDown(requireUnconsumed = false)
                         down.consume()
                         Log.d(TAG, "Handle DOWN: $handle")
+                        activeHandle = handle
                         onInteractionStart()
 
-                        // 2. Track drag movement until release
-                        var lastPosition = down.position
+                        // 2. Track drag movement using INCREMENTAL deltas
+                        var previousPosition = down.position
                         try {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Main)
                                 val change = event.changes.firstOrNull() ?: break
 
                                 if (change.pressed) {
-                                    val dragDelta = change.position - lastPosition
-                                    lastPosition = change.position
+                                    // INCREMENTAL delta: current position minus previous position
+                                    val incrementalDelta = change.position - previousPosition
                                     change.consume()
 
-                                    if (dragDelta != Offset.Zero) {
-                                        onResizeByHandle(handle, dragDelta)
+                                    if (incrementalDelta != Offset.Zero) {
+                                        onResizeByHandle(handle, incrementalDelta)
                                     }
+                                    // Update previous position for next frame
+                                    previousPosition = change.position
                                 } else {
                                     // Pointer released
                                     change.consume()
@@ -139,6 +157,7 @@ fun ResizeHandles(
                         }
 
                         Log.d(TAG, "Handle UP: $handle")
+                        activeHandle = null
                         onResizeEnd()
                         onInteractionEnd()
                     }

@@ -31,11 +31,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.pdf.pdfreader.domain.model.EditedTextBlock
+import com.pdf.pdfreader.domain.model.TextAlignment
 import com.pdf.pdfreader.domain.model.TextBlock
 
 private const val TAG = "TextEditOverlay"
@@ -46,12 +49,13 @@ private const val MAX_SIZE_PX = 262000
 /**
  * Overlay composable that renders extracted text blocks as interactive regions.
  *
- * Fix notes:
- * - Uses pointerInput + detectTapGestures instead of clickable modifier
- *   (clickable doesn't propagate correctly in overlay stacks)
- * - Each text block is a separate composable with its own tap handler
- * - Tap targets have zIndex(5) to be above the highlight canvas
- * - Editor popup has zIndex(50) to be above everything
+ * CRITICAL FIX: Now renders edited text content on top of the original PDF text.
+ * Previously only highlight rectangles were drawn — the actual text edits were
+ * never visible. Now:
+ * 1. Un-edited blocks get a yellow highlight border (tap to edit)
+ * 2. Edited blocks get a white background + the new text rendered on top,
+ *    hiding the original PDF text underneath
+ * 3. Selected block shows the inline editor (zIndex 50)
  */
 @Composable
 fun TextEditOverlay(
@@ -76,7 +80,7 @@ fun TextEditOverlay(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // ─── Layer 1: Highlight rectangles (visual only, no interaction) ───
+        // ─── Layer 1: Highlight rectangles for UN-EDITED blocks (visual only) ───
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -85,6 +89,9 @@ fun TextEditOverlay(
                     pageBlocks.forEach { block ->
                         val editedBlock = editedTextBlocks.find { it.originalBlock.id == block.id }
                         val isSelected = block.id == selectedTextBlockId
+
+                        // Skip drawing highlight for edited blocks — they get a composable overlay
+                        if (editedBlock != null) return@forEach
 
                         val rectX = block.x * pageWidth
                         val rectY = block.y * pageHeight
@@ -95,7 +102,6 @@ fun TextEditOverlay(
                         drawRect(
                             color = when {
                                 isSelected -> Color(0xFF2196F3).copy(alpha = 0.2f)
-                                editedBlock != null -> Color(0xFF4CAF50).copy(alpha = 0.15f)
                                 else -> Color(0xFFFFC107).copy(alpha = 0.1f)
                             },
                             topLeft = Offset(rectX, rectY),
@@ -106,7 +112,6 @@ fun TextEditOverlay(
                         drawRect(
                             color = when {
                                 isSelected -> Color(0xFF2196F3)
-                                editedBlock != null -> Color(0xFF4CAF50)
                                 else -> Color(0xFFFFC107).copy(alpha = 0.5f)
                             },
                             topLeft = Offset(rectX, rectY),
@@ -117,7 +122,57 @@ fun TextEditOverlay(
                 }
         )
 
-        // ─── Layer 2: Tap targets for each text block (zIndex 5) ───
+        // ─── Layer 2: Rendered EDITED text blocks (visible text overlays) ───
+        // This is the CRITICAL FIX: previously edited text was never rendered.
+        // Now we draw a white background + the new text on top of the original PDF text.
+        pageBlocks.forEach { block ->
+            val editedBlock = editedTextBlocks.find { it.originalBlock.id == block.id }
+                ?: return@forEach
+
+            // Don't render if currently being edited (editor is showing instead)
+            if (block.id == selectedTextBlockId) return@forEach
+
+            val rectX = (block.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectY = (block.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectW = (block.width * pageWidth).toInt().coerceIn(20, MAX_SIZE_PX)
+            val rectH = (block.height * pageHeight).toInt().coerceIn(20, MAX_SIZE_PX)
+
+            val textAlign = when (editedBlock.alignment) {
+                TextAlignment.LEFT -> TextAlign.Start
+                TextAlignment.CENTER -> TextAlign.Center
+                TextAlignment.RIGHT -> TextAlign.End
+            }
+
+            Box(
+                modifier = Modifier
+                    .zIndex(3f)
+                    .offset { IntOffset(rectX, rectY) }
+                    .size(
+                        width = with(density) { rectW.toDp() },
+                        height = with(density) { rectH.toDp() }
+                    )
+                    // White background to hide original PDF text underneath
+                    .background(Color.White)
+                    // Green border to indicate edited
+                    .border(1.dp, Color(0xFF4CAF50).copy(alpha = 0.6f))
+                    .padding(2.dp)
+            ) {
+                Text(
+                    text = editedBlock.newText,
+                    style = TextStyle(
+                        color = editedBlock.newColor.copy(alpha = editedBlock.opacity),
+                        fontSize = with(density) { editedBlock.newFontSize.toSp() },
+                        fontWeight = FontWeight.Normal,
+                        textAlign = textAlign
+                    ),
+                    maxLines = 10,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        // ─── Layer 3: Tap targets for each text block (zIndex 5) ───
         pageBlocks.forEach { block ->
             val rectX = (block.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
             val rectY = (block.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
@@ -149,7 +204,7 @@ fun TextEditOverlay(
             )
         }
 
-        // ─── Layer 3: Inline editor popup (zIndex 50) ───
+        // ─── Layer 4: Inline editor popup (zIndex 50) ───
         val selectedBlock = pageBlocks.find { it.id == selectedTextBlockId }
         if (selectedBlock != null) {
             val editedVersion = editedTextBlocks.find { it.originalBlock.id == selectedBlock.id }
@@ -170,7 +225,7 @@ fun TextEditOverlay(
                     onConfirm = { newText, newFontSize, newColor ->
                         Log.d(TAG, "Text edit confirmed: $newText")
                         onEditTextBlock(selectedBlock.id, newText, newFontSize, newColor)
-                        onSelectTextBlock(null)
+                        // onSelectTextBlock(null) is called by editTextBlock which sets selectedTextBlockId = null
                     },
                     onDismiss = {
                         Log.d(TAG, "Text edit dismissed")
