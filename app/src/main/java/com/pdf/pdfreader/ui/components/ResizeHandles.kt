@@ -1,7 +1,8 @@
 package com.pdf.pdfreader.ui.components
 
 import android.util.Log
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -13,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -26,10 +28,11 @@ private const val TAG = "ResizeHandles"
  * Draws 8 resize handles around a selected image element.
  *
  * Each handle:
- * - Has a large 32dp touch target (only 6dp visible circle)
- * - Uses its own pointerInput to avoid gesture conflicts
+ * - Has a large 44dp touch target (only 7dp visible circle)
+ * - Uses awaitEachGesture to consume pointer-down IMMEDIATELY
+ *   — this prevents parent scroll from stealing the gesture
  * - Is at zIndex(10f) to stay above the image body
- * - Fully consumes drag events to prevent parent scroll
+ * - Signals InteractionMode.RESIZE on initial touch
  */
 @Composable
 fun ResizeHandles(
@@ -42,8 +45,8 @@ fun ResizeHandles(
 ) {
     val handleVisualRadius = 7.dp
     val handleVisualRadiusPx = with(LocalDensity.current) { handleVisualRadius.toPx() }
-    // Large touch target — easy to grab
-    val hitAreaSize = 32.dp
+    // 44dp — Android accessibility minimum touch target
+    val hitAreaSize = 44.dp
 
     val handles = listOf(
         ResizeHandle.TOP_LEFT to Offset(0f, 0f),
@@ -100,24 +103,44 @@ fun ResizeHandles(
                         style = Stroke(width = 2.5f)
                     )
                 }
+                // CRITICAL: Use awaitEachGesture to consume DOWN event immediately.
+                // This prevents the parent (LazyColumn scroll) from stealing the gesture.
                 .pointerInput(handle) {
-                    detectDragGestures(
-                        onDragStart = {
-                            Log.d(TAG, "Handle drag start: $handle")
-                            onInteractionStart()
-                        },
-                        onDragEnd = {
-                            Log.d(TAG, "Handle drag end: $handle")
-                            onResizeEnd()
-                            onInteractionEnd()
-                        },
-                        onDragCancel = {
-                            onResizeEnd()
-                            onInteractionEnd()
+                    awaitEachGesture {
+                        // 1. Await initial touch-down — consume it immediately
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        Log.d(TAG, "Handle DOWN: $handle")
+                        onInteractionStart()
+
+                        // 2. Track drag movement until release
+                        var lastPosition = down.position
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Main)
+                                val change = event.changes.firstOrNull() ?: break
+
+                                if (change.pressed) {
+                                    val dragDelta = change.position - lastPosition
+                                    lastPosition = change.position
+                                    change.consume()
+
+                                    if (dragDelta != Offset.Zero) {
+                                        onResizeByHandle(handle, dragDelta)
+                                    }
+                                } else {
+                                    // Pointer released
+                                    change.consume()
+                                    break
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Gesture cancelled
                         }
-                    ) { change, dragAmount ->
-                        change.consume() // CRITICAL: prevents parent scroll
-                        onResizeByHandle(handle, dragAmount)
+
+                        Log.d(TAG, "Handle UP: $handle")
+                        onResizeEnd()
+                        onInteractionEnd()
                     }
                 }
         )

@@ -5,8 +5,9 @@ import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -14,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -27,13 +29,17 @@ import com.pdf.pdfreader.domain.model.ResizeHandle
 
 private const val TAG = "ImageOverlay"
 
+/** Compose layout max constraint = 262143. Clamp to stay safely under. */
+private const val MAX_SIZE_PX = 262000f
+
 /**
  * Overlay composable that renders all inserted images on a PDF page.
  *
- * Gesture priority (critical):
- *   1. Resize handles (zIndex = 20)
- *   2. Image body drag (zIndex = 10)
- *   3. Deselect tap catcher (zIndex = 0) — BELOW images, not above
+ * Architecture (critical for gesture priority):
+ *   - Each image is a SINGLE Box containing both the image and its resize handles.
+ *   - Handles are children of the image Box, so their pointerInput handlers
+ *     run BEFORE the parent's drag handler (depth-first event dispatch).
+ *   - Deselect tap catcher sits below all images at zIndex(0).
  */
 @Composable
 fun ImageOverlay(
@@ -63,9 +69,14 @@ fun ImageOverlay(
                     .fillMaxSize()
                     .zIndex(0f)
                     .pointerInput(selectedImageId) {
-                        detectTapGestures {
-                            Log.d(TAG, "Tap on empty space → deselect")
-                            onSelectImage(null)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            // Wait for up to determine if it's a tap (not a drag)
+                            val up = waitForUpOrCancellation()
+                            if (up != null) {
+                                Log.d(TAG, "Tap on empty space → deselect")
+                                onSelectImage(null)
+                            }
                         }
                     }
             )
@@ -83,11 +94,9 @@ fun ImageOverlay(
                         onSelectImage(element.id)
                     },
                     onMoveBy = { delta ->
-                        Log.d(TAG, "Move ${element.id}: $delta")
                         onMoveImage(element.id, delta)
                     },
                     onResizeByHandle = { handle, delta ->
-                        Log.d(TAG, "Resize ${element.id} handle=$handle delta=$delta")
                         onResizeImage(element.id, handle, delta)
                     },
                     onResizeEnd = { onResizeEnd(element.id) },
@@ -101,10 +110,21 @@ fun ImageOverlay(
 }
 
 /**
- * Individual image element with proper gesture hierarchy:
- * - Tap to select
- * - Drag to move (only when selected, consumes events to prevent scroll)
- * - Resize handles drawn above with higher zIndex
+ * Individual image element with unified gesture hierarchy:
+ *
+ * Structure:
+ *   Box (positioned, handles drag when selected)
+ *     ├─ Image (visual content)
+ *     └─ ResizeHandles (children — get gesture priority over parent)
+ *
+ * When selected:
+ *   - Parent Box uses awaitEachGesture for drag, consuming DOWN immediately
+ *     to prevent LazyColumn from stealing the gesture
+ *   - ResizeHandles are CHILDREN of this Box, so their pointerInput handlers
+ *     run first in depth-first traversal, giving them priority over parent drag
+ *
+ * When not selected:
+ *   - Simple tap-to-select handler
  */
 @Composable
 private fun ImageElementView(
@@ -139,10 +159,10 @@ private fun ImageElementView(
 
     if (bitmap == null || bitmap.isRecycled) return
 
-    val scaledWidth = element.width * element.scale
-    val scaledHeight = element.height * element.scale
+    val scaledWidth = (element.width * element.scale).coerceIn(1f, MAX_SIZE_PX)
+    val scaledHeight = (element.height * element.scale).coerceIn(1f, MAX_SIZE_PX)
 
-    // Image body — zIndex 10
+    // ─── UNIFIED Box: image body + handles as children ───
     Box(
         modifier = Modifier
             .zIndex(if (isSelected) 12f else 10f)
@@ -157,32 +177,57 @@ private fun ImageElementView(
             }
             .then(
                 if (isInteractive && isSelected) {
-                    // Drag gesture — when selected, consume events to prevent parent scroll
+                    // DRAG gesture — awaitEachGesture consumes DOWN immediately
+                    // to prevent parent scroll from stealing. ResizeHandles children
+                    // get priority because Compose dispatches to children first.
                     Modifier.pointerInput(element.id) {
-                        detectDragGestures(
-                            onDragStart = {
-                                Log.d(TAG, "Drag start: ${element.id}")
-                                onInteractionStart()
-                            },
-                            onDragEnd = {
-                                Log.d(TAG, "Drag end: ${element.id}")
-                                onMoveEnd()
-                                onInteractionEnd()
-                            },
-                            onDragCancel = {
-                                onMoveEnd()
-                                onInteractionEnd()
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            onInteractionStart()
+
+                            var lastPosition = down.position
+                            var hasDragged = false
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                    val change = event.changes.firstOrNull() ?: break
+
+                                    if (change.pressed) {
+                                        val dragDelta = change.position - lastPosition
+                                        lastPosition = change.position
+                                        change.consume()
+
+                                        if (dragDelta != Offset.Zero) {
+                                            hasDragged = true
+                                            onMoveBy(dragDelta)
+                                        }
+                                    } else {
+                                        // Pointer released
+                                        change.consume()
+                                        break
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                // Gesture cancelled
                             }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            onMoveBy(dragAmount)
+
+                            if (hasDragged) {
+                                onMoveEnd()
+                            }
+                            onInteractionEnd()
                         }
                     }
                 } else if (isInteractive) {
-                    // Tap to select
+                    // Tap to select when NOT already selected
                     Modifier.pointerInput(element.id) {
-                        detectTapGestures {
-                            onSelect()
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val up = waitForUpOrCancellation()
+                            if (up != null) {
+                                up.consume()
+                                onSelect()
+                            }
                         }
                     }
                 } else {
@@ -197,29 +242,16 @@ private fun ImageElementView(
                 }
             )
     ) {
+        // ─── Child 1: Image content ───
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "Inserted image",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
-    }
 
-    // ─── Resize handles — zIndex 20 (ABOVE image) ───
-    if (isSelected && isInteractive) {
-        Box(
-            modifier = Modifier
-                .zIndex(20f)
-                .offset { IntOffset(element.position.x.toInt(), element.position.y.toInt()) }
-                .size(
-                    width = with(density) { scaledWidth.toDp() },
-                    height = with(density) { scaledHeight.toDp() }
-                )
-                .graphicsLayer {
-                    rotationZ = element.rotation
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
-                }
-        ) {
+        // ─── Child 2: Resize handles (ABOVE image, gesture priority over parent drag) ───
+        if (isSelected && isInteractive) {
             ResizeHandles(
                 elementWidth = scaledWidth,
                 elementHeight = scaledHeight,

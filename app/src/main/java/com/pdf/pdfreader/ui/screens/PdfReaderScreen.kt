@@ -349,7 +349,7 @@ fun PdfReaderScreen(
                     val userScrollEnabled = (!uiState.isEditMode
                             || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE)
                             && scale <= 1f
-                            && !uiState.isOverlayInteracting
+                            && uiState.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.NONE
 
                     val pageContent: @Composable (Int) -> Unit = { pageIndex ->
                         PdfPage(
@@ -686,7 +686,9 @@ fun PdfPage(
         BackgroundMode.EYE_COMFORT -> Color(0xFFF8E8C8)
         BackgroundMode.INVERT -> Color.Black
     }
-    // Only intercept taps for annotation deselect when NOT in text/image editing mode
+    // Only intercept taps for annotation deselect when NOT in text/image editing mode.
+    // CRITICAL: When EDIT_TEXT, INSERT_IMAGE, or image selected, do NOT attach
+    // any tap handler at the page level — let events pass through to overlay children.
     val isInteractiveEditMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT
             || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
             || uiState.selectedImageId != null
@@ -697,7 +699,16 @@ fun PdfPage(
             .padding(vertical = 4.dp)
             .background(pageBg)
             .then(
-                if (!isInteractiveEditMode) {
+                if (!isInteractiveEditMode && !uiState.isEditMode) {
+                    // Reading mode: double-tap to zoom, single-tap deselect
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onDoubleTap() },
+                            onTap = { viewModel.selectAnnotation(null) }
+                        )
+                    }
+                } else if (!isInteractiveEditMode) {
+                    // Edit mode with drawing tool: deselect + double-tap
                     Modifier.pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = { onDoubleTap() },
@@ -705,11 +716,9 @@ fun PdfPage(
                         )
                     }
                 } else {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = { onDoubleTap() }
-                        )
-                    }
+                    // Interactive overlay mode (EDIT_TEXT / INSERT_IMAGE / image selected):
+                    // Do NOT attach tap gesture — let children handle all events
+                    Modifier
                 }
             ),
         contentAlignment = Alignment.Center
@@ -835,8 +844,8 @@ fun PdfPage(
                                 onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
                                 onResizeEnd = { id -> viewModel.onResizeEnd(id) },
                                 onMoveEnd = { id -> viewModel.onMoveEnd(id) },
-                                onInteractionStart = { viewModel.setOverlayInteracting(true) },
-                                onInteractionEnd = { viewModel.setOverlayInteracting(false) }
+                                onInteractionStart = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.DRAG) },
+                                onInteractionEnd = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.NONE) }
                             )
 
                             // Image edit toolbar for selected image

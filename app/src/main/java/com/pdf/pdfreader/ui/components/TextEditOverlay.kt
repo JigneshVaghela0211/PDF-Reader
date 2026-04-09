@@ -3,7 +3,10 @@ package com.pdf.pdfreader.ui.components
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -36,6 +39,9 @@ import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.TextBlock
 
 private const val TAG = "TextEditOverlay"
+
+/** Compose layout max constraint = 262143. Clamp to stay safely under. */
+private const val MAX_SIZE_PX = 262000
 
 /**
  * Overlay composable that renders extracted text blocks as interactive regions.
@@ -113,10 +119,10 @@ fun TextEditOverlay(
 
         // ─── Layer 2: Tap targets for each text block (zIndex 5) ───
         pageBlocks.forEach { block ->
-            val rectX = (block.x * pageWidth).toInt()
-            val rectY = (block.y * pageHeight).toInt()
-            val rectW = (block.width * pageWidth).toInt().coerceAtLeast(20)
-            val rectH = (block.height * pageHeight).toInt().coerceAtLeast(20)
+            val rectX = (block.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectY = (block.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectW = (block.width * pageWidth).toInt().coerceIn(20, MAX_SIZE_PX)
+            val rectH = (block.height * pageHeight).toInt().coerceIn(20, MAX_SIZE_PX)
 
             Box(
                 modifier = Modifier
@@ -126,10 +132,18 @@ fun TextEditOverlay(
                         width = with(density) { rectW.toDp() },
                         height = with(density) { rectH.toDp() }
                     )
+                    // Use awaitEachGesture to ensure we receive events even
+                    // when a parent pointerInput has consumed the down event
                     .pointerInput(block.id) {
-                        detectTapGestures {
-                            Log.d(TAG, "Text block tapped: id=${block.id} text='${block.text.take(30)}'")
-                            onSelectTextBlock(block.id)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            val up = waitForUpOrCancellation()
+                            if (up != null) {
+                                up.consume()
+                                Log.d(TAG, "Text block tapped: id=${block.id} text='${block.text.take(30)}'")
+                                onSelectTextBlock(block.id)
+                            }
                         }
                     }
             )
@@ -140,9 +154,9 @@ fun TextEditOverlay(
         if (selectedBlock != null) {
             val editedVersion = editedTextBlocks.find { it.originalBlock.id == selectedBlock.id }
 
-            val blockX = (selectedBlock.x * pageWidth).toInt()
-            val blockY = (selectedBlock.y * pageHeight).toInt()
-            val blockH = (selectedBlock.height * pageHeight).toInt()
+            val blockX = (selectedBlock.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
+            val blockY = (selectedBlock.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
+            val blockH = (selectedBlock.height * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
 
             Log.d(TAG, "Showing editor for: ${selectedBlock.id} at ($blockX, ${blockY + blockH + 8})")
 

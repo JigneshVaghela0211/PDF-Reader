@@ -52,70 +52,86 @@ fun PdfAnnotationOverlay(
     var strokeColor by remember { mutableStateOf(currentColor) }
     var strokeWidth by remember { mutableStateOf(currentStrokeWidth) }
 
+    // Only attach gesture handlers for drawing tools.
+    // For NONE / EDIT_TEXT / INSERT_IMAGE, the Canvas must NOT intercept
+    // pointer events — those should pass through to overlays above.
+    val isDrawingTool = isEditMode && (currentTool == AnnotationTool.PEN
+            || currentTool == AnnotationTool.HIGHLIGHTER
+            || currentTool == AnnotationTool.ERASER)
+    val isTextPlaceTool = isEditMode && currentTool == AnnotationTool.TEXT
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(isEditMode, currentTool) {
-                if (isEditMode && (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER || currentTool == AnnotationTool.ERASER)) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            if (currentTool != AnnotationTool.ERASER) {
-                                // Capture color/width at stroke START — this is the key fix
-                                strokeColor = latestColor
-                                strokeWidth = latestStrokeWidth
-                                currentPathPoints = listOf(offset)
-                            }
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            if (currentTool == AnnotationTool.ERASER) {
-                                val position = change.position
-                                val toRemove = latestAnnotations.filter { ann ->
-                                    ann is PdfAnnotation.Path && ann.pageIndex == pageIndex &&
-                                            ann.points.any { p ->
-                                                val dx = p.x - position.x
-                                                val dy = p.y - position.y
-                                                (dx * dx + dy * dy) < 2500f
-                                            }
+            .then(
+                if (isDrawingTool) {
+                    Modifier.pointerInput(currentTool) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                if (currentTool != AnnotationTool.ERASER) {
+                                    // Capture color/width at stroke START — this is the key fix
+                                    strokeColor = latestColor
+                                    strokeWidth = latestStrokeWidth
+                                    currentPathPoints = listOf(offset)
                                 }
-                                toRemove.forEach { onAnnotationRemoved(it.id) }
-                            } else {
-                                currentPathPoints = currentPathPoints + change.position
-                            }
-                        },
-                        onDragEnd = {
-                            if (currentTool != AnnotationTool.ERASER && currentPathPoints.isNotEmpty()) {
-                                val newAnnotation = PdfAnnotation.Path(
-                                    pageIndex = pageIndex,
-                                    points = currentPathPoints,
-                                    color = strokeColor,  // Use captured color, not current
-                                    strokeWidth = strokeWidth,  // Use captured width, not current
-                                    isHighlighter = currentTool == AnnotationTool.HIGHLIGHTER
-                                )
-                                onAnnotationAdded(newAnnotation)
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                if (currentTool == AnnotationTool.ERASER) {
+                                    val position = change.position
+                                    val toRemove = latestAnnotations.filter { ann ->
+                                        ann is PdfAnnotation.Path && ann.pageIndex == pageIndex &&
+                                                ann.points.any { p ->
+                                                    val dx = p.x - position.x
+                                                    val dy = p.y - position.y
+                                                    (dx * dx + dy * dy) < 2500f
+                                                }
+                                    }
+                                    toRemove.forEach { onAnnotationRemoved(it.id) }
+                                } else {
+                                    currentPathPoints = currentPathPoints + change.position
+                                }
+                            },
+                            onDragEnd = {
+                                if (currentTool != AnnotationTool.ERASER && currentPathPoints.isNotEmpty()) {
+                                    val newAnnotation = PdfAnnotation.Path(
+                                        pageIndex = pageIndex,
+                                        points = currentPathPoints,
+                                        color = strokeColor,  // Use captured color, not current
+                                        strokeWidth = strokeWidth,  // Use captured width, not current
+                                        isHighlighter = currentTool == AnnotationTool.HIGHLIGHTER
+                                    )
+                                    onAnnotationAdded(newAnnotation)
+                                    currentPathPoints = emptyList()
+                                }
+                            },
+                            onDragCancel = {
                                 currentPathPoints = emptyList()
                             }
-                        },
-                        onDragCancel = {
-                            currentPathPoints = emptyList()
-                        }
-                    )
-                }
-            }
-            .pointerInput(isEditMode, currentTool) {
-                if (isEditMode && currentTool == AnnotationTool.TEXT) {
-                    detectTapGestures { offset ->
-                        val newAnnotation = PdfAnnotation.TextNote(
-                            pageIndex = pageIndex,
-                            text = "",
-                            position = offset,
-                            color = latestColor,  // Use latest via rememberUpdatedState
-                            fontSize = 24f
                         )
-                        onAnnotationAdded(newAnnotation)
                     }
+                } else {
+                    Modifier // No gesture handler — events pass through
                 }
-            }
+            )
+            .then(
+                if (isTextPlaceTool) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            val newAnnotation = PdfAnnotation.TextNote(
+                                pageIndex = pageIndex,
+                                text = "",
+                                position = offset,
+                                color = latestColor,  // Use latest via rememberUpdatedState
+                                fontSize = 24f
+                            )
+                            onAnnotationAdded(newAnnotation)
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         // Draw existing annotations for this page
         annotations.filter { it.pageIndex == pageIndex }.forEach { annotation ->

@@ -9,6 +9,7 @@ import com.pdf.pdfreader.data.local.PreferenceManager
 import com.pdf.pdfreader.domain.model.BackgroundMode
 import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.ImageElement
+import com.pdf.pdfreader.domain.model.InteractionMode
 import com.pdf.pdfreader.domain.model.ResizeHandle
 import com.pdf.pdfreader.domain.model.TextBlock
 import com.pdf.pdfreader.domain.model.ViewSettings
@@ -104,7 +105,7 @@ data class PdfReaderUiState(
     val selectedImageId: String? = null,
 
     // ─── Interaction State ───────────────────────────────────
-    val isOverlayInteracting: Boolean = false,
+    val interactionMode: InteractionMode = InteractionMode.NONE,
 
     // ─── Export State ───────────────────────────────────────
     val isExporting: Boolean = false,
@@ -1529,11 +1530,11 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     /**
-     * Set overlay interaction state (drag/resize in progress).
-     * Used to disable parent scroll during image/text manipulation.
+     * Set the current interaction mode.
+     * Used to disable parent scroll and control gesture priority.
      */
-    fun setOverlayInteracting(interacting: Boolean) {
-        _uiState.update { it.copy(isOverlayInteracting = interacting) }
+    fun setInteractionMode(mode: InteractionMode) {
+        _uiState.update { it.copy(interactionMode = mode) }
     }
 
     // ─── Export Edited PDF ──────────────────────────────────────
