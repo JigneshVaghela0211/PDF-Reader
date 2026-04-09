@@ -22,5 +22,7 @@ enum class InteractionMode {
     /** Inline text-block editor is open */
     EDIT_TEXT,
     /** Movable text-note interaction (tap / drag) */
-    TEXT_NOTE
+    TEXT_NOTE,
+    /** Granular text selection in progress */
+    SELECT_TEXT
 }

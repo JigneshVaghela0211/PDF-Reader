@@ -45,7 +45,8 @@ fun AnnotationTopBar(
     onSave: () -> Unit,
     hasEditableOverlays: Boolean = false,
     isExporting: Boolean = false,
-    onExport: () -> Unit = {}
+    onExport: () -> Unit = {},
+    onSignatureClick: () -> Unit = {}
 ) {
     var showStrokeSlider by remember { mutableStateOf(false) }
 
@@ -113,7 +114,11 @@ fun AnnotationTopBar(
                     Spacer(modifier = Modifier.width(4.dp))
 
                     // Tool buttons
-                    AnnotationToolButtons(currentTool, onToolChange)
+                    AnnotationToolButtons(
+                        currentTool = currentTool,
+                        onToolChange = onToolChange,
+                        onSignatureClick = onSignatureClick
+                    )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -174,7 +179,8 @@ fun AnnotationTopBar(
 @Composable
 fun AnnotationToolButtons(
     currentTool: AnnotationTool,
-    onToolChange: (AnnotationTool) -> Unit
+    onToolChange: (AnnotationTool) -> Unit,
+    onSignatureClick: () -> Unit
 ) {
     IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE else AnnotationTool.PEN) }) {
         Icon(Icons.Default.Brush, contentDescription = "Pen", tint = if (currentTool == AnnotationTool.PEN) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
@@ -204,6 +210,10 @@ fun AnnotationToolButtons(
     // Insert image
     IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE else AnnotationTool.INSERT_IMAGE) }) {
         Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Insert Image", tint = if (currentTool == AnnotationTool.INSERT_IMAGE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    }
+    // Signature
+    IconButton(onClick = onSignatureClick) {
+        Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_edit), contentDescription = "Signature", tint = MaterialTheme.colorScheme.onSurface)
     }
 }
 

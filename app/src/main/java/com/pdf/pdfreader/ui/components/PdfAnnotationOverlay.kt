@@ -165,6 +165,38 @@ fun PdfAnnotationOverlay(
                     }
                 }
                 is PdfAnnotation.TextNote -> { /* handled by MovableTextNote composable */ }
+                is PdfAnnotation.TextMarkup -> {
+                    val rectColor = annotation.color
+                    annotation.rects.forEach { rect ->
+                        when (annotation.type) {
+                            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT -> {
+                                drawRect(
+                                    color = rectColor,
+                                    topLeft = rect.topLeft,
+                                    size = rect.size
+                                )
+                            }
+                            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE -> {
+                                val y = rect.bottom + 2f
+                                drawLine(
+                                    color = rectColor,
+                                    start = Offset(rect.left, y),
+                                    end = Offset(rect.right, y),
+                                    strokeWidth = 3f
+                                )
+                            }
+                            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH -> {
+                                val y = rect.top + rect.height / 2f
+                                drawLine(
+                                    color = rectColor,
+                                    start = Offset(rect.left, y),
+                                    end = Offset(rect.right, y),
+                                    strokeWidth = 3f
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 

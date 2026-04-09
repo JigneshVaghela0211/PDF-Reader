@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -129,23 +130,18 @@ fun ResizeHandles(
                         activeHandle = handle
                         onInteractionStart()
 
-                        // 2. Track drag movement using INCREMENTAL deltas
-                        var previousPosition = down.position
                         try {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Main)
                                 val change = event.changes.firstOrNull() ?: break
 
                                 if (change.pressed) {
-                                    // INCREMENTAL delta: current position minus previous position
-                                    val incrementalDelta = change.position - previousPosition
+                                    val incrementalDelta = change.positionChange()
                                     change.consume()
 
                                     if (incrementalDelta != Offset.Zero) {
                                         onResizeByHandle(handle, incrementalDelta)
                                     }
-                                    // Update previous position for next frame
-                                    previousPosition = change.position
                                 } else {
                                     // Pointer released
                                     change.consume()

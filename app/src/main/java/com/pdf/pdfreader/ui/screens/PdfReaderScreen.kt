@@ -212,7 +212,8 @@ fun PdfReaderScreen(
                         onSave = { viewModel.saveAnnotationsToPdf(screenWidthPx) },
                         hasEditableOverlays = uiState.hasEditableOverlays,
                         isExporting = uiState.isExporting,
-                        onExport = { viewModel.exportEditedPdf(screenWidthPx) }
+                        onExport = { viewModel.exportEditedPdf(screenWidthPx) },
+                        onSignatureClick = { viewModel.setSignatureSheetVisible(true) }
                     )
                 }
                 uiState.isSearchActive -> {
@@ -468,6 +469,29 @@ fun PdfReaderScreen(
                             }
                         }
                     }
+
+                    // ─── Text Selection Toolbar ───────
+                    val textSel = uiState.textSelection
+                    if (textSel != null && textSel.bounds != null) {
+                        val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
+                        val pageLayout = pageLayouts.find { it.pageIndex == textSel.pageIndex }
+                        if (pageLayout != null) {
+                            val toolbarGlobalY = pageLayout.offsetInViewport + textSel.bounds.top.toInt() - 60
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
+                                com.pdf.pdfreader.ui.components.TextSelectionToolbar(
+                                    visible = true,
+                                    offsetX = textSel.bounds.left.toInt(),
+                                    offsetY = toolbarGlobalY.coerceAtLeast(0),
+                                    onCopy = { viewModel.copySelectedText(context) },
+                                    onEdit = { viewModel.editSelectedText() },
+                                    onHighlight = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
+                                    onUnderline = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },
+                                    onStrikethrough = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH) }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Pan + un-zoom overlay — only visible when zoomed
@@ -585,6 +609,26 @@ fun PdfReaderScreen(
                     onNavigateToManagePages(uiState.filePath)
                 },
                 onDismiss = { showViewOptions = false }
+            )
+        }
+
+        // ─── Signature UIs ───────────────────────────────────────
+        com.pdf.pdfreader.ui.components.SignatureBottomSheet(
+            visible = uiState.isSignatureSheetVisible,
+            savedSignatures = uiState.savedSignatures,
+            onDismissRequest = { viewModel.setSignatureSheetVisible(false) },
+            onCreateNewSignature = { 
+                viewModel.setSignatureSheetVisible(false)
+                viewModel.setSignaturePadVisible(true)
+            },
+            onSelectSignature = { viewModel.insertSignatureAsImage(it) },
+            onDeleteSignature = { viewModel.deleteSignature(it) }
+        )
+
+        if (uiState.isSignaturePadVisible) {
+            com.pdf.pdfreader.ui.components.SignaturePadDialog(
+                onDismissRequest = { viewModel.setSignaturePadVisible(false) },
+                onSaveSignature = { strokes, w, h -> viewModel.saveSignature(strokes, w, h) }
             )
         }
     }
@@ -888,6 +932,23 @@ fun PdfPage(
                                         strokeWidth = 3.dp
                                     )
                                 }
+                            }
+                        }
+
+                        // ─── Text Selection Overlay (Chunk 2, 3) ────
+                        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE && !uiState.isEditMode && pageSize != IntSize.Zero) {
+                            val pageTextBlocks = uiState.textBlocks[pageIndex] ?: emptyList()
+                            if (pageTextBlocks.isNotEmpty()) {
+                                com.pdf.pdfreader.ui.components.TextSelectionOverlay(
+                                    modifier = Modifier.matchParentSize(),
+                                    pageIndex = pageIndex,
+                                    pageWidth = pageSize.width,
+                                    pageHeight = pageSize.height,
+                                    textBlocks = pageTextBlocks,
+                                    interactionMode = uiState.interactionMode,
+                                    textSelection = uiState.textSelection,
+                                    viewModel = viewModel
+                                )
                             }
                         }
 

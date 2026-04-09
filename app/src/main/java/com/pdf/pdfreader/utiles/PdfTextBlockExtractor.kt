@@ -191,6 +191,26 @@ class PdfTextBlockExtractor @Inject constructor() {
 
         // Build text by joining lines
         val textBuilder = StringBuilder()
+        val words = mutableListOf<com.pdf.pdfreader.domain.model.TextWord>()
+        var currentWordChars = mutableListOf<CharPosition>()
+        
+        fun commitWord() {
+            if (currentWordChars.isEmpty()) return
+            val wMinX = currentWordChars.minOf { it.x }
+            val wMinY = currentWordChars.minOf { it.y }
+            val wMaxX = currentWordChars.maxOf { it.x + it.width }
+            val wMaxY = currentWordChars.maxOf { it.y + it.height }
+            val wText = currentWordChars.joinToString("") { it.char }
+            words.add(com.pdf.pdfreader.domain.model.TextWord(
+                text = wText,
+                x = (wMinX / pdfWidth).coerceIn(0f, 1f),
+                y = (wMinY / pdfHeight).coerceIn(0f, 1f),
+                width = ((wMaxX - wMinX) / pdfWidth).coerceIn(0f, 1f),
+                height = ((wMaxY - wMinY) / pdfHeight).coerceIn(0f, 1f)
+            ))
+            currentWordChars.clear()
+        }
+
         for ((lineIdx, line) in lines.withIndex()) {
             for ((charIdx, cp) in line.withIndex()) {
                 if (charIdx > 0) {
@@ -198,10 +218,13 @@ class PdfTextBlockExtractor @Inject constructor() {
                     val gap = cp.x - (prev.x + prev.width)
                     if (gap > WORD_GAP_THRESHOLD) {
                         textBuilder.append(' ')
+                        commitWord()
                     }
                 }
                 textBuilder.append(cp.char)
+                currentWordChars.add(cp)
             }
+            commitWord()
             if (lineIdx < lines.size - 1) {
                 textBuilder.append('\n')
             }
@@ -232,7 +255,8 @@ class PdfTextBlockExtractor @Inject constructor() {
             width = ((maxX - minX) / pdfWidth).coerceIn(0f, 1f),
             height = ((maxY - minY) / pdfHeight).coerceIn(0f, 1f),
             fontSize = avgFontSize,
-            fontName = fontName
+            fontName = fontName,
+            words = words
         )
     }
 

@@ -21,7 +21,20 @@ data class TextBlock(
     /** Approximate font size in PDF points */
     val fontSize: Float,
     /** Font name from PDF metadata */
-    val fontName: String = "Helvetica"
+    val fontName: String = "Helvetica",
+    /** The individual words and their bounding boxes */
+    val words: List<TextWord> = emptyList()
+)
+
+/**
+ * Represents a single word within a text block with its normalized bounding box.
+ */
+data class TextWord(
+    val text: String,
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float
 )
 
 /**

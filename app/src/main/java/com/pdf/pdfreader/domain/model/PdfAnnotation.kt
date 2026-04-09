@@ -24,4 +24,16 @@ sealed class PdfAnnotation {
         val color: Color,
         val fontSize: Float
     ) : PdfAnnotation()
+    
+    enum class MarkupType {
+        HIGHLIGHT, UNDERLINE, STRIKETHROUGH
+    }
+
+    data class TextMarkup(
+        override val id: String = java.util.UUID.randomUUID().toString(),
+        override val pageIndex: Int,
+        val rects: List<androidx.compose.ui.geometry.Rect>,
+        val color: Color,
+        val type: MarkupType
+    ) : PdfAnnotation()
 }

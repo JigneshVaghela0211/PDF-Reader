@@ -26,7 +26,16 @@ data class ImageElement(
     /** When true, element cannot be moved or resized */
     val isLocked: Boolean = false,
     /** Layer ordering index. Higher values render on top. */
-    val zIndex: Int = 0
+    val zIndex: Int = 0,
+    
+    /** Elements with the same groupId move, scale, and rotate together */
+    val groupId: String? = null,
+    
+    // --- TRANSIENT RESIZE STATE (For State-driven, continuous layout-free resize) ---
+    val isResizing: Boolean = false,
+    val transientScaleX: Float = 1f,
+    val transientScaleY: Float = 1f,
+    val transientTransformOrigin: androidx.compose.ui.graphics.TransformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
 )
 
 /**

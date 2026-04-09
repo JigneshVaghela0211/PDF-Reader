@@ -60,6 +60,12 @@ data class SearchMatch(
 )
 
 // ─── UI State ───────────────────────────────────────────────────
+data class TextSelectionState(
+    val pageIndex: Int,
+    val selectedWords: List<com.pdf.pdfreader.domain.model.TextWord>,
+    val bounds: androidx.compose.ui.geometry.Rect?
+)
+
 data class PdfReaderUiState(
     val filePath: String = "",
     val fileName: String = "",
@@ -99,17 +105,24 @@ data class PdfReaderUiState(
     val editedTextBlocks: List<EditedTextBlock> = emptyList(),
     val selectedTextBlockId: String? = null,
     val isTextBlocksLoading: Boolean = false,
+    val textSelection: TextSelectionState? = null,
 
     // ─── Image Element State ────────────────────────────────
     val imageElements: List<ImageElement> = emptyList(),
     val selectedImageId: String? = null,
+    val selectedImageIds: Set<String> = emptySet(),
 
     // ─── Interaction State ───────────────────────────────────
     val interactionMode: InteractionMode = InteractionMode.NONE,
 
     // ─── Export State ───────────────────────────────────────
     val isExporting: Boolean = false,
-    val exportResult: String? = null
+    val exportResult: String? = null,
+
+    // ─── Signature State ────────────────────────────────────
+    val savedSignatures: List<String> = emptyList(),
+    val isSignaturePadVisible: Boolean = false,
+    val isSignatureSheetVisible: Boolean = false
 ) {
     /** Convenience: true when background mode is INVERT */
     val isNightMode: Boolean get() = viewSettings.backgroundMode == BackgroundMode.INVERT
@@ -129,7 +142,8 @@ class PdfReaderViewModel @Inject constructor(
     private val undoRedoManager: UndoRedoManager,
     private val preferenceManager: PreferenceManager,
     private val textBlockExtractor: PdfTextBlockExtractor,
-    private val pdfExportManager: PdfExportManager
+    private val pdfExportManager: PdfExportManager,
+    private val signatureManager: com.pdf.pdfreader.domain.repository.SignatureManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -217,6 +231,8 @@ class PdfReaderViewModel @Inject constructor(
                             it.copy(totalPages = pages, isLoading = false, isPasswordProtected = false,
                                 isPasswordCorrect = true, isPasswordPromptVisible = false, errorMessage = null)
                         }
+                        // Start text extraction in background to enable cross-page selection
+                        extractTextBlocks()
                     } else {
                         _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load PDF or PDF is empty") }
                     }
@@ -233,6 +249,10 @@ class PdfReaderViewModel @Inject constructor(
                     }
                 }
             }
+
+            // Load saved signatures
+            val sigs = signatureManager.getAllSignatureUris()
+            _uiState.update { it.copy(savedSignatures = sigs) }
         }
     }
 
@@ -911,6 +931,7 @@ class PdfReaderViewModel @Inject constructor(
                     fontSize = annotation.fontSize
                 )
             }
+            is PdfAnnotation.TextMarkup -> null // Serialization for markup to be done later
         }
     }
 
@@ -983,6 +1004,7 @@ class PdfReaderViewModel @Inject constructor(
                     fontSize = annotation.fontSize
                 )
             }
+            is PdfAnnotation.TextMarkup -> "" // Serialization not implemented yet
         }
     }
 
@@ -1054,6 +1076,9 @@ class PdfReaderViewModel @Inject constructor(
                                         cs.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, ann.fontSize * scaleX)
                                         cs.newLineAtOffset(ann.position.x * scaleX, pdfHeight - (ann.position.y * scaleX) - (ann.fontSize * scaleX))
                                         cs.showText(ann.text); cs.endText()
+                                    }
+                                    is PdfAnnotation.TextMarkup -> {
+                                        // Feature: PDFBox exporting for text markup
                                     }
                                 }
                             }
@@ -1155,6 +1180,197 @@ class PdfReaderViewModel @Inject constructor(
             val blocks = textBlockExtractor.extractTextBlocks(path)
             _uiState.update { it.copy(textBlocks = blocks, isTextBlocksLoading = false) }
             Log.d(TAG, "Extracted text blocks: ${blocks.values.sumOf { it.size }} blocks across ${blocks.size} pages")
+        }
+    }
+
+    // ─── Text Selection Gestures (Multi-word) ─────────────────────────
+
+    fun startTextSelection(pageIndex: Int, word: com.pdf.pdfreader.domain.model.TextWord, allWords: List<com.pdf.pdfreader.domain.model.TextWord>) {
+        if (_uiState.value.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.NONE || _uiState.value.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.SELECT_TEXT) {
+            _uiState.update { state ->
+                state.copy(
+                    interactionMode = com.pdf.pdfreader.domain.model.InteractionMode.SELECT_TEXT,
+                    textSelection = TextSelectionState(
+                        pageIndex = pageIndex,
+                        selectedWords = listOf(word),
+                        bounds = null
+                    )
+                )
+            }
+        }
+    }
+
+    fun updateTextSelection(pageIndex: Int, endWord: com.pdf.pdfreader.domain.model.TextWord, allWords: List<com.pdf.pdfreader.domain.model.TextWord>) {
+        val currentState = _uiState.value.textSelection ?: return
+        if (currentState.pageIndex != pageIndex) return
+        
+        val startWord = currentState.selectedWords.firstOrNull() ?: return
+        val startIndex = allWords.indexOf(startWord)
+        val endIndex = allWords.indexOf(endWord)
+        
+        if (startIndex == -1 || endIndex == -1) return
+        
+        val actualStart = minOf(startIndex, endIndex)
+        val actualEnd = maxOf(startIndex, endIndex)
+        val selectedRange = allWords.subList(actualStart, actualEnd + 1)
+        
+        _uiState.update { state ->
+            state.copy(
+                textSelection = currentState.copy(selectedWords = selectedRange)
+            )
+        }
+    }
+
+    fun finalizeTextSelection() {
+        val currentState = _uiState.value.textSelection ?: return
+        if (currentState.selectedWords.isEmpty()) {
+            clearTextSelection()
+            return
+        }
+        
+        // Finalize bounds
+        val minX = currentState.selectedWords.minOf { it.x }
+        val minY = currentState.selectedWords.minOf { it.y }
+        val maxX = currentState.selectedWords.maxOf { it.x + it.width }
+        val maxY = currentState.selectedWords.maxOf { it.y + it.height }
+        
+        val bounds = androidx.compose.ui.geometry.Rect(minX, minY, maxX, maxY)
+        
+        _uiState.update { state ->
+            state.copy(textSelection = currentState.copy(bounds = bounds))
+        }
+    }
+
+    fun clearTextSelection() {
+        _uiState.update { state ->
+            state.copy(
+                textSelection = null,
+                interactionMode = if (state.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.SELECT_TEXT) com.pdf.pdfreader.domain.model.InteractionMode.NONE else state.interactionMode
+            )
+        }
+    }
+
+    fun copySelectedText(context: android.content.Context) {
+        val sel = _uiState.value.textSelection ?: return
+        val text = sel.selectedWords.joinToString(" ") { it.text }
+        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Copied Text", text)
+        clipboard.setPrimaryClip(clip)
+        clearTextSelection()
+    }
+
+    fun editSelectedText() {
+        val sel = _uiState.value.textSelection ?: return
+        
+        // Find which block contains the first selected word based on coordinates
+        val firstWord = sel.selectedWords.firstOrNull() ?: return
+        val blocksOnPage = _uiState.value.textBlocks[sel.pageIndex] ?: emptyList()
+        val block = blocksOnPage.find { b ->
+            firstWord.x >= b.x && firstWord.y >= b.y &&
+            (firstWord.x + firstWord.width) <= (b.x + b.width + 0.05f)
+        }
+        
+        clearTextSelection()
+        
+        if (block != null) {
+            _uiState.update { it.copy(isEditMode = true, currentTool = com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT) }
+            selectTextBlock(block.id)
+        }
+    }
+
+    fun annotateSelectedText(type: com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType) {
+        val sel = _uiState.value.textSelection ?: return
+        
+        val rects = sel.selectedWords.map { w ->
+            androidx.compose.ui.geometry.Rect(w.x, w.y, w.x + w.width, w.y + w.height)
+        }
+        
+        val color = when(type) {
+            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT -> Color(0xFFFFEB3B).copy(alpha = 0.4f)
+            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE -> Color(0xFFE53935)
+            com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH -> Color.Red
+        }
+        
+        val annotation = com.pdf.pdfreader.domain.model.PdfAnnotation.TextMarkup(
+            pageIndex = sel.pageIndex,
+            rects = rects,
+            color = color,
+            type = type
+        )
+        
+        addAnnotation(annotation)
+        clearTextSelection()
+    }
+
+    // ─── Signatures ──────────────────────────────────────────────────
+
+    fun setSignatureSheetVisible(visible: Boolean) {
+        _uiState.update { it.copy(isSignatureSheetVisible = visible) }
+    }
+
+    fun setSignaturePadVisible(visible: Boolean) {
+        _uiState.update { it.copy(isSignaturePadVisible = visible) }
+    }
+
+    fun saveSignature(strokes: List<com.pdf.pdfreader.ui.components.SignatureStroke>, width: Float, height: Float) {
+        viewModelScope.launch {
+            val uri = signatureManager.saveSignature(strokes, width, height)
+            val updatedList = signatureManager.getAllSignatureUris()
+            _uiState.update { 
+                it.copy(
+                    savedSignatures = updatedList,
+                    isSignaturePadVisible = false,
+                    isSignatureSheetVisible = true // re-open sheet to show new sig
+                ) 
+            }
+        }
+    }
+
+    fun deleteSignature(uri: String) {
+        viewModelScope.launch {
+            signatureManager.deleteSignature(uri)
+            val updatedList = signatureManager.getAllSignatureUris()
+            _uiState.update { it.copy(savedSignatures = updatedList) }
+        }
+    }
+
+    fun insertSignatureAsImage(uri: String) {
+        // Standard signature dimensions roughly approx
+        val defaultWidth = 300f
+        val defaultHeight = 150f
+        
+        insertImageUri(uri, defaultWidth, defaultHeight)
+        setSignatureSheetVisible(false)
+    }
+
+    private fun insertImageUri(uriString: String, width: Float, height: Float) {
+        val currentPage = _uiState.value.currentPage
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val element = com.pdf.pdfreader.domain.model.ImageElement(
+                    pageIndex = currentPage,
+                    uri = uriString,
+                    position = androidx.compose.ui.geometry.Offset(100f, 100f),
+                    width = width,
+                    height = height,
+                    scale = 1f,
+                    rotation = 0f,
+                    opacity = 1f,
+                    isLocked = false,
+                    zIndex = 10
+                )
+                
+                _uiState.update { state ->
+                    state.copy(
+                        imageElements = state.imageElements + element,
+                        selectedImageId = element.id,
+                        isEditMode = true,
+                        currentTool = com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+                    )
+                }
+            } catch (e: Exception) {
+               android.util.Log.e(TAG, "Failed to insert image", e)
+            }
         }
     }
 
@@ -1315,10 +1531,68 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     /**
-     * Select an image element.
+     * Select an image element (clears multi-selection if simple tap).
      */
     fun selectImage(id: String?) {
-        _uiState.update { it.copy(selectedImageId = id) }
+        _uiState.update { 
+            it.copy(
+                selectedImageId = id,
+                selectedImageIds = if (id == null) emptySet() else setOf(id)
+            ) 
+        }
+    }
+
+    /**
+     * Toggle selection of an image (for multi-select / grouping).
+     */
+    fun toggleImageSelection(id: String) {
+        _uiState.update { state ->
+            val newSelection = if (state.selectedImageIds.contains(id)) {
+                state.selectedImageIds - id
+            } else {
+                state.selectedImageIds + id
+            }
+            state.copy(
+                selectedImageIds = newSelection,
+                selectedImageId = newSelection.lastOrNull() // ensure something remains "primary" if needed
+            )
+        }
+    }
+
+    /**
+     * Group currently selected images.
+     */
+    fun groupSelectedImages() {
+        val uiState = _uiState.value
+        if (uiState.selectedImageIds.size < 2) return
+
+        val newGroupId = java.util.UUID.randomUUID().toString()
+        _uiState.update { state ->
+            state.copy(
+                imageElements = state.imageElements.map {
+                    if (state.selectedImageIds.contains(it.id)) it.copy(groupId = newGroupId) else it
+                },
+                selectedImageIds = emptySet(),
+                selectedImageId = null
+            )
+        }
+    }
+
+    /**
+     * Ungroup the currently selected element's group.
+     */
+    fun ungroupSelectedImage() {
+        val targetId = _uiState.value.selectedImageId ?: return
+        val element = _uiState.value.imageElements.find { it.id == targetId }
+        val targetGroup = element?.groupId ?: return
+
+        _uiState.update { state ->
+            state.copy(
+                imageElements = state.imageElements.map {
+                    if (it.groupId == targetGroup) it.copy(groupId = null) else it
+                }
+            )
+        }
     }
 
     /**
@@ -1333,9 +1607,16 @@ class PdfReaderViewModel @Inject constructor(
             imageMoveStartPosition = element.position
         }
 
+        // Find all elements to move: this element PLUS its group PLUS any co-selected elements!
+        val elementsToMove = _uiState.value.imageElements.filter {
+            it.id == id || (element.groupId != null && it.groupId == element.groupId) || _uiState.value.selectedImageIds.contains(it.id)
+        }
+        
+        val moveIds = elementsToMove.map { it.id }.toSet()
+
         _uiState.update { state ->
             state.copy(imageElements = state.imageElements.map {
-                if (it.id == id) it.copy(position = it.position + delta) else it
+                if (moveIds.contains(it.id)) it.copy(position = it.position + delta) else it
             })
         }
     }
@@ -1502,10 +1783,36 @@ class PdfReaderViewModel @Inject constructor(
             }
         }
 
+        // Calculate the unrotated centers
+        val oldCx = element.position.x + element.width / 2f
+        val oldCy = element.position.y + element.height / 2f
+        val unrotatedNewCx = newX + newW / 2f
+        val unrotatedNewCy = newY + newH / 2f
+        
+        // The shift of the center in the local unrotated coordinate space
+        val dcLocalX = unrotatedNewCx - oldCx
+        val dcLocalY = unrotatedNewCy - oldCy
+        
+        // Rotate the shift vector by the element's rotation to get the shift in parent (global) space
+        val rad = Math.toRadians(element.rotation.toDouble())
+        val cos = Math.cos(rad).toFloat()
+        val sin = Math.sin(rad).toFloat()
+        
+        val dcParentX = dcLocalX * cos - dcLocalY * sin
+        val dcParentY = dcLocalX * sin + dcLocalY * cos
+        
+        // The new actual center in parent space
+        val finalCx = oldCx + dcParentX
+        val finalCy = oldCy + dcParentY
+        
+        // Find new layout offset based on the shifted parent center
+        val finalX = finalCx - newW / 2f
+        val finalY = finalCy - newH / 2f
+
         _uiState.update { state ->
             state.copy(imageElements = state.imageElements.map {
                 if (it.id == id) it.copy(
-                    position = Offset(newX, newY),
+                    position = Offset(finalX, finalY),
                     width = newW,
                     height = newH
                 ) else it
