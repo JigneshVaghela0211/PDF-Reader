@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
                             val pageIndex = backStackEntry.arguments?.getInt("pageIndex") ?: -1
                             val searchQuery = backStackEntry.arguments?.getString("searchQuery")?.let { Uri.decode(it) }
                             val readerViewModel: PdfReaderViewModel = hiltViewModel()
+                            val editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel = hiltViewModel()
                             
                             val refreshResult = backStackEntry.savedStateHandle
                                 .getStateFlow<Boolean>("refresh_pdf", false)
@@ -94,6 +95,7 @@ class MainActivity : AppCompatActivity() {
                             
                             PdfReaderScreen(
                                 viewModel = readerViewModel,
+                                editorViewModel = editorViewModel,
                                 path = Uri.decode(path),
                                 initialPageIndex = pageIndex,
                                 searchQuery = searchQuery,

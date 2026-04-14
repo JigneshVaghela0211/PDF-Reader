@@ -29,7 +29,7 @@ fun TextSelectionOverlay(
     textBlocks: List<TextBlock>,
     interactionMode: InteractionMode,
     textSelection: TextSelectionState?,
-    viewModel: PdfReaderViewModel
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel
 ) {
     if (pageWidth <= 0 || pageHeight <= 0) return
 
@@ -85,25 +85,25 @@ fun TextSelectionOverlay(
                         val word = findWordAt(offset)
                         if (word != null) {
                             Log.d(TAG, "Selection gesture started at word: ${word.text}")
-                            viewModel.startTextSelection(pageIndex, word, allWords)
+                            editorViewModel.startTextSelection(pageIndex, word, allWords)
                         } else {
                             // If user long presses empty space, maybe clear selection?
-                            viewModel.clearTextSelection()
+                            editorViewModel.clearTextSelection()
                         }
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         val word = findWordAt(change.position)
                         if (word != null && textSelection?.pageIndex == pageIndex) {
-                            viewModel.updateTextSelection(pageIndex, word, allWords)
+                            editorViewModel.updateTextSelection(pageIndex, word, allWords)
                         }
                     },
                     onDragEnd = {
                         Log.d(TAG, "Selection gesture ended")
-                        viewModel.finalizeTextSelection()
+                        editorViewModel.finalizeTextSelection()
                     },
                     onDragCancel = {
-                        viewModel.clearTextSelection()
+                        editorViewModel.clearTextSelection()
                     }
                 )
             }
@@ -111,7 +111,7 @@ fun TextSelectionOverlay(
                 detectTapGestures(
                     onTap = {
                         if (interactionMode == InteractionMode.SELECT_TEXT) {
-                            viewModel.clearTextSelection()
+                            editorViewModel.clearTextSelection()
                         }
                     }
                 )

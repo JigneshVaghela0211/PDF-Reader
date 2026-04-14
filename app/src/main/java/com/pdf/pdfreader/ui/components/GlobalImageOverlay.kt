@@ -324,17 +324,16 @@ private fun GlobalImageElementView(
     Box(
         modifier = Modifier
             .zIndex(if (isSelected) 112f + element.zIndex else 110f + element.zIndex)
-            .offset {
-                IntOffset(
-                    globalX.toInt(),
-                    globalY.toInt()
-                )
-            }
             .size(
                 width = with(density) { scaledWidth.toDp() },
                 height = with(density) { scaledHeight.toDp() }
             )
+            // PERF: Use graphicsLayer for ALL transform properties (position + rotation + opacity).
+            // graphicsLayer updates bypass recomposition — only the render layer is re-drawn.
+            // Modifier.offset{} would cause recomposition on every drag frame.
             .graphicsLayer {
+                translationX = globalX
+                translationY = globalY
                 rotationZ = element.rotation
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
                 alpha = element.opacity

@@ -83,6 +83,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 @Composable
 fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel,
     path: String,
     initialPageIndex: Int = -1,
     searchQuery: String? = null,
@@ -90,12 +91,14 @@ fun PdfReaderScreen(
     onNavigateToManagePages: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val editorUiState by editorViewModel.uiState.collectAsStateWithLifecycle()
     val pageStates by viewModel.pageStates.collectAsStateWithLifecycle()
     val scrollState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(path) {
         viewModel.initialize(path)
+        editorViewModel.initialize(path)
     }
 
     // Handle initial page / external search query
@@ -162,6 +165,7 @@ fun PdfReaderScreen(
         val safeRange = (firstVisible - 2).coerceAtLeast(0)..(lastVisible + 2).coerceAtMost(uiState.totalPages - 1)
         viewModel.cancelRenderingOutsideRange(safeRange)
         viewModel.updateCurrentPage(firstVisible)
+        editorViewModel.setCurrentPage(firstVisible)
     }
 
     // Image picker launcher
@@ -169,26 +173,26 @@ fun PdfReaderScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.addImage(it, uiState.currentPage, screenWidthPx)
+            editorViewModel.addImage(it, uiState.currentPage, screenWidthPx)
         }
     }
 
     // Launch image picker when INSERT_IMAGE tool is selected
-    LaunchedEffect(uiState.currentTool) {
-        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE) {
+    LaunchedEffect(editorUiState.currentTool) {
+        if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE) {
             imagePickerLauncher.launch("image/*")
         }
     }
 
     // Show snackbar for export result
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(uiState.exportResult) {
-        uiState.exportResult?.let { result ->
+    LaunchedEffect(editorUiState.exportResult) {
+        editorUiState.exportResult?.let { result ->
             snackbarHostState.showSnackbar(
                 message = "Saved: ${java.io.File(result).name}",
                 duration = SnackbarDuration.Short
             )
-            viewModel.clearExportResult()
+            editorViewModel.clearExportResult()
         }
     }
 
@@ -197,7 +201,7 @@ fun PdfReaderScreen(
         topBar = {
             var showMenu by remember { mutableStateOf(false) }
             when {
-                uiState.isEditMode -> {
+                editorUiState.isEditMode -> {
                     // Slim edit-mode top bar: Close + Save/Export only
                     // All tools are in the bottom EditingBottomBar — no duplication
                     TopAppBar(
@@ -209,29 +213,29 @@ fun PdfReaderScreen(
                             )
                         },
                         navigationIcon = {
-                            IconButton(onClick = { viewModel.setEditMode(false) }) {
+                            IconButton(onClick = { editorViewModel.setEditMode(false) }) {
                                 Icon(Icons.Default.Close, contentDescription = "Close Edit Mode")
                             }
                         },
                         actions = {
                             // Stroke width slider toggle (only for pen/highlighter)
-                            if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
-                                || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
+                            if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
+                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
                             ) {
                                 Text(
-                                    text = "${uiState.currentStrokeWidth.toInt()}px",
+                                    text = "${editorUiState.currentStrokeWidth.toInt()}px",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             
                             // Export (visible when overlays exist)
-                            if (uiState.hasEditableOverlays) {
+                            if (editorUiState.hasEditableOverlays) {
                                 IconButton(
-                                    onClick = { viewModel.exportEditedPdf(screenWidthPx) },
-                                    enabled = !uiState.isExporting
+                                    onClick = { editorViewModel.exportEditedPdf(screenWidthPx) },
+                                    enabled = !editorUiState.isExporting
                                 ) {
-                                    if (uiState.isExporting) {
+                                    if (editorUiState.isExporting) {
                                         CircularProgressIndicator(
                                             modifier = Modifier.size(20.dp),
                                             strokeWidth = 2.dp
@@ -246,7 +250,7 @@ fun PdfReaderScreen(
                                 }
                             }
                             // Save annotations
-                            IconButton(onClick = { viewModel.saveAnnotationsToPdf(screenWidthPx) }) {
+                            IconButton(onClick = { editorViewModel.saveAnnotationsToPdf(screenWidthPx) }) {
                                 Icon(Icons.Default.Save, contentDescription = "Save Annotations")
                             }
                         },
@@ -257,13 +261,13 @@ fun PdfReaderScreen(
                     )
                     
                     // Stroke width slider (expandable below top bar for pen/highlighter)
-                    if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
-                        || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
+                    if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
+                        || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
                     ) {
                         com.pdf.pdfreader.ui.components.StrokeWidthSliderExpandable(
-                            currentStrokeWidth = uiState.currentStrokeWidth,
-                            currentColor = uiState.currentColor,
-                            onStrokeWidthChange = viewModel::setAnnotationStrokeWidth
+                            currentStrokeWidth = editorUiState.currentStrokeWidth,
+                            currentColor = editorUiState.currentColor,
+                            onStrokeWidthChange = editorViewModel::setAnnotationStrokeWidth
                         )
                     }
                 }
@@ -329,7 +333,7 @@ fun PdfReaderScreen(
                                     text = { Text("Edit / Annotate") },
                                     onClick = { 
                                         showMenu = false
-                                        viewModel.setEditMode(true) 
+                                        editorViewModel.setEditMode(true) 
                                     },
                                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
                                 )
@@ -358,22 +362,22 @@ fun PdfReaderScreen(
             
             if (showBottomColorPicker) {
                 com.pdf.pdfreader.ui.components.ColorSelectionDialog(
-                    initialColor = uiState.currentColor,
-                    onColorSelected = { viewModel.setAnnotationColor(it) },
+                    initialColor = editorUiState.currentColor,
+                    onColorSelected = { editorViewModel.setAnnotationColor(it) },
                     onDismiss = { showBottomColorPicker = false }
                 )
             }
             
             com.pdf.pdfreader.ui.components.EditingBottomBar(
-                visible = uiState.isEditMode,
-                currentTool = uiState.currentTool,
-                currentColor = uiState.currentColor,
-                canUndo = uiState.canUndo,
-                canRedo = uiState.canRedo,
-                onToolChange = viewModel::setAnnotationToolWithAutoExtract,
-                onSignatureClick = { viewModel.setSignatureSheetVisible(true) },
-                onUndoClick = viewModel::undo,
-                onRedoClick = viewModel::redo,
+                visible = editorUiState.isEditMode,
+                currentTool = editorUiState.currentTool,
+                currentColor = editorUiState.currentColor,
+                canUndo = editorUiState.canUndo,
+                canRedo = editorUiState.canRedo,
+                onToolChange = editorViewModel::setAnnotationToolWithAutoExtract,
+                onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) },
+                onUndoClick = editorViewModel::undo,
+                onRedoClick = editorViewModel::redo,
                 onColorClick = { showBottomColorPicker = true }
             )
         }
@@ -423,15 +427,16 @@ fun PdfReaderScreen(
                     // - User is actively interacting with image/text overlays
                     // - Edit mode is active with an interactive tool
                     // - Zoomed in (handled by existing pan gesture)
-                    val userScrollEnabled = (!uiState.isEditMode
-                            || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE)
+                    val userScrollEnabled = (!editorUiState.isEditMode
+                            || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE)
                             && scale <= 1f
-                            && uiState.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.NONE
+                            && editorUiState.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.NONE
 
                     val pageContent: @Composable (Int) -> Unit = { pageIndex ->
                         PdfPage(
                             pageIndex = pageIndex,
                             viewModel = viewModel,
+                            editorViewModel = editorViewModel,
                             width = screenWidthPx,
                             pageStates = pageStates,
                             isScrolling = isScrolling,
@@ -488,35 +493,35 @@ fun PdfReaderScreen(
                     // This is the architectural fix: images render in a SINGLE
                     // layer ABOVE the LazyColumn, so they never go behind
                     // subsequent pages when dragged across page boundaries.
-                    if (uiState.imageElements.isNotEmpty()) {
+                    if (editorUiState.imageElements.isNotEmpty()) {
                         com.pdf.pdfreader.ui.components.GlobalImageOverlay(
                             modifier = Modifier.fillMaxSize(),
                             scrollState = scrollState,
-                            imageElements = uiState.imageElements,
-                            selectedImageId = uiState.selectedImageId,
-                            selectedImageIds = uiState.selectedImageIds,
-                            isImageMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
-                                    || uiState.selectedImageId != null,
-                            onSelectImage = { viewModel.selectImage(it) },
-                            onMoveImage = { id, delta -> viewModel.moveImage(id, delta) },
-                            onResizeImage = { id, handle, delta -> viewModel.resizeImage(id, handle, delta) },
+                            imageElements = editorUiState.imageElements,
+                            selectedImageId = editorUiState.selectedImageId,
+                            selectedImageIds = editorUiState.selectedImageIds,
+                            isImageMode = editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+                                    || editorUiState.selectedImageId != null,
+                            onSelectImage = { editorViewModel.selectImage(it) },
+                            onMoveImage = { id, delta -> editorViewModel.moveImage(id, delta) },
+                            onResizeImage = { id, handle, delta -> editorViewModel.resizeImage(id, handle, delta) },
                             onResizeGroup = { ids, handle, delta, groupW, groupH -> 
-                                viewModel.resizeGroup(ids, handle, delta, groupW, groupH) 
+                                editorViewModel.resizeGroup(ids, handle, delta, groupW, groupH) 
                             },
-                            onResizeEnd = { id -> viewModel.onResizeEnd(id) },
-                            onResizeGroupEnd = { ids -> viewModel.onResizeGroupEnd(ids) },
+                            onResizeEnd = { id -> editorViewModel.onResizeEnd(id) },
+                            onResizeGroupEnd = { ids -> editorViewModel.onResizeGroupEnd(ids) },
                             onMoveEnd = { id ->
                                 // On move end, detect page boundary crossing
-                                viewModel.detectPageBoundaryAfterMove(id, scrollState)
-                                viewModel.onMoveEnd(id)
+                                editorViewModel.detectPageBoundaryAfterMove(id, scrollState)
+                                editorViewModel.onMoveEnd(id)
                             },
-                            onInteractionStart = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.DRAG) },
-                            onInteractionEnd = { viewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.NONE) }
+                            onInteractionStart = { editorViewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.DRAG) },
+                            onInteractionEnd = { editorViewModel.setInteractionMode(com.pdf.pdfreader.domain.model.InteractionMode.NONE) }
                         )
 
                         // ─── Context-Aware Element Toolbar (dispatched by SelectedElementType) ───
-                        val selectedImage = uiState.imageElements.find { it.id == uiState.selectedImageId }
-                        when (uiState.selectedElementType) {
+                        val selectedImage = editorUiState.imageElements.find { it.id == editorUiState.selectedImageId }
+                        when (editorUiState.selectedElementType) {
                             com.pdf.pdfreader.ui.viewmodel.SelectedElementType.SIGNATURE -> {
                                 if (selectedImage != null) {
                                     val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
@@ -539,25 +544,25 @@ fun PdfReaderScreen(
                                                 currentColor = sigColor,
                                                 hasEditableStrokes = selectedImage.signatureStrokes != null,
                                                 onStrokeWidthChange = { newWidth ->
-                                                    viewModel.updateSignatureProperties(
+                                                    editorViewModel.updateSignatureProperties(
                                                         selectedImage.id,
                                                         newStrokeWidth = newWidth
                                                     )
                                                 },
                                                 onColorChange = { newColor ->
-                                                    viewModel.updateSignatureProperties(
+                                                    editorViewModel.updateSignatureProperties(
                                                         selectedImage.id,
                                                         newColor = newColor
                                                     )
                                                 },
-                                                onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
-                                                onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
-                                                onDelete = { viewModel.deleteImage(selectedImage.id) },
-                                                onDuplicate = { viewModel.duplicateImage(selectedImage.id) },
-                                                onBringToFront = { viewModel.bringToFront(selectedImage.id) },
-                                                onSendToBack = { viewModel.sendToBack(selectedImage.id) },
-                                                onToggleLock = { viewModel.toggleImageLock(selectedImage.id) },
-                                                onOpacityChange = { viewModel.setImageOpacity(selectedImage.id, it) }
+                                                onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
+                                                onRotateRight = { editorViewModel.rotateImage(selectedImage.id, 90f) },
+                                                onDelete = { editorViewModel.deleteImage(selectedImage.id) },
+                                                onDuplicate = { editorViewModel.duplicateImage(selectedImage.id) },
+                                                onBringToFront = { editorViewModel.bringToFront(selectedImage.id) },
+                                                onSendToBack = { editorViewModel.sendToBack(selectedImage.id) },
+                                                onToggleLock = { editorViewModel.toggleImageLock(selectedImage.id) },
+                                                onOpacityChange = { editorViewModel.setImageOpacity(selectedImage.id, it) }
                                             )
                                         }
                                     }
@@ -577,16 +582,16 @@ fun PdfReaderScreen(
                                                 offsetY = toolbarGlobalY.coerceAtLeast(0),
                                                 isLocked = selectedImage.isLocked,
                                                 opacity = selectedImage.opacity,
-                                                onRotateLeft = { viewModel.rotateImage(selectedImage.id, -90f) },
-                                                onRotateRight = { viewModel.rotateImage(selectedImage.id, 90f) },
-                                                onDelete = { viewModel.deleteImage(selectedImage.id) },
-                                                onDuplicate = { viewModel.duplicateImage(selectedImage.id) },
-                                                onBringToFront = { viewModel.bringToFront(selectedImage.id) },
-                                                onSendToBack = { viewModel.sendToBack(selectedImage.id) },
-                                                onToggleLock = { viewModel.toggleImageLock(selectedImage.id) },
-                                                onOpacityChange = { viewModel.setImageOpacity(selectedImage.id, it) },
+                                                onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
+                                                onRotateRight = { editorViewModel.rotateImage(selectedImage.id, 90f) },
+                                                onDelete = { editorViewModel.deleteImage(selectedImage.id) },
+                                                onDuplicate = { editorViewModel.duplicateImage(selectedImage.id) },
+                                                onBringToFront = { editorViewModel.bringToFront(selectedImage.id) },
+                                                onSendToBack = { editorViewModel.sendToBack(selectedImage.id) },
+                                                onToggleLock = { editorViewModel.toggleImageLock(selectedImage.id) },
+                                                onOpacityChange = { editorViewModel.setImageOpacity(selectedImage.id, it) },
                                                 onSnapToCenter = {
-                                                    viewModel.snapImageToCenter(
+                                                    editorViewModel.snapImageToCenter(
                                                         selectedImage.id,
                                                         screenWidthPx,
                                                         pageLayout.height
@@ -599,7 +604,7 @@ fun PdfReaderScreen(
                             }
                             
                             com.pdf.pdfreader.ui.viewmodel.SelectedElementType.GROUP -> {
-                                val groupElements = uiState.imageElements.filter { uiState.selectedImageIds.contains(it.id) }
+                                val groupElements = editorUiState.imageElements.filter { editorUiState.selectedImageIds.contains(it.id) }
                                 val minX = groupElements.minOfOrNull { it.position.x } ?: 0f
                                 val minY = groupElements.minOfOrNull { it.position.y } ?: 0f
                                 val topPageIdx = groupElements.minOfOrNull { it.pageIndex } ?: 0
@@ -619,23 +624,23 @@ fun PdfReaderScreen(
                                             onRotateLeft = { },
                                             onRotateRight = { },
                                             onDelete = { 
-                                                uiState.selectedImageIds.forEach { viewModel.deleteImage(it) }
-                                                viewModel.selectImage(null)
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.deleteImage(it) }
+                                                editorViewModel.selectImage(null)
                                             },
                                             onDuplicate = { 
-                                                uiState.selectedImageIds.forEach { viewModel.duplicateImage(it) } 
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.duplicateImage(it) } 
                                             },
                                             onBringToFront = { 
-                                                uiState.selectedImageIds.forEach { viewModel.bringToFront(it) } 
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.bringToFront(it) } 
                                             },
                                             onSendToBack = { 
-                                                uiState.selectedImageIds.forEach { viewModel.sendToBack(it) } 
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.sendToBack(it) } 
                                             },
                                             onToggleLock = { 
-                                                uiState.selectedImageIds.forEach { viewModel.toggleImageLock(it) } 
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.toggleImageLock(it) } 
                                             },
                                             onOpacityChange = { op ->
-                                                uiState.selectedImageIds.forEach { viewModel.setImageOpacity(it, op) }
+                                                editorUiState.selectedImageIds.forEach { editorViewModel.setImageOpacity(it, op) }
                                             },
                                             onSnapToCenter = { }
                                         )
@@ -649,7 +654,7 @@ fun PdfReaderScreen(
                     }
 
                     // ─── Text Selection Toolbar ───────
-                    val textSel = uiState.textSelection
+                    val textSel = editorUiState.textSelection
                     if (textSel != null && textSel.bounds != null) {
                         val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
                         val pageLayout = pageLayouts.find { it.pageIndex == textSel.pageIndex }
@@ -661,11 +666,11 @@ fun PdfReaderScreen(
                                     visible = true,
                                     offsetX = textSel.bounds.left.toInt(),
                                     offsetY = toolbarGlobalY.coerceAtLeast(0),
-                                    onCopy = { viewModel.copySelectedText(context) },
-                                    onEdit = { viewModel.editSelectedText() },
-                                    onHighlight = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
-                                    onUnderline = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },
-                                    onStrikethrough = { viewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH) }
+                                    onCopy = { editorViewModel.copySelectedText(context) },
+                                    onEdit = { editorViewModel.editSelectedText() },
+                                    onHighlight = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
+                                    onUnderline = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },
+                                    onStrikethrough = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH) }
                                 )
                             }
                         }
@@ -792,21 +797,21 @@ fun PdfReaderScreen(
 
         // ─── Signature UIs ───────────────────────────────────────
         com.pdf.pdfreader.ui.components.SignatureBottomSheet(
-            visible = uiState.isSignatureSheetVisible,
-            savedSignatures = uiState.savedSignatures,
-            onDismissRequest = { viewModel.setSignatureSheetVisible(false) },
+            visible = editorUiState.isSignatureSheetVisible,
+            savedSignatures = editorUiState.savedSignatures,
+            onDismissRequest = { editorViewModel.setSignatureSheetVisible(false) },
             onCreateNewSignature = { 
-                viewModel.setSignatureSheetVisible(false)
-                viewModel.setSignaturePadVisible(true)
+                editorViewModel.setSignatureSheetVisible(false)
+                editorViewModel.setSignaturePadVisible(true)
             },
-            onSelectSignature = { viewModel.insertSignatureAsImage(it) },
-            onDeleteSignature = { viewModel.deleteSignature(it) }
+            onSelectSignature = { editorViewModel.insertSignatureAsImage(it) },
+            onDeleteSignature = { editorViewModel.deleteSignature(it) }
         )
 
-        if (uiState.isSignaturePadVisible) {
+        if (editorUiState.isSignaturePadVisible) {
             com.pdf.pdfreader.ui.components.SignaturePadDialog(
-                onDismissRequest = { viewModel.setSignaturePadVisible(false) },
-                onSaveSignature = { strokes, w, h -> viewModel.saveSignature(strokes, w, h) }
+                onDismissRequest = { editorViewModel.setSignaturePadVisible(false) },
+                onSaveSignature = { strokes, w, h -> editorViewModel.saveSignature(strokes, w, h) }
             )
         }
     }
@@ -936,6 +941,7 @@ private fun SearchTopBar(
 fun PdfPage(
     pageIndex: Int,
     viewModel: PdfReaderViewModel,
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel,
     width: Int,
     pageStates: Map<Int, PageRenderState>,
     isScrolling: Boolean = false,
@@ -964,6 +970,7 @@ fun PdfPage(
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val editorUiState by editorViewModel.uiState.collectAsStateWithLifecycle()
     val pageBg = when (uiState.viewSettings.backgroundMode) {
         BackgroundMode.ORIGINAL -> Color.White
         BackgroundMode.PAPER -> Color(0xFFF5F0E1)
@@ -973,9 +980,9 @@ fun PdfPage(
     // Only intercept taps for annotation deselect when NOT in text/image editing mode.
     // CRITICAL: When EDIT_TEXT, INSERT_IMAGE, or image selected, do NOT attach
     // any tap handler at the page level — let events pass through to overlay children.
-    val isInteractiveEditMode = uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT
-            || uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
-            || uiState.selectedImageId != null
+    val isInteractiveEditMode = editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT
+            || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+            || editorUiState.selectedImageId != null
 
     Box(
         modifier = Modifier
@@ -983,12 +990,12 @@ fun PdfPage(
             .padding(vertical = 4.dp)
             .background(pageBg)
             .then(
-                if (!isInteractiveEditMode && !uiState.isEditMode) {
+                if (!isInteractiveEditMode && !editorUiState.isEditMode) {
                     // Reading mode: double-tap to zoom, single-tap deselect
                     Modifier.pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = { onDoubleTap() },
-                            onTap = { viewModel.selectAnnotation(null) }
+                            onTap = { editorViewModel.selectAnnotation(null) }
                         )
                     }
                 } else if (!isInteractiveEditMode) {
@@ -996,7 +1003,7 @@ fun PdfPage(
                     Modifier.pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = { onDoubleTap() },
-                            onTap = { viewModel.selectAnnotation(null) }
+                            onTap = { editorViewModel.selectAnnotation(null) }
                         )
                     }
                 } else {
@@ -1049,33 +1056,33 @@ fun PdfPage(
                         // Annotation overlay
                         PdfAnnotationOverlay(
                             modifier = Modifier.matchParentSize(),
-                            isEditMode = uiState.isEditMode,
-                            currentTool = uiState.currentTool,
-                            currentColor = uiState.currentColor,
-                            currentStrokeWidth = uiState.currentStrokeWidth,
-                            annotations = uiState.annotations,
-                            onAnnotationAdded = viewModel::addAnnotation,
-                            onAnnotationRemoved = viewModel::removeAnnotation,
+                            isEditMode = editorUiState.isEditMode,
+                            currentTool = editorUiState.currentTool,
+                            currentColor = editorUiState.currentColor,
+                            currentStrokeWidth = editorUiState.currentStrokeWidth,
+                            annotations = editorUiState.annotations,
+                            onAnnotationAdded = editorViewModel::addAnnotation,
+                            onAnnotationRemoved = editorViewModel::removeAnnotation,
                             pageIndex = pageIndex
                         )
 
                         // Text annotations
-                        uiState.annotations
+                        editorUiState.annotations
                             .filterIsInstance<com.pdf.pdfreader.domain.model.PdfAnnotation.TextNote>()
                             .filter { it.pageIndex == pageIndex }
                             .forEach { textNote ->
                                 key(textNote.id) {
                                     com.pdf.pdfreader.ui.components.MovableTextNote(
                                         note = textNote,
-                                        isEditMode = uiState.isEditMode,
-                                        isSelected = uiState.selectedAnnotationId == textNote.id,
-                                        onSelect = { viewModel.selectAnnotation(textNote.id) },
-                                        onDeselect = { viewModel.selectAnnotation(null) },
-                                        onCommit = { before, after -> viewModel.commitTextAnnotation(before, after, pageIndex) },
+                                        isEditMode = editorUiState.isEditMode,
+                                        isSelected = editorUiState.selectedAnnotationId == textNote.id,
+                                        onSelect = { editorViewModel.selectAnnotation(textNote.id) },
+                                        onDeselect = { editorViewModel.selectAnnotation(null) },
+                                        onCommit = { before, after -> editorViewModel.commitTextAnnotation(before, after, pageIndex) },
                                         onDelete = { 
-                                            viewModel.removeAnnotation(textNote.id)
-                                            if (uiState.selectedAnnotationId == textNote.id) {
-                                                viewModel.selectAnnotation(null)
+                                            editorViewModel.removeAnnotation(textNote.id)
+                                            if (editorUiState.selectedAnnotationId == textNote.id) {
+                                                editorViewModel.selectAnnotation(null)
                                             }
                                         }
                                     )
@@ -1083,24 +1090,24 @@ fun PdfPage(
                             }
 
                         // ─── Text Edit Overlay (Edit existing PDF text) ────
-                        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT && pageSize != IntSize.Zero) {
-                            val pageTextBlocks = uiState.textBlocks[pageIndex] ?: emptyList()
+                        if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT && pageSize != IntSize.Zero) {
+                            val pageTextBlocks = editorUiState.textBlocks[pageIndex] ?: emptyList()
                             com.pdf.pdfreader.ui.components.TextEditOverlay(
                                 modifier = Modifier.matchParentSize(),
                                 pageIndex = pageIndex,
                                 pageSize = pageSize,
                                 textBlocks = pageTextBlocks,
-                                editedTextBlocks = uiState.editedTextBlocks.filter { it.originalBlock.pageIndex == pageIndex },
-                                selectedTextBlockId = uiState.selectedTextBlockId,
+                                editedTextBlocks = editorUiState.editedTextBlocks.filter { it.originalBlock.pageIndex == pageIndex },
+                                selectedTextBlockId = editorUiState.selectedTextBlockId,
                                 isEditTextMode = true,
-                                onSelectTextBlock = { viewModel.selectTextBlock(it) },
+                                onSelectTextBlock = { editorViewModel.selectTextBlock(it) },
                                 onEditTextBlock = { blockId, newText, newFontSize, newColor ->
-                                    viewModel.editTextBlock(blockId, newText, newFontSize, newColor)
+                                    editorViewModel.editTextBlock(blockId, newText, newFontSize, newColor)
                                 }
                             )
 
                             // Show loading indicator while extracting text
-                            if (uiState.isTextBlocksLoading) {
+                            if (editorUiState.isTextBlocksLoading) {
                                 Box(
                                     modifier = Modifier.matchParentSize(),
                                     contentAlignment = Alignment.Center
@@ -1114,8 +1121,8 @@ fun PdfPage(
                         }
 
                         // ─── Text Selection Overlay (Chunk 2, 3) ────
-                        if (uiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE && !uiState.isEditMode && pageSize != IntSize.Zero) {
-                            val pageTextBlocks = uiState.textBlocks[pageIndex] ?: emptyList()
+                        if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE && !editorUiState.isEditMode && pageSize != IntSize.Zero) {
+                            val pageTextBlocks = editorUiState.textBlocks[pageIndex] ?: emptyList()
                             if (pageTextBlocks.isNotEmpty()) {
                                 com.pdf.pdfreader.ui.components.TextSelectionOverlay(
                                     modifier = Modifier.matchParentSize(),
@@ -1123,9 +1130,9 @@ fun PdfPage(
                                     pageWidth = pageSize.width,
                                     pageHeight = pageSize.height,
                                     textBlocks = pageTextBlocks,
-                                    interactionMode = uiState.interactionMode,
-                                    textSelection = uiState.textSelection,
-                                    viewModel = viewModel
+                                    interactionMode = editorUiState.interactionMode,
+                                    textSelection = editorUiState.textSelection,
+                                    editorViewModel = editorViewModel
                                 )
                             }
                         }
