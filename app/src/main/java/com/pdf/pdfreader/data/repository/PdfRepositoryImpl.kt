@@ -124,8 +124,8 @@ class PdfRepositoryImpl @Inject constructor(
             // Insert new/updated files
             if (scannedFiles.isNotEmpty()) {
                 pdfDao.upsertPdfs(scannedFiles)
-                // Fire and forget indexing for new files
-                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                // Fire and forget indexing for new files sequentially
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO.limitedParallelism(1)).launch {
                     scannedFiles.forEach { pdf ->
                         if (!pdf.isLocked) {
                             textExtractor.extractAndIndexPdf(pdf.path)

@@ -129,6 +129,23 @@ data class PdfReaderUiState(
 
     /** True when any editable overlay exists (text edits or images) */
     val hasEditableOverlays: Boolean get() = editedTextBlocks.isNotEmpty() || imageElements.isNotEmpty()
+
+    /** Derived: what type of element is currently selected */
+    val selectedElementType: SelectedElementType get() = when {
+        selectedImageId != null -> {
+            val img = imageElements.find { it.id == selectedImageId }
+            if (img?.isSignature == true) SelectedElementType.SIGNATURE
+            else SelectedElementType.IMAGE
+        }
+        selectedImageIds.size >= 2 -> SelectedElementType.GROUP
+        selectedTextBlockId != null -> SelectedElementType.TEXT
+        else -> SelectedElementType.NONE
+    }
+}
+
+/** Identifies the type of element currently under user interaction */
+enum class SelectedElementType {
+    NONE, TEXT, IMAGE, SIGNATURE, GROUP
 }
 
 sealed class ScrollEvent {
@@ -183,6 +200,7 @@ class PdfReaderViewModel @Inject constructor(
 
     private val activeRenderJobs = ConcurrentHashMap<Int, Job>()
     private val failureCounts = ConcurrentHashMap<Int, Int>()
+    private val groupResizeStartStates = mutableMapOf<String, ImageElement>()
 
     init {
         // Observe undo/redo state changes and sync to UI
@@ -1316,13 +1334,22 @@ class PdfReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val uri = signatureManager.saveSignature(strokes, width, height)
             val updatedList = signatureManager.getAllSignatureUris()
+            
+            // Convert strokes to serializable format for preservation
+            val serializableStrokes = strokes.map { 
+                com.pdf.pdfreader.domain.model.SerializableStroke.fromComposeStroke(it)
+            }
+            
             _uiState.update { 
                 it.copy(
                     savedSignatures = updatedList,
                     isSignaturePadVisible = false,
-                    isSignatureSheetVisible = true // re-open sheet to show new sig
+                    isSignatureSheetVisible = false
                 ) 
             }
+            
+            // Auto-insert the signature onto the current page
+            insertSignatureWithStrokes(uri, serializableStrokes, width, height)
         }
     }
 
@@ -1335,15 +1362,104 @@ class PdfReaderViewModel @Inject constructor(
     }
 
     fun insertSignatureAsImage(uri: String) {
-        // Standard signature dimensions roughly approx
+        // Insert from saved signatures list (no stroke data available — bitmap only)
         val defaultWidth = 300f
         val defaultHeight = 150f
-        
-        insertImageUri(uri, defaultWidth, defaultHeight)
+        insertImageUri(uri, defaultWidth, defaultHeight, isSignature = true)
         setSignatureSheetVisible(false)
     }
+    
+    /**
+     * Insert a signature with preserved editable stroke data.
+     */
+    private fun insertSignatureWithStrokes(
+        uri: String,
+        strokes: List<com.pdf.pdfreader.domain.model.SerializableStroke>,
+        canvasWidth: Float,
+        canvasHeight: Float
+    ) {
+        val currentPage = _uiState.value.currentPage
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val element = com.pdf.pdfreader.domain.model.ImageElement(
+                    pageIndex = currentPage,
+                    uri = uri,
+                    position = androidx.compose.ui.geometry.Offset(100f, 100f),
+                    width = 300f,
+                    height = 150f,
+                    scale = 1f,
+                    rotation = 0f,
+                    opacity = 1f,
+                    isLocked = false,
+                    zIndex = 10,
+                    isSignature = true,
+                    signatureStrokes = strokes,
+                    signatureCanvasWidth = canvasWidth,
+                    signatureCanvasHeight = canvasHeight
+                )
+                
+                _uiState.update { state ->
+                    state.copy(
+                        imageElements = state.imageElements + element,
+                        selectedImageId = element.id,
+                        isEditMode = true,
+                        currentTool = com.pdf.pdfreader.ui.components.AnnotationTool.NONE
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to insert signature", e)
+            }
+        }
+    }
 
-    private fun insertImageUri(uriString: String, width: Float, height: Float) {
+    /**
+     * Update signature stroke properties (thickness and/or color) and re-render bitmap.
+     * Only works for elements that have preserved stroke data (isSignature = true).
+     */
+    fun updateSignatureProperties(
+        elementId: String,
+        newColor: androidx.compose.ui.graphics.Color? = null,
+        newStrokeWidth: Float? = null
+    ) {
+        val element = _uiState.value.imageElements.find { it.id == elementId } ?: return
+        val currentStrokes = element.signatureStrokes ?: return
+        
+        // Apply changes to all strokes
+        val updatedStrokes = currentStrokes.map { stroke ->
+            stroke.copy(
+                color = newColor?.value?.toLong() ?: stroke.color,
+                strokeWidth = newStrokeWidth ?: stroke.strokeWidth
+            )
+        }
+        
+        viewModelScope.launch {
+            try {
+                // Re-render with updated strokes
+                val composeStrokes = updatedStrokes.map { it.toComposeStroke() }
+                val newUri = signatureManager.reRenderSignature(
+                    composeStrokes,
+                    element.signatureCanvasWidth,
+                    element.signatureCanvasHeight
+                )
+                
+                _uiState.update { state ->
+                    state.copy(imageElements = state.imageElements.map {
+                        if (it.id == elementId) {
+                            it.copy(
+                                uri = newUri,
+                                signatureStrokes = updatedStrokes,
+                                bitmapVersion = it.bitmapVersion + 1
+                            )
+                        } else it
+                    })
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to re-render signature", e)
+            }
+        }
+    }
+
+    private fun insertImageUri(uriString: String, width: Float, height: Float, isSignature: Boolean = false) {
         val currentPage = _uiState.value.currentPage
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -1357,7 +1473,8 @@ class PdfReaderViewModel @Inject constructor(
                     rotation = 0f,
                     opacity = 1f,
                     isLocked = false,
-                    zIndex = 10
+                    zIndex = 10,
+                    isSignature = isSignature
                 )
                 
                 _uiState.update { state ->
@@ -1365,7 +1482,10 @@ class PdfReaderViewModel @Inject constructor(
                         imageElements = state.imageElements + element,
                         selectedImageId = element.id,
                         isEditMode = true,
-                        currentTool = com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
+                        // Only set INSERT_IMAGE for actual images (triggers picker)
+                        // Signatures must NOT set INSERT_IMAGE — it would open the image picker
+                        currentTool = if (isSignature) com.pdf.pdfreader.ui.components.AnnotationTool.NONE
+                                      else com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
                     )
                 }
             } catch (e: Exception) {
@@ -1456,8 +1576,6 @@ class PdfReaderViewModel @Inject constructor(
 
     // ─── Image Manipulation ─────────────────────────────────────
 
-    /** Stores the image position before a drag begins (for move undo) */
-    private var imageMoveStartPosition: Offset? = null
     /** Stores the image bounds before a resize begins */
     private var imageResizeStartState: ImageElement? = null
 
@@ -1602,11 +1720,6 @@ class PdfReaderViewModel @Inject constructor(
         val element = _uiState.value.imageElements.find { it.id == id } ?: return
         if (element.isLocked) return // Locked elements cannot be moved
 
-        // Capture start position on first move
-        if (imageMoveStartPosition == null) {
-            imageMoveStartPosition = element.position
-        }
-
         // Find all elements to move: this element PLUS its group PLUS any co-selected elements!
         val elementsToMove = _uiState.value.imageElements.filter {
             it.id == id || (element.groupId != null && it.groupId == element.groupId) || _uiState.value.selectedImageIds.contains(it.id)
@@ -1614,36 +1727,82 @@ class PdfReaderViewModel @Inject constructor(
         
         val moveIds = elementsToMove.map { it.id }.toSet()
 
+        // Capture start positions for ALL elements being moved on first delta
+        if (groupMoveStartStates.isEmpty()) {
+            elementsToMove.forEach { groupMoveStartStates[it.id] = it.position }
+        }
+
+        // Get screen dimensions for boundary clamping
+        val displayMetrics = getApplication<android.app.Application>().resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels.toFloat()
+        val screenHeight = displayMetrics.heightPixels.toFloat()
+
         _uiState.update { state ->
-            state.copy(imageElements = state.imageElements.map {
-                if (moveIds.contains(it.id)) it.copy(position = it.position + delta) else it
+            state.copy(imageElements = state.imageElements.map { elem ->
+                if (moveIds.contains(elem.id)) {
+                    val newPos = elem.position + delta
+                    val elemW = elem.width * elem.scale
+                    val elemH = elem.height * elem.scale
+                    // Clamp: at least 20% of element must remain visible
+                    val minVisibleFraction = 0.2f
+                    val clampedX = newPos.x.coerceIn(
+                        -elemW * (1f - minVisibleFraction),
+                        screenWidth - elemW * minVisibleFraction
+                    )
+                    val clampedY = newPos.y.coerceIn(
+                        -elemH * (1f - minVisibleFraction),
+                        screenHeight - elemH * minVisibleFraction
+                    )
+                    elem.copy(position = Offset(clampedX, clampedY))
+                } else elem
             })
         }
     }
 
+    /** Stores the start positions of all elements in a group move for undo */
+    private val groupMoveStartStates = mutableMapOf<String, Offset>()
+
     /**
      * Finalize a move operation — create undo command.
+     * If multiple elements were moved (group/multi-select), wraps in CompositeCommand.
      */
     fun onMoveEnd(id: String) {
-        val element = _uiState.value.imageElements.find { it.id == id } ?: return
-        val startPos = imageMoveStartPosition ?: return
-        imageMoveStartPosition = null
+        if (groupMoveStartStates.isEmpty()) return
 
-        if (startPos == element.position) return // No actual move
-
-        viewModelScope.launch {
-            val command = AnnotationCommand.MoveImageCommand(
+        val commands = groupMoveStartStates.mapNotNull { (elemId, startPos) ->
+            val finalElement = _uiState.value.imageElements.find { it.id == elemId } ?: return@mapNotNull null
+            if (startPos == finalElement.position) return@mapNotNull null // No actual move
+            
+            AnnotationCommand.MoveImageCommand(
                 id = java.util.UUID.randomUUID().toString(),
                 pdfPath = _uiState.value.filePath,
-                pageIndex = element.pageIndex,
+                pageIndex = finalElement.pageIndex,
                 timestamp = System.currentTimeMillis(),
-                elementId = id,
+                elementId = elemId,
                 beforeX = startPos.x,
                 beforeY = startPos.y,
-                afterX = element.position.x,
-                afterY = element.position.y
+                afterX = finalElement.position.x,
+                afterY = finalElement.position.y
             )
-            undoRedoManager.execute(command)
+        }
+
+        groupMoveStartStates.clear()
+
+        if (commands.isEmpty()) return
+
+        viewModelScope.launch {
+            if (commands.size == 1) {
+                undoRedoManager.execute(commands.first())
+            } else {
+                val composite = AnnotationCommand.CompositeCommand(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = _uiState.value.filePath,
+                    pageIndex = -1,
+                    timestamp = System.currentTimeMillis(),
+                    commands = commands
+                )
+                undoRedoManager.execute(composite)
+            }
         }
     }
 
@@ -1818,6 +1977,135 @@ class PdfReaderViewModel @Inject constructor(
                 ) else it
             })
         }
+    }
+
+    /**
+     * Resizes all items within a group boundary using Affine scale tracking.
+     */
+    fun resizeGroup(ids: Set<String>, handle: ResizeHandle, delta: Offset, groupW: Float, groupH: Float) {
+        val minSize = 30f
+        var newW = groupW
+        var newH = groupH
+        var shiftX = 0f
+        var shiftY = 0f
+
+        // Capture starting states for Undo
+        if (groupResizeStartStates.isEmpty()) {
+            _uiState.value.imageElements.filter { ids.contains(it.id) }.forEach {
+                groupResizeStartStates[it.id] = it
+            }
+        }
+
+        when (handle) {
+            ResizeHandle.BOTTOM_RIGHT -> {
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.BOTTOM_LEFT -> {
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                shiftX = newW - dw
+                newW = dw
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_RIGHT -> {
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                shiftY = newH - dh
+                newH = dh
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_LEFT -> {
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                shiftX = newW - dw
+                shiftY = newH - dh
+                newW = dw
+                newH = dh
+            }
+            ResizeHandle.LEFT_CENTER -> {
+                val dw = (newW - delta.x).coerceAtLeast(minSize)
+                shiftX = newW - dw
+                newW = dw
+            }
+            ResizeHandle.RIGHT_CENTER -> {
+                newW = (newW + delta.x).coerceAtLeast(minSize)
+            }
+            ResizeHandle.TOP_CENTER -> {
+                val dh = (newH - delta.y).coerceAtLeast(minSize)
+                shiftY = newH - dh
+                newH = dh
+            }
+            ResizeHandle.BOTTOM_CENTER -> {
+                newH = (newH + delta.y).coerceAtLeast(minSize)
+            }
+        }
+
+        val scaleX = newW / groupW
+        val scaleY = newH / groupH
+
+        // Find centroid relative min
+        val elements = _uiState.value.imageElements.filter { ids.contains(it.id) }
+        val minX = elements.minOfOrNull { it.position.x } ?: return
+        val minY = elements.minOfOrNull { it.position.y } ?: return
+
+        val newMinX = minX + shiftX
+        val newMinY = minY + shiftY
+
+        _uiState.update { state ->
+            state.copy(imageElements = state.imageElements.map { el ->
+                if (ids.contains(el.id)) {
+                    val localDX = el.position.x - minX
+                    val localDY = el.position.y - minY
+                    el.copy(
+                        position = Offset(newMinX + localDX * scaleX, newMinY + localDY * scaleY),
+                        width = el.width * scaleX,
+                        height = el.height * scaleY
+                    )
+                } else el
+            })
+        }
+    }
+
+    /**
+     * Dispatch Group Resize to Undo Stack.
+     */
+    fun onResizeGroupEnd(ids: Set<String>) {
+        if (groupResizeStartStates.isEmpty()) return
+
+        val commands = ids.mapNotNull { id ->
+            val startState = groupResizeStartStates[id] ?: return@mapNotNull null
+            val finalState = _uiState.value.imageElements.find { it.id == id } ?: return@mapNotNull null
+            if (startState.position == finalState.position && startState.width == finalState.width && startState.height == finalState.height) return@mapNotNull null
+            
+            AnnotationCommand.ResizeImageCommand(
+                id = java.util.UUID.randomUUID().toString(),
+                pdfPath = _uiState.value.filePath,
+                pageIndex = finalState.pageIndex,
+                timestamp = System.currentTimeMillis(),
+                elementId = id,
+                beforeX = startState.position.x,
+                beforeY = startState.position.y,
+                beforeWidth = startState.width,
+                beforeHeight = startState.height,
+                afterX = finalState.position.x,
+                afterY = finalState.position.y,
+                afterWidth = finalState.width,
+                afterHeight = finalState.height
+            )
+        }
+
+        if (commands.isNotEmpty()) {
+            viewModelScope.launch {
+                val composite = AnnotationCommand.CompositeCommand(
+                    id = java.util.UUID.randomUUID().toString(),
+                    pdfPath = _uiState.value.filePath,
+                    pageIndex = -1,
+                    timestamp = System.currentTimeMillis(),
+                    commands = commands
+                )
+                undoRedoManager.execute(composite)
+            }
+        }
+        groupResizeStartStates.clear()
     }
 
     /**
@@ -2292,6 +2580,12 @@ class PdfReaderViewModel @Inject constructor(
                     })
                 }
             }
+            is AnnotationCommand.CompositeCommand -> {
+                command.commands.reversed().forEach { 
+                    applyUndoCommand(it) 
+                    applyUndoForEditCommands(it)
+                }
+            }
             else -> {} // handled by existing applyUndoCommand
         }
     }
@@ -2416,6 +2710,12 @@ class PdfReaderViewModel @Inject constructor(
                     state.copy(imageElements = state.imageElements.map {
                         if (it.id == command.elementId) it.copy(isLocked = command.afterLocked) else it
                     })
+                }
+            }
+            is AnnotationCommand.CompositeCommand -> {
+                command.commands.forEach { 
+                    applyRedoCommand(it) 
+                    applyRedoForEditCommands(it)
                 }
             }
             else -> {} // handled by existing applyRedoCommand

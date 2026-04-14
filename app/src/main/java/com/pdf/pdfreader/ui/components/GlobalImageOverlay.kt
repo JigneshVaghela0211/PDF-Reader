@@ -83,11 +83,14 @@ fun GlobalImageOverlay(
     scrollState: LazyListState,
     imageElements: List<ImageElement>,
     selectedImageId: String?,
+    selectedImageIds: Set<String> = emptySet(),
     isImageMode: Boolean,
     onSelectImage: (String?) -> Unit,
     onMoveImage: (String, Offset) -> Unit,
     onResizeImage: (String, ResizeHandle, Offset) -> Unit,
+    onResizeGroup: (Set<String>, ResizeHandle, Offset, Float, Float) -> Unit = { _, _, _, _, _ -> },
     onResizeEnd: (String) -> Unit,
+    onResizeGroupEnd: (Set<String>) -> Unit = { _ -> },
     onMoveEnd: (String) -> Unit,
     onInteractionStart: () -> Unit = {},
     onInteractionEnd: () -> Unit = {},
@@ -144,6 +147,19 @@ fun GlobalImageOverlay(
             )
         }
 
+        // ─── Group Computations ───
+        val activeGroupItems = remember(visibleImages, selectedImageId, selectedImageIds) {
+            if (selectedImageIds.size > 1) {
+                visibleImages.filter { selectedImageIds.contains(it.id) }
+            } else if (selectedImageId != null) {
+                val primary = visibleImages.find { it.id == selectedImageId }
+                if (primary?.groupId != null) {
+                    visibleImages.filter { it.groupId == primary.groupId }
+                } else emptyList()
+            } else emptyList()
+        }
+        val activeGroupIds = remember(activeGroupItems) { activeGroupItems.map { it.id }.toSet() }
+
         // ─── Render each visible image at its global position ───
         visibleImages.forEach { element ->
             val pageLayout = visiblePages[element.pageIndex]
@@ -159,7 +175,8 @@ fun GlobalImageOverlay(
                     element = element,
                     globalX = globalX,
                     globalY = globalY,
-                    isSelected = element.id == selectedImageId,
+                    isSelected = element.id == selectedImageId || selectedImageIds.contains(element.id),
+                    showGroupHandles = !activeGroupIds.contains(element.id), // hide individual handles if this element is part of active group
                     isInteractive = isImageMode,
                     pageLayouts = pageLayouts,
                     onSelect = {
@@ -182,6 +199,69 @@ fun GlobalImageOverlay(
                 )
             }
         }
+        
+        // ─── Render Group Bounding Box ───
+        if (activeGroupItems.size > 1) {
+            var minX = Float.MAX_VALUE
+            var minY = Float.MAX_VALUE
+            var maxX = Float.MIN_VALUE
+            var maxY = Float.MIN_VALUE
+            
+            activeGroupItems.forEach { item ->
+                val layout = visiblePages[item.pageIndex] ?: return@forEach
+                val gX = item.position.x
+                val gY = layout.offsetInViewport.toFloat() + item.position.y
+                val w = item.width * item.scale
+                val h = item.height * item.scale
+                
+                if (gX < minX) minX = gX
+                if (gY < minY) minY = gY
+                if (gX + w > maxX) maxX = gX + w
+                if (gY + h > maxY) maxY = gY + h
+            }
+            
+            if (minX <= maxX) {
+                val groupW = maxX - minX
+                val groupH = maxY - minY
+                val density = LocalDensity.current
+                
+                Box(
+                    modifier = Modifier
+                        .zIndex(150f)
+                        .offset { IntOffset(minX.toInt(), minY.toInt()) }
+                        .size(
+                            width = with(density) { groupW.toDp() },
+                            height = with(density) { groupH.toDp() }
+                        )
+                ) {
+                    // Draw Group bounds
+                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRect(
+                            color = Color(0xFFFF9800),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 2.dp.toPx(),
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                            )
+                        )
+                    }
+                    
+                    if (isImageMode) {
+                        ResizeHandles(
+                            elementWidth = groupW,
+                            elementHeight = groupH,
+                            onResizeByHandle = { handle, delta ->
+                                onResizeGroup(activeGroupIds, handle, delta, groupW, groupH)
+                            },
+                            onResizeEnd = { 
+                                onResizeGroupEnd(activeGroupIds)
+                            },
+                            onInteractionStart = onInteractionStart,
+                            onInteractionEnd = onInteractionEnd
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -195,6 +275,7 @@ private fun GlobalImageElementView(
     globalX: Float,
     globalY: Float,
     isSelected: Boolean,
+    showGroupHandles: Boolean,
     isInteractive: Boolean,
     pageLayouts: List<PageLayout>,
     onSelect: () -> Unit,
@@ -209,18 +290,28 @@ private fun GlobalImageElementView(
     val context = LocalContext.current
     val density = LocalDensity.current
 
-    // Load bitmap from URI (cached)
-    val bitmap = remember(element.uri) {
+    // Load bitmap from URI (cached, busted by bitmapVersion for re-rendered signatures)
+    val bitmapKey = "${element.uri}_v${element.bitmapVersion}"
+    val bitmap = remember(bitmapKey) {
         try {
             val uri = Uri.parse(element.uri)
             val inputStream = context.contentResolver.openInputStream(uri)
             val opts = BitmapFactory.Options().apply {
-                inSampleSize = 2
+                // Signatures are small PNGs — don't downsample them
+                inSampleSize = if (element.isSignature) 1 else 2
             }
             inputStream?.use { BitmapFactory.decodeStream(it, null, opts) }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load image: ${element.uri}", e)
             null
+        }
+    }
+
+    DisposableEffect(bitmap) {
+        onDispose {
+            if (bitmap != null && !bitmap.isRecycled) {
+                bitmap.recycle()
+            }
         }
     }
 
@@ -235,7 +326,7 @@ private fun GlobalImageElementView(
             .zIndex(if (isSelected) 112f + element.zIndex else 110f + element.zIndex)
             .offset {
                 IntOffset(
-                    globalX.toInt().coerceAtLeast(0),
+                    globalX.toInt(),
                     globalY.toInt()
                 )
             }
@@ -327,7 +418,7 @@ private fun GlobalImageElementView(
         )
 
         // Resize handles (above image, gesture priority over parent drag)
-        if (isSelected && isInteractive && !isLocked) {
+        if (isSelected && isInteractive && !isLocked && showGroupHandles) {
             ResizeHandles(
                 elementWidth = scaledWidth,
                 elementHeight = scaledHeight,

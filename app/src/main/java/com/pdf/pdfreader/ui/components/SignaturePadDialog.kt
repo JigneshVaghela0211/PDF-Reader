@@ -138,7 +138,45 @@ fun SignaturePadDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Stroke thickness control
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Thickness",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Slider(
+                        value = selectedStrokeWidth,
+                        onValueChange = { selectedStrokeWidth = it },
+                        valueRange = 2f..20f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = selectedColor,
+                            activeTrackColor = selectedColor
+                        )
+                    )
+                    // Live preview circle showing current pen size
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.size(32.dp)) {
+                            drawCircle(
+                                color = selectedColor,
+                                radius = selectedStrokeWidth / 2f
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Drawing Canvas
                 var canvasWidth by remember { mutableStateOf(1f) }

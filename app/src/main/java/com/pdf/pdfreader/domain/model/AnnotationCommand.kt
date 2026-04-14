@@ -267,6 +267,18 @@ sealed class AnnotationCommand {
         val beforeLocked: Boolean,
         val afterLocked: Boolean
     ) : AnnotationCommand()
+
+    /**
+     * A composite command that groups multiple commands into a single undo/redo transaction.
+     * Useful for performing simultaneous actions on a group of synchronized elements.
+     */
+    data class CompositeCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val commands: List<AnnotationCommand>
+    ) : AnnotationCommand()
 }
 
 /**

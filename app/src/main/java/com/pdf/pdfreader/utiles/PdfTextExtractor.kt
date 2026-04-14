@@ -15,7 +15,7 @@ import javax.inject.Singleton
 class PdfTextExtractor @Inject constructor(
     private val pdfDao: PdfDao
 ) {
-    suspend fun extractAndIndexPdf(path: String) = withContext(Dispatchers.IO) {
+    suspend fun extractAndIndexPdf(path: String) = withContext(Dispatchers.IO.limitedParallelism(1)) {
         try {
             val file = File(path)
             if (!file.exists()) return@withContext

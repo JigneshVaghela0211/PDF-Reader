@@ -52,7 +52,7 @@ class PdfExportManager @Inject constructor() {
         editedTextBlocks: List<EditedTextBlock>,
         imageElements: List<ImageElement>,
         viewWidth: Int
-    ): String? = withContext(Dispatchers.IO) {
+    ): String? = withContext(Dispatchers.IO.limitedParallelism(1)) {
         try {
             val originalFile = File(originalPath)
             if (!originalFile.exists()) {

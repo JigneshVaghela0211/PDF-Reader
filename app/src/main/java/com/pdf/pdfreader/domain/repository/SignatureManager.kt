@@ -44,10 +44,10 @@ class SignatureManager @Inject constructor(
 
         for (stroke in strokes) {
             paint.color = android.graphics.Color.argb(
-                stroke.color.alpha,
-                stroke.color.red,
-                stroke.color.green,
-                stroke.color.blue
+                (stroke.color.alpha * 255).toInt(),
+                (stroke.color.red * 255).toInt(),
+                (stroke.color.green * 255).toInt(),
+                (stroke.color.blue * 255).toInt()
             )
             paint.strokeWidth = stroke.strokeWidth
 
@@ -95,6 +95,66 @@ class SignatureManager @Inject constructor(
         } else {
             false
         }
+    }
+
+    /**
+     * Re-renders signature strokes with updated properties (thickness/color)
+     * to a NEW file. Returns the new URI. The old file is NOT deleted
+     * (it may be referenced by undo history).
+     */
+    suspend fun reRenderSignature(
+        strokes: List<SignatureStroke>,
+        width: Float,
+        height: Float
+    ): String = withContext(Dispatchers.IO) {
+        val bW = width.toInt().coerceAtLeast(1)
+        val bH = height.toInt().coerceAtLeast(1)
+
+        val bitmap = Bitmap.createBitmap(bW, bH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val paint = Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        for (stroke in strokes) {
+            paint.color = android.graphics.Color.argb(
+                (stroke.color.alpha * 255).toInt(),
+                (stroke.color.red * 255).toInt(),
+                (stroke.color.green * 255).toInt(),
+                (stroke.color.blue * 255).toInt()
+            )
+            paint.strokeWidth = stroke.strokeWidth
+
+            if (stroke.points.size >= 2) {
+                val path = Path()
+                path.moveTo(stroke.points.first().x, stroke.points.first().y)
+                for (i in 1 until stroke.points.size) {
+                    path.lineTo(stroke.points[i].x, stroke.points[i].y)
+                }
+                canvas.drawPath(path, paint)
+            } else if (stroke.points.size == 1) {
+                paint.style = Paint.Style.FILL
+                canvas.drawCircle(stroke.points.first().x, stroke.points.first().y, stroke.strokeWidth / 2f, paint)
+                paint.style = Paint.Style.STROKE
+            }
+        }
+
+        val cropped = cropTransparent(bitmap)
+        if (bitmap != cropped) bitmap.recycle()
+
+        val fileName = "sig_${System.currentTimeMillis()}.png"
+        val file = File(signaturesDir, fileName)
+
+        FileOutputStream(file).use { out ->
+            cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        cropped.recycle()
+
+        "file://${file.absolutePath}"
     }
 
     private fun cropTransparent(bitmap: Bitmap): Bitmap {

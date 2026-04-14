@@ -114,6 +114,16 @@ fun SignatureGridItem(
             val path = uri.replace("file://", "")
             BitmapFactory.decodeFile(path)
         }
+        
+        // Recycle bitmap when composable leaves composition
+        androidx.compose.runtime.DisposableEffect(bmp) {
+            onDispose {
+                if (bmp != null && !bmp.isRecycled) {
+                    bmp.recycle()
+                }
+            }
+        }
+        
         bmp?.let { 
             androidx.compose.foundation.Image(
                 bitmap = it.asImageBitmap(),

@@ -34,6 +34,7 @@ object CommandSerializer {
     const val TYPE_CHANGE_LAYER = "CHANGE_LAYER"
     const val TYPE_CHANGE_OPACITY = "CHANGE_OPACITY"
     const val TYPE_LOCK_IMAGE = "LOCK_IMAGE"
+    const val TYPE_COMPOSITE_COMMAND = "COMPOSITE_COMMAND"
 
     // ─── Serialize: AnnotationCommand → (type, payload JSON) ────
 
@@ -53,6 +54,7 @@ object CommandSerializer {
         is AnnotationCommand.ChangeLayerCommand -> TYPE_CHANGE_LAYER
         is AnnotationCommand.ChangeImageOpacityCommand -> TYPE_CHANGE_OPACITY
         is AnnotationCommand.LockImageCommand -> TYPE_LOCK_IMAGE
+        is AnnotationCommand.CompositeCommand -> TYPE_COMPOSITE_COMMAND
     }
 
     fun toPayload(command: AnnotationCommand): String = when (command) {
@@ -103,6 +105,7 @@ object CommandSerializer {
         is AnnotationCommand.ChangeLayerCommand -> gson.toJson(command)
         is AnnotationCommand.ChangeImageOpacityCommand -> gson.toJson(command)
         is AnnotationCommand.LockImageCommand -> gson.toJson(command)
+        is AnnotationCommand.CompositeCommand -> gson.toJson(command)
     }
 
     // ─── Deserialize: (type, payload JSON) → AnnotationCommand ──
@@ -207,6 +210,9 @@ object CommandSerializer {
 
             TYPE_LOCK_IMAGE -> {
                 gson.fromJson(entity.payload, AnnotationCommand.LockImageCommand::class.java)
+            }
+            TYPE_COMPOSITE_COMMAND -> {
+                gson.fromJson(entity.payload, AnnotationCommand.CompositeCommand::class.java)
             }
 
             else -> throw IllegalArgumentException("Unknown command type: ${entity.type}")
