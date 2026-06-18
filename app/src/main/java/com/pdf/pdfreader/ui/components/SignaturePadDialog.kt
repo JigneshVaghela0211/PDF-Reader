@@ -94,6 +94,12 @@ fun SignaturePadDialog(
                                     .pointerInput(color) {
                                         detectTapGestures {
                                             selectedColor = color
+                                            // Apply the colour to the signature already drawn
+                                            // (not just future strokes) so it can be changed
+                                            // before saving.
+                                            if (strokes.isNotEmpty()) {
+                                                strokes = strokes.map { it.copy(color = color) }
+                                            }
                                         }
                                     }
                             )
@@ -153,7 +159,14 @@ fun SignaturePadDialog(
                     )
                     Slider(
                         value = selectedStrokeWidth,
-                        onValueChange = { selectedStrokeWidth = it },
+                        onValueChange = {
+                            selectedStrokeWidth = it
+                            // Re-apply thickness to the already-drawn signature so it can
+                            // be adjusted before saving (not only for future strokes).
+                            if (strokes.isNotEmpty()) {
+                                strokes = strokes.map { s -> s.copy(strokeWidth = it) }
+                            }
+                        },
                         valueRange = 2f..20f,
                         modifier = Modifier.weight(1f),
                         colors = SliderDefaults.colors(

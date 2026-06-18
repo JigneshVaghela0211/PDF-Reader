@@ -365,8 +365,18 @@ class PdfEditorViewModel @Inject constructor(
     }
 
     fun insertSignatureAsImage(uri: String) {
-        insertImageUri(uri, 300f, 150f, isSignature = true)
-        setSignatureSheetVisible(false)
+        viewModelScope.launch {
+            // If editable stroke data was persisted for this signature, insert it as an
+            // editable signature (thickness / colour can be changed). Otherwise fall back
+            // to a plain image (older signatures saved before stroke persistence existed).
+            val data = signatureManager.loadSignatureData(uri)
+            setSignatureSheetVisible(false)
+            if (data != null) {
+                insertSignatureWithStrokes(uri, data.strokes, data.canvasWidth, data.canvasHeight)
+            } else {
+                insertImageUri(uri, 300f, 150f, isSignature = true)
+            }
+        }
     }
 
     private fun insertSignatureWithStrokes(uri: String, strokes: List<SerializableStroke>, canvasWidth: Float, canvasHeight: Float) {

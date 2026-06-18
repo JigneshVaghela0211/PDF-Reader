@@ -595,17 +595,22 @@ fun PdfReaderScreen(
                                     val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
                                     val pageLayout = pageLayouts.find { it.pageIndex == selectedImage.pageIndex }
                                     if (pageLayout != null) {
-                                        val toolbarGlobalY = pageLayout.offsetInViewport + selectedImage.position.y.toInt() - 60
+                                        val sigAnchorTop = pageLayout.offsetInViewport + selectedImage.position.y.toInt()
+                                        val sigW = selectedImage.width * selectedImage.scale
+                                        val sigH = selectedImage.height * selectedImage.scale
+                                        val sigAnchorCenterX = (selectedImage.position.x + sigW / 2f).toInt()
+                                        val sigAnchorBottom = sigAnchorTop + sigH.toInt()
                                         val sigColor = selectedImage.signatureStrokes?.firstOrNull()?.let {
                                             androidx.compose.ui.graphics.Color(it.color.toULong())
                                         } ?: Color.Black
                                         val sigStrokeWidth = selectedImage.signatureStrokes?.firstOrNull()?.strokeWidth ?: 5f
-                                        
+
                                         Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
                                             com.pdf.pdfreader.ui.components.SignatureEditToolbar(
                                                 visible = true,
-                                                offsetX = selectedImage.position.x.toInt(),
-                                                offsetY = toolbarGlobalY.coerceAtLeast(0),
+                                                anchorCenterX = sigAnchorCenterX,
+                                                anchorTop = sigAnchorTop,
+                                                anchorBottom = sigAnchorBottom,
                                                 isLocked = selectedImage.isLocked,
                                                 opacity = selectedImage.opacity,
                                                 currentStrokeWidth = sigStrokeWidth,
@@ -642,12 +647,17 @@ fun PdfReaderScreen(
                                     val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
                                     val pageLayout = pageLayouts.find { it.pageIndex == selectedImage.pageIndex }
                                     if (pageLayout != null) {
-                                        val toolbarGlobalY = pageLayout.offsetInViewport + selectedImage.position.y.toInt() - 60
+                                        val imgAnchorTop = pageLayout.offsetInViewport + selectedImage.position.y.toInt()
+                                        val imgW = selectedImage.width * selectedImage.scale
+                                        val imgH = selectedImage.height * selectedImage.scale
+                                        val imgAnchorCenterX = (selectedImage.position.x + imgW / 2f).toInt()
+                                        val imgAnchorBottom = imgAnchorTop + imgH.toInt()
                                         Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
                                             com.pdf.pdfreader.ui.components.ImageEditToolbar(
                                                 visible = true,
-                                                offsetX = selectedImage.position.x.toInt(),
-                                                offsetY = toolbarGlobalY.coerceAtLeast(0),
+                                                anchorCenterX = imgAnchorCenterX,
+                                                anchorTop = imgAnchorTop,
+                                                anchorBottom = imgAnchorBottom,
                                                 isLocked = selectedImage.isLocked,
                                                 opacity = selectedImage.opacity,
                                                 onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
@@ -681,12 +691,17 @@ fun PdfReaderScreen(
                                 val pageLayout = pageLayouts.find { it.pageIndex == topPageIdx }
                                 
                                 if (pageLayout != null) {
-                                    val toolbarGlobalY = pageLayout.offsetInViewport + minY.toInt() - 60
+                                    val grpMaxRight = groupElements.maxOfOrNull { it.position.x + it.width * it.scale } ?: minX
+                                    val grpMaxBottom = groupElements.maxOfOrNull { it.position.y + it.height * it.scale } ?: minY
+                                    val grpAnchorTop = pageLayout.offsetInViewport + minY.toInt()
+                                    val grpAnchorBottom = pageLayout.offsetInViewport + grpMaxBottom.toInt()
+                                    val grpAnchorCenterX = ((minX + grpMaxRight) / 2f).toInt()
                                     Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
                                         com.pdf.pdfreader.ui.components.ImageEditToolbar(
                                             visible = true,
-                                            offsetX = minX.toInt(),
-                                            offsetY = toolbarGlobalY.coerceAtLeast(0),
+                                            anchorCenterX = grpAnchorCenterX,
+                                            anchorTop = grpAnchorTop,
+                                            anchorBottom = grpAnchorBottom,
                                             isLocked = false,
                                             opacity = 1f,
                                             onRotateLeft = { },

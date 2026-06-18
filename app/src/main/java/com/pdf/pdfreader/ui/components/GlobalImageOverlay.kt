@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -353,7 +354,6 @@ private fun GlobalImageElementView(
                             down.consume()
                             onInteractionStart()
 
-                            var previousPosition = down.position
                             var hasDragged = false
                             try {
                                 while (true) {
@@ -361,14 +361,19 @@ private fun GlobalImageElementView(
                                     val change = event.changes.firstOrNull() ?: break
 
                                     if (change.pressed) {
-                                        val incrementalDelta = change.position - previousPosition
+                                        // Use Compose's frame-stable delta. The element is moved
+                                        // via graphicsLayer translation every frame, which shifts
+                                        // its LOCAL coordinate space — so manually differencing
+                                        // change.position against a cached previous position made
+                                        // the delta oscillate (the visible "vibration").
+                                        // positionChange() is computed consistently and is immune.
+                                        val delta = change.positionChange()
                                         change.consume()
 
-                                        if (incrementalDelta != Offset.Zero) {
+                                        if (delta != Offset.Zero) {
                                             hasDragged = true
-                                            onMoveBy(incrementalDelta)
+                                            onMoveBy(delta)
                                         }
-                                        previousPosition = change.position
                                     } else {
                                         change.consume()
                                         break

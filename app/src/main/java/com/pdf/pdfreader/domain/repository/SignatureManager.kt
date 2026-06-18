@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.Log
 import androidx.core.graphics.toColorInt
+import com.google.gson.Gson
+import com.pdf.pdfreader.domain.model.SerializableStroke
 import com.pdf.pdfreader.ui.components.SignatureStroke
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -15,12 +18,59 @@ import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Editable data persisted alongside a saved signature PNG so the signature can be
+ * re-rendered (thickness / colour changes) even after being re-inserted later.
+ */
+data class SignatureData(
+    val strokes: List<SerializableStroke>,
+    val canvasWidth: Float,
+    val canvasHeight: Float
+)
+
 @Singleton
 class SignatureManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val signaturesDir = File(context.filesDir, "signatures").apply {
         if (!exists()) mkdirs()
+    }
+
+    private val gson = Gson()
+
+    /** Returns the JSON sidecar file holding editable stroke data for a PNG file. */
+    private fun strokeSidecarFor(pngFile: File): File =
+        File(signaturesDir, "${pngFile.nameWithoutExtension}.json")
+
+    /** Persist editable stroke data next to the PNG so it can be edited again later. */
+    private fun saveStrokeData(pngFile: File, strokes: List<SignatureStroke>, width: Float, height: Float) {
+        try {
+            val data = SignatureData(
+                strokes = strokes.map { SerializableStroke.fromComposeStroke(it) },
+                canvasWidth = width,
+                canvasHeight = height
+            )
+            strokeSidecarFor(pngFile).writeText(gson.toJson(data))
+        } catch (e: Exception) {
+            Log.e("SignatureManager", "Failed to persist stroke data", e)
+        }
+    }
+
+    /**
+     * Loads the editable stroke data for a saved signature URI, or null if none was
+     * stored (e.g. signatures created before this feature existed).
+     */
+    suspend fun loadSignatureData(uri: String): SignatureData? = withContext(Dispatchers.IO) {
+        try {
+            val pngPath = uri.replace("file://", "")
+            val sidecar = strokeSidecarFor(File(pngPath))
+            if (!sidecar.exists()) return@withContext null
+            gson.fromJson(sidecar.readText(), SignatureData::class.java)
+                ?.takeIf { it.strokes.isNotEmpty() }
+        } catch (e: Exception) {
+            Log.e("SignatureManager", "Failed to load stroke data", e)
+            null
+        }
     }
 
     /**
@@ -77,6 +127,10 @@ class SignatureManager @Inject constructor(
         }
         cropped.recycle()
 
+        // Persist the editable stroke data so this signature stays editable
+        // (thickness / colour) even when re-inserted from the saved list later.
+        saveStrokeData(file, strokes, width, height)
+
         "file://${file.absolutePath}"
     }
 
@@ -91,6 +145,8 @@ class SignatureManager @Inject constructor(
         val path = uri.replace("file://", "")
         val file = File(path)
         if (file.exists() && file.parentFile?.absolutePath == signaturesDir.absolutePath) {
+            // Remove the editable stroke sidecar too, if present.
+            strokeSidecarFor(file).takeIf { it.exists() }?.delete()
             file.delete()
         } else {
             false
