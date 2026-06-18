@@ -562,14 +562,26 @@ fun PdfReaderScreen(
                     // layer ABOVE the LazyColumn, so they never go behind
                     // subsequent pages when dragged across page boundaries.
                     if (editorUiState.imageElements.isNotEmpty()) {
+                        // An inserted image/signature stays interactive (tap-to-select, drag,
+                        // resize) UNLESS a drawing/text tool is actively in use. This means a
+                        // placed image can always be re-selected by tapping it — even after
+                        // deselecting, and even when not in explicit edit mode — while drawing
+                        // tools can still paint over an image without it stealing the touch.
+                        val drawingToolActive = editorUiState.isEditMode && (
+                            editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
+                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
+                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.ERASER
+                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.TEXT
+                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT)
+                        val imagesInteractive = !drawingToolActive
+
                         com.pdf.pdfreader.ui.components.GlobalImageOverlay(
                             modifier = Modifier.fillMaxSize(),
                             scrollState = scrollState,
                             imageElements = editorUiState.imageElements,
                             selectedImageId = editorUiState.selectedImageId,
                             selectedImageIds = editorUiState.selectedImageIds,
-                            isImageMode = editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.INSERT_IMAGE
-                                    || editorUiState.selectedImageId != null,
+                            isImageMode = imagesInteractive,
                             onSelectImage = { editorViewModel.selectImage(it) },
                             onMoveImage = { id, delta -> editorViewModel.moveImage(id, delta) },
                             onResizeImage = { id, handle, delta -> editorViewModel.resizeImage(id, handle, delta) },

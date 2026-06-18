@@ -346,12 +346,19 @@ private fun GlobalImageElementView(
                     } else {
                         Modifier
                     }
-                } else if (isInteractive && isSelected) {
-                    // DRAG gesture with cross-page detection
+                } else if (isInteractive) {
+                    // Unified press → select → drag handler.
+                    // Pressing the image selects it immediately (so the toolbar shows) and
+                    // the SAME gesture can drag it — no separate "tap to select first" step.
+                    // This is what fixes "can't drag after scrolling": dragging no longer
+                    // depends on the image already being selected (a state that scrolling /
+                    // the deselect catcher could clear).
                     Modifier.pointerInput(element.id) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             down.consume()
+                            // Select on press (idempotent if already selected).
+                            onSelect()
                             onInteractionStart()
 
                             var hasDragged = false
@@ -361,12 +368,8 @@ private fun GlobalImageElementView(
                                     val change = event.changes.firstOrNull() ?: break
 
                                     if (change.pressed) {
-                                        // Use Compose's frame-stable delta. The element is moved
-                                        // via graphicsLayer translation every frame, which shifts
-                                        // its LOCAL coordinate space — so manually differencing
-                                        // change.position against a cached previous position made
-                                        // the delta oscillate (the visible "vibration").
-                                        // positionChange() is computed consistently and is immune.
+                                        // Frame-stable delta (immune to the graphicsLayer
+                                        // translation shifting the local coordinate space).
                                         val delta = change.positionChange()
                                         change.consume()
 
@@ -387,18 +390,6 @@ private fun GlobalImageElementView(
                                 onMoveEnd()
                             }
                             onInteractionEnd()
-                        }
-                    }
-                } else if (isInteractive) {
-                    // Tap to select
-                    Modifier.pointerInput(element.id) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val up = waitForUpOrCancellation()
-                            if (up != null) {
-                                up.consume()
-                                onSelect()
-                            }
                         }
                     }
                 } else {

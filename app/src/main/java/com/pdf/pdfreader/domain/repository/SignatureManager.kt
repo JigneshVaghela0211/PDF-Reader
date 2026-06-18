@@ -38,6 +38,27 @@ class SignatureManager @Inject constructor(
 
     private val gson = Gson()
 
+    /**
+     * Temporary location for signatures re-rendered after thickness/colour edits.
+     * These live in the cache (NOT the saved-signatures folder) so they don't pile up
+     * in the "saved signatures" list shown on the draw pad.
+     */
+    private val rerenderDir = File(context.cacheDir, "signature_rerender").apply {
+        if (!exists()) mkdirs()
+    }
+
+    /** Deletes a re-rendered temp file. No-op for real saved signatures. */
+    fun deleteRerenderFile(uri: String) {
+        try {
+            val file = File(uri.replace("file://", ""))
+            if (file.exists() && file.parentFile?.absolutePath == rerenderDir.absolutePath) {
+                file.delete()
+            }
+        } catch (e: Exception) {
+            Log.e("SignatureManager", "Failed to delete re-render temp", e)
+        }
+    }
+
     /** Returns the JSON sidecar file holding editable stroke data for a PNG file. */
     private fun strokeSidecarFor(pngFile: File): File =
         File(signaturesDir, "${pngFile.nameWithoutExtension}.json")
@@ -154,9 +175,10 @@ class SignatureManager @Inject constructor(
     }
 
     /**
-     * Re-renders signature strokes with updated properties (thickness/color)
-     * to a NEW file. Returns the new URI. The old file is NOT deleted
-     * (it may be referenced by undo history).
+     * Re-renders signature strokes with updated properties (thickness/color).
+     * Writes to the re-render CACHE (not the saved-signatures folder) so repeated
+     * edits don't accumulate in the saved-signatures list. Returns the new URI;
+     * the caller should delete the previous re-render temp via [deleteRerenderFile].
      */
     suspend fun reRenderSignature(
         strokes: List<SignatureStroke>,
@@ -202,8 +224,9 @@ class SignatureManager @Inject constructor(
         val cropped = cropTransparent(bitmap)
         if (bitmap != cropped) bitmap.recycle()
 
-        val fileName = "sig_${System.currentTimeMillis()}.png"
-        val file = File(signaturesDir, fileName)
+        // Re-renders go to the cache dir so they never appear in the saved list.
+        val fileName = "sig_rerender_${System.currentTimeMillis()}.png"
+        val file = File(rerenderDir, fileName)
 
         FileOutputStream(file).use { out ->
             cropped.compress(Bitmap.CompressFormat.PNG, 100, out)

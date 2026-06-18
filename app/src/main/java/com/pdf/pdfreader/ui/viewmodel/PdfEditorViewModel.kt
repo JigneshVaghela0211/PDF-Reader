@@ -400,6 +400,7 @@ class PdfEditorViewModel @Inject constructor(
     fun updateSignatureProperties(elementId: String, newColor: Color? = null, newStrokeWidth: Float? = null) {
         val element = _uiState.value.imageElements.find { it.id == elementId } ?: return
         val currentStrokes = element.signatureStrokes ?: return
+        val previousUri = element.uri
         viewModelScope.launch {
             try {
                 val updatedStrokes = currentStrokes.map { stroke ->
@@ -414,6 +415,9 @@ class PdfEditorViewModel @Inject constructor(
                     element.signatureCanvasWidth,
                     element.signatureCanvasHeight
                 )
+                // Discard the previous re-render temp so edits don't pile up. This only
+                // deletes cache temps — the original saved signature is left untouched.
+                signatureManager.deleteRerenderFile(previousUri)
                 withContext(Dispatchers.Main) {
                     _uiState.update { state ->
                         state.copy(imageElements = state.imageElements.map {
