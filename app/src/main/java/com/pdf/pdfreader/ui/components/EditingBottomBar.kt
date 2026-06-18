@@ -1,11 +1,16 @@
 package com.pdf.pdfreader.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,19 +22,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 /**
- * Modern bottom editing toolbar for the PDF editor.
- * 
- * Architecture:
- * - Primary bar: 5 main tools (Select, Text, Image, Signature, More)
- * - "More" expands a grouped options panel from the bottom
- * - Clean, scalable, Material 3 design
+ * Floating, rounded Material 3 editing toolbar for the PDF editor.
+ *
+ * Design:
+ * - A single floating, rounded, elevated bar detached from the screen edges.
+ * - Edit tools are organized into GROUPS (Draw, Text, Insert). Tapping a group
+ *   reveals a floating rounded panel above the bar with that group's tools.
+ * - Undo / Redo and the active colour live directly on the bar for quick access.
+ *
+ * The public signature is unchanged, so the call site needs no edits.
  */
+
+/** Logical grouping of the editing tools shown on the bar. */
+private enum class EditGroup { DRAW, TEXT, INSERT }
+
 @Composable
 fun EditingBottomBar(
     visible: Boolean,
@@ -44,7 +56,17 @@ fun EditingBottomBar(
     onColorClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showMorePanel by remember { mutableStateOf(false) }
+    var expandedGroup by remember { mutableStateOf<EditGroup?>(null) }
+
+    // Collapse any open group when the bar is hidden.
+    LaunchedEffect(visible) { if (!visible) expandedGroup = null }
+
+    val drawActive = currentTool == AnnotationTool.PEN ||
+        currentTool == AnnotationTool.HIGHLIGHTER ||
+        currentTool == AnnotationTool.ERASER
+    val textActive = currentTool == AnnotationTool.TEXT ||
+        currentTool == AnnotationTool.EDIT_TEXT
+    val insertActive = currentTool == AnnotationTool.INSERT_IMAGE
 
     AnimatedVisibility(
         visible = visible,
@@ -52,335 +74,303 @@ fun EditingBottomBar(
         exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
     ) {
         Column(
-            modifier = modifier.fillMaxWidth()
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ─── Expandable "More" Panel ───
+            // ─── Floating group panel (appears above the bar) ───
             AnimatedVisibility(
-                visible = showMorePanel,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                visible = expandedGroup != null,
+                enter = fadeIn() + scaleIn(initialScale = 0.92f) + slideInVertically { it / 3 },
+                exit = fadeOut() + scaleOut(targetScale = 0.92f) + slideOutVertically { it / 3 }
             ) {
-                MoreOptionsPanel(
-                    currentTool = currentTool,
-                    onToolChange = {
-                        onToolChange(it)
-                        showMorePanel = false
-                    },
-                    onDismiss = { showMorePanel = false }
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    GroupPanel(
+                        group = expandedGroup,
+                        currentTool = currentTool,
+                        onToolSelected = {
+                            onToolChange(it)
+                            expandedGroup = null
+                        },
+                        onSignatureClick = {
+                            onSignatureClick()
+                            expandedGroup = null
+                        }
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
             }
 
-            // ─── Primary Bottom Bar ───
+            // ─── Primary floating bar ───
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                tonalElevation = 8.dp,
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
                 shadowElevation = 12.dp,
-                color = MaterialTheme.colorScheme.surface
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Undo
-                    BottomBarItem(
-                        icon = Icons.Default.Undo,
-                        label = "Undo",
-                        isSelected = false,
-                        enabled = canUndo,
-                        onClick = onUndoClick
-                    )
+                    HistoryButton(Icons.Default.Undo, "Undo", canUndo, onUndoClick)
+                    HistoryButton(Icons.Default.Redo, "Redo", canRedo, onRedoClick)
 
-                    // Redo
-                    BottomBarItem(
-                        icon = Icons.Default.Redo,
-                        label = "Redo",
-                        isSelected = false,
-                        enabled = canRedo,
-                        onClick = onRedoClick
-                    )
+                    BarDivider()
 
-                    // Divider
-                    Box(
-                        modifier = Modifier
-                            .height(28.dp)
-                            .width(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
-
-                    // Pen
-                    BottomBarItem(
+                    GroupButton(
                         icon = Icons.Default.Brush,
-                        label = "Pen",
-                        isSelected = currentTool == AnnotationTool.PEN,
-                        onClick = {
-                            onToolChange(
-                                if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE
-                                else AnnotationTool.PEN
-                            )
-                        }
-                    )
-
-                    // Text
-                    BottomBarItem(
+                        label = "Draw",
+                        active = drawActive,
+                        expanded = expandedGroup == EditGroup.DRAW,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        expandedGroup = if (expandedGroup == EditGroup.DRAW) null else EditGroup.DRAW
+                    }
+                    GroupButton(
                         icon = Icons.Default.TextFields,
                         label = "Text",
-                        isSelected = currentTool == AnnotationTool.TEXT,
-                        onClick = {
-                            onToolChange(
-                                if (currentTool == AnnotationTool.TEXT) AnnotationTool.NONE
-                                else AnnotationTool.TEXT
-                            )
-                        }
-                    )
-
-                    // Image
-                    BottomBarItem(
+                        active = textActive,
+                        expanded = expandedGroup == EditGroup.TEXT,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        expandedGroup = if (expandedGroup == EditGroup.TEXT) null else EditGroup.TEXT
+                    }
+                    GroupButton(
                         icon = Icons.Default.AddPhotoAlternate,
-                        label = "Image",
-                        isSelected = currentTool == AnnotationTool.INSERT_IMAGE,
-                        onClick = {
-                            onToolChange(
-                                if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE
-                                else AnnotationTool.INSERT_IMAGE
-                            )
-                        }
-                    )
+                        label = "Insert",
+                        active = insertActive,
+                        expanded = expandedGroup == EditGroup.INSERT,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        expandedGroup = if (expandedGroup == EditGroup.INSERT) null else EditGroup.INSERT
+                    }
 
-                    // Signature
-                    BottomBarItem(
-                        icon = Icons.Default.Draw,
-                        label = "Sign",
-                        isSelected = false,
-                        onClick = onSignatureClick
-                    )
+                    BarDivider()
 
-                    // Color indicator
+                    // Active colour swatch
+                    val colorActive = currentTool == AnnotationTool.PEN ||
+                        currentTool == AnnotationTool.HIGHLIGHTER
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(
-                                if (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER)
-                                    currentColor
-                                else
-                                    MaterialTheme.colorScheme.surfaceVariant
+                                if (colorActive) currentColor
+                                else MaterialTheme.colorScheme.surfaceVariant
                             )
+                            .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                             .clickable(onClick = onColorClick),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Palette,
                             contentDescription = "Color",
-                            tint = if (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER)
-                                Color.White
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                            tint = if (colorActive) Color.White
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-
-                    // More
-                    BottomBarItem(
-                        icon = Icons.Default.MoreHoriz,
-                        label = "More",
-                        isSelected = showMorePanel,
-                        onClick = { showMorePanel = !showMorePanel }
-                    )
                 }
             }
         }
     }
 }
 
-/**
- * Expandable panel showing grouped tool categories.
- */
+/** Floating rounded panel listing the tools for the expanded group. */
 @Composable
-private fun MoreOptionsPanel(
+private fun GroupPanel(
+    group: EditGroup?,
     currentTool: AnnotationTool,
-    onToolChange: (AnnotationTool) -> Unit,
-    onDismiss: () -> Unit
+    onToolSelected: (AnnotationTool) -> Unit,
+    onSignatureClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        shadowElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 2.dp,
+        shadowElevation = 10.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            // Header with drag handle
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.outlineVariant)
-                )
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            val title = when (group) {
+                EditGroup.DRAW -> "Drawing tools"
+                EditGroup.TEXT -> "Text tools"
+                EditGroup.INSERT -> "Insert"
+                null -> ""
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ─── Drawing Group ───
             Text(
-                "Drawing",
-                style = MaterialTheme.typography.labelSmall,
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp)
+                modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                MoreOptionChip(
-                    icon = Icons.Default.Brush,
-                    label = "Pen",
-                    isSelected = currentTool == AnnotationTool.PEN,
-                    onClick = { onToolChange(AnnotationTool.PEN) }
-                )
-                MoreOptionChip(
-                    icon = Icons.Default.Highlight,
-                    label = "Highlight",
-                    isSelected = currentTool == AnnotationTool.HIGHLIGHTER,
-                    onClick = { onToolChange(AnnotationTool.HIGHLIGHTER) }
-                )
-                MoreOptionChip(
-                    icon = Icons.Default.CleaningServices,
-                    label = "Eraser",
-                    isSelected = currentTool == AnnotationTool.ERASER,
-                    onClick = { onToolChange(AnnotationTool.ERASER) }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (group) {
+                    EditGroup.DRAW -> {
+                        ToolChip(Icons.Default.Brush, "Pen",
+                            currentTool == AnnotationTool.PEN, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.PEN))
+                        }
+                        ToolChip(Icons.Default.Highlight, "Highlight",
+                            currentTool == AnnotationTool.HIGHLIGHTER, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.HIGHLIGHTER))
+                        }
+                        ToolChip(Icons.Default.CleaningServices, "Eraser",
+                            currentTool == AnnotationTool.ERASER, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.ERASER))
+                        }
+                    }
+                    EditGroup.TEXT -> {
+                        ToolChip(Icons.Default.TextFields, "Add Text",
+                            currentTool == AnnotationTool.TEXT, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.TEXT))
+                        }
+                        ToolChip(Icons.Default.EditNote, "Edit Text",
+                            currentTool == AnnotationTool.EDIT_TEXT, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.EDIT_TEXT))
+                        }
+                    }
+                    EditGroup.INSERT -> {
+                        ToolChip(Icons.Default.AddPhotoAlternate, "Image",
+                            currentTool == AnnotationTool.INSERT_IMAGE, Modifier.weight(1f)) {
+                            onToolSelected(toggle(currentTool, AnnotationTool.INSERT_IMAGE))
+                        }
+                        ToolChip(Icons.Default.Draw, "Signature",
+                            isSelected = false, modifier = Modifier.weight(1f)) {
+                            onSignatureClick()
+                        }
+                    }
+                    null -> {}
+                }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ─── Content Group ───
-            Text(
-                "Content",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                MoreOptionChip(
-                    icon = Icons.Default.TextFields,
-                    label = "Text Note",
-                    isSelected = currentTool == AnnotationTool.TEXT,
-                    onClick = { onToolChange(AnnotationTool.TEXT) }
-                )
-                MoreOptionChip(
-                    icon = Icons.Default.EditNote,
-                    label = "Edit Text",
-                    isSelected = currentTool == AnnotationTool.EDIT_TEXT,
-                    onClick = { onToolChange(AnnotationTool.EDIT_TEXT) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
-/**
- * Single item in the primary bottom bar.
- */
+/** Toggle helper: tapping the active tool again clears it back to NONE. */
+private fun toggle(current: AnnotationTool, tool: AnnotationTool): AnnotationTool =
+    if (current == tool) AnnotationTool.NONE else tool
+
+/** A grouped category button on the primary bar. */
 @Composable
-private fun BottomBarItem(
+private fun GroupButton(
     icon: ImageVector,
     label: String,
-    isSelected: Boolean,
-    enabled: Boolean = true,
+    active: Boolean,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val tint = when {
-        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-        isSelected -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val highlighted = active || expanded
+    val bg = if (highlighted) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val fg = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(180),
+        label = "chevron"
+    )
 
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .then(
-                    if (isSelected) Modifier
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            RoundedCornerShape(10.dp)
-                        )
-                    else Modifier
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = tint,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint
-        )
-    }
-}
-
-/**
- * Chip-style option in the "More" panel.
- */
-@Composable
-private fun MoreOptionChip(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
     Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(12.dp)
+        color = bg,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(18.dp)
-            )
+            Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface
+                color = fg,
+                maxLines = 1
             )
+            Icon(
+                Icons.Default.KeyboardArrowUp,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer { rotationZ = chevronRotation }
+            )
+        }
+    }
+}
+
+/** Undo / Redo round icon button. */
+@Composable
+private fun HistoryButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Thin vertical divider used to separate sections on the bar. */
+@Composable
+private fun BarDivider() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .height(26.dp)
+            .width(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}
+
+/** A tool chip used inside the expanded group panel. */
+@Composable
+private fun ToolChip(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+    else MaterialTheme.colorScheme.surfaceContainerHighest
+    val fg = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSurface
+
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(24.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = fg, maxLines = 1)
         }
     }
 }

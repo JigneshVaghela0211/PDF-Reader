@@ -147,6 +147,8 @@ fun PdfReaderScreen(
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    // True while 2+ fingers are down — used to suspend list scrolling during a pinch.
+    var multiTouch by remember { mutableStateOf(false) }
 
     // ─── Crisp-zoom: re-render the focused page at the zoomed resolution ───
     // graphicsLayer only magnifies the existing bitmap (blurry). When the user
@@ -437,25 +439,22 @@ fun PdfReaderScreen(
                 .padding(paddingValues)
                 .background(pageBgColor)
                 .then(
-                    // Two-finger pinch-to-zoom from the normal reading view. Only
-                    // consumes events when 2+ pointers are down, so single-finger
-                    // list scrolling is unaffected. The crisp high-res re-render is
-                    // handled by the LaunchedEffect(scale, currentPage) above.
-                    if (!editorUiState.isEditMode
-                        && editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE
-                        && editorUiState.selectedImageId == null
-                    ) {
+                    // Two-finger pinch-to-zoom from the normal reading view.
+                    // Enabled whenever we're NOT in annotation edit mode (currentTool
+                    // defaults to PEN even while just reading, so it must NOT gate this).
+                    // While 2 fingers are down we flip `multiTouch` to disable the
+                    // LazyColumn's scrolling, removing the gesture competition that
+                    // previously made direct pinch fail until after a double-tap.
+                    if (!editorUiState.isEditMode && editorUiState.selectedImageId == null) {
                         Modifier.pointerInput(Unit) {
                             awaitEachGesture {
                                 awaitFirstDown(requireUnconsumed = false)
                                 do {
-                                    // Read in the Initial (top-down) pass so a 2-finger
-                                    // pinch is claimed here BEFORE the child LazyColumn
-                                    // can treat it as a scroll. Single-finger gestures
-                                    // (pressed < 2) are left untouched so list scrolling
-                                    // still works normally.
+                                    // Initial (top-down) pass: claim the pinch before the
+                                    // child list can treat it as a scroll.
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     val pressed = event.changes.count { it.pressed }
+                                    multiTouch = pressed >= 2
                                     if (pressed >= 2) {
                                         val zoomChange = event.calculateZoom()
                                         val panChange = event.calculatePan()
@@ -469,11 +468,11 @@ fun PdfReaderScreen(
                                         } else {
                                             offsetX = 0f; offsetY = 0f
                                         }
-                                        // Consume in the Initial pass to lock out list scroll
-                                        // for the whole pinch.
+                                        // Consume so the list never scrolls during a pinch.
                                         event.changes.forEach { it.consume() }
                                     }
                                 } while (event.changes.any { it.pressed })
+                                multiTouch = false
                             }
                         }
                     } else Modifier
@@ -498,6 +497,7 @@ fun PdfReaderScreen(
                     val userScrollEnabled = (!editorUiState.isEditMode
                             || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE)
                             && scale <= 1f
+                            && !multiTouch
                             && editorUiState.interactionMode == com.pdf.pdfreader.domain.model.InteractionMode.NONE
 
                     val pageContent: @Composable (Int) -> Unit = { pageIndex ->
@@ -778,45 +778,18 @@ fun PdfReaderScreen(
                 }
             }
 
-            // Page slider
-            if (uiState.totalPages > 1) {
-                AnimatedVisibility(
-                    visible = isSliderVisible,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                RoundedCornerShape(24.dp)
-                            )
-                            .padding(horizontal = 20.dp, vertical = 8.dp)
-                    ) {
-                        Slider(
-                            value = uiState.currentPage.toFloat(),
-                            onValueChange = { page ->
-                                sliderInteractionTime = System.currentTimeMillis()
-                                viewModel.updateCurrentPage(page.toInt())
-                                coroutineScope.launch {
-                                    scrollState.scrollToItem(page.toInt())
-                                }
-                            },
-                            valueRange = 0f..(uiState.totalPages - 1).coerceAtLeast(1).toFloat(),
-                            steps = if (uiState.totalPages > 2) uiState.totalPages - 2 else 0,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
-                        )
-                    }
-                }
-            }
+            // Right-side draggable page scrollbar (replaces the old bottom slider).
+            com.pdf.pdfreader.ui.components.PageScrollbar(
+                visible = isSliderVisible,
+                currentPage = uiState.currentPage,
+                totalPages = uiState.totalPages,
+                onPageChange = { page ->
+                    sliderInteractionTime = System.currentTimeMillis()
+                    viewModel.updateCurrentPage(page)
+                    coroutineScope.launch { scrollState.scrollToItem(page) }
+                },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
 
             if (uiState.isLoading) {
                 CircularProgressIndicator(
