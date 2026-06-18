@@ -118,7 +118,9 @@ class PdfReaderViewModel @Inject constructor(
         private val MAX_CACHE_SIZE_KB = (Runtime.getRuntime().maxMemory() / 1024 / 4).toInt().coerceAtLeast(80 * 1024)
         private const val MAX_RETRY_BEFORE_REINIT = 2
         private const val ZOOM_RERENDER_THRESHOLD = 1.25f
-        private const val MAX_ZOOM_RENDER_SCALE = 4f
+        // Must match MAX_ZOOM in PdfReaderScreen so the re-rendered bitmap matches
+        // the maximum on-screen zoom and stays crisp (and bounds memory use).
+        private const val MAX_ZOOM_RENDER_SCALE = 3f
     }
 
     private val _uiState = MutableStateFlow(PdfReaderUiState())

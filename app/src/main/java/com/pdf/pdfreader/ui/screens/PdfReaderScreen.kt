@@ -7,8 +7,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -78,6 +83,10 @@ import kotlinx.coroutines.launch
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+
+/** Maximum zoom factor. Kept in sync with the ViewModel's high-res render cap
+ *  so the re-rendered bitmap always matches the on-screen zoom (stays crisp). */
+private const val MAX_ZOOM = 3f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,8 +154,10 @@ fun PdfReaderScreen(
     // so text/graphics stay sharp — similar to Google Drive's PDF viewer.
     LaunchedEffect(scale, uiState.currentPage) {
         if (scale > 1f) {
-            // debounce so we don't render mid-gesture / during the zoom animation
-            delay(180)
+            // Short debounce: while the pinch is ongoing, `scale` keeps changing and
+            // restarts this effect, so the high-res render only fires once the gesture
+            // settles — then the page sharpens to match the zoom.
+            delay(120)
             viewModel.requestHighResRender(uiState.currentPage, screenWidthPx, scale)
         } else {
             // Zoomed back out — restore the cached base-resolution render
@@ -424,7 +435,49 @@ fun PdfReaderScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(pageBgColor),
+                .background(pageBgColor)
+                .then(
+                    // Two-finger pinch-to-zoom from the normal reading view. Only
+                    // consumes events when 2+ pointers are down, so single-finger
+                    // list scrolling is unaffected. The crisp high-res re-render is
+                    // handled by the LaunchedEffect(scale, currentPage) above.
+                    if (!editorUiState.isEditMode
+                        && editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE
+                        && editorUiState.selectedImageId == null
+                    ) {
+                        Modifier.pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                do {
+                                    // Read in the Initial (top-down) pass so a 2-finger
+                                    // pinch is claimed here BEFORE the child LazyColumn
+                                    // can treat it as a scroll. Single-finger gestures
+                                    // (pressed < 2) are left untouched so list scrolling
+                                    // still works normally.
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val pressed = event.changes.count { it.pressed }
+                                    if (pressed >= 2) {
+                                        val zoomChange = event.calculateZoom()
+                                        val panChange = event.calculatePan()
+                                        val newScale = (scale * zoomChange).coerceIn(1f, MAX_ZOOM)
+                                        scale = newScale
+                                        if (newScale > 1f) {
+                                            val maxX = (size.width * (newScale - 1f)) / 2f
+                                            val maxY = (size.height * (newScale - 1f)) / 2f
+                                            offsetX = (offsetX + panChange.x).coerceIn(-maxX, maxX)
+                                            offsetY = (offsetY + panChange.y).coerceIn(-maxY, maxY)
+                                        } else {
+                                            offsetX = 0f; offsetY = 0f
+                                        }
+                                        // Consume in the Initial pass to lock out list scroll
+                                        // for the whole pinch.
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                } while (event.changes.any { it.pressed })
+                            }
+                        }
+                    } else Modifier
+                ),
             contentAlignment = Alignment.Center
         ) {
             if (!uiState.isLoading && uiState.totalPages > 0) {
@@ -705,12 +758,20 @@ fun PdfReaderScreen(
                                 )
                             }
                             .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val maxX = (size.width * (scale - 1f)) / 2f
-                                    val maxY = (size.height * (scale - 1f)) / 2f
-                                    offsetX = (offsetX + dragAmount.x).coerceIn(-maxX, maxX)
-                                    offsetY = (offsetY + dragAmount.y).coerceIn(-maxY, maxY)
+                                // While zoomed, list scroll is disabled, so we can use
+                                // a full transform gesture: pinch to zoom further or
+                                // out, and single-finger drag to pan.
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
+                                    scale = newScale
+                                    if (newScale > 1f) {
+                                        val maxX = (size.width * (newScale - 1f)) / 2f
+                                        val maxY = (size.height * (newScale - 1f)) / 2f
+                                        offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
+                                        offsetY = (offsetY + pan.y).coerceIn(-maxY, maxY)
+                                    } else {
+                                        offsetX = 0f; offsetY = 0f
+                                    }
                                 }
                             }
                     )
