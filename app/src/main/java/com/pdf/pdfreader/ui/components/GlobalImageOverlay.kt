@@ -325,16 +325,19 @@ private fun GlobalImageElementView(
     Box(
         modifier = Modifier
             .zIndex(if (isSelected) 112f + element.zIndex else 110f + element.zIndex)
+            // POSITION via Modifier.offset (placement), NOT graphicsLayer translation.
+            // graphicsLayer translation shifts the layer's own coordinate space, which
+            // fed back into the drag delta each frame (vibration), and combined with
+            // rotation it diverged and made the image jump. Modifier.offset places the
+            // node without that feedback. The offset lambda is read in the layout phase,
+            // so it stays efficient during drag.
+            .offset { IntOffset(globalX.toInt(), globalY.toInt()) }
             .size(
                 width = with(density) { scaledWidth.toDp() },
                 height = with(density) { scaledHeight.toDp() }
             )
-            // PERF: Use graphicsLayer for ALL transform properties (position + rotation + opacity).
-            // graphicsLayer updates bypass recomposition — only the render layer is re-drawn.
-            // Modifier.offset{} would cause recomposition on every drag frame.
+            // graphicsLayer now only handles rotation + opacity (constant during a drag).
             .graphicsLayer {
-                translationX = globalX
-                translationY = globalY
                 rotationZ = element.rotation
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
                 alpha = element.opacity
@@ -375,7 +378,22 @@ private fun GlobalImageElementView(
 
                                         if (delta != Offset.Zero) {
                                             hasDragged = true
-                                            onMoveBy(delta)
+                                            // The image is rotated via graphicsLayer, so this
+                                            // delta is in the element's LOCAL (rotated) space.
+                                            // Rotate it back into viewport space so a rotated
+                                            // image drags in the direction the finger moves.
+                                            val screenDelta = if (element.rotation == 0f) {
+                                                delta
+                                            } else {
+                                                val rad = Math.toRadians(element.rotation.toDouble())
+                                                val cos = kotlin.math.cos(rad).toFloat()
+                                                val sin = kotlin.math.sin(rad).toFloat()
+                                                Offset(
+                                                    delta.x * cos - delta.y * sin,
+                                                    delta.x * sin + delta.y * cos
+                                                )
+                                            }
+                                            onMoveBy(screenDelta)
                                         }
                                     } else {
                                         change.consume()
