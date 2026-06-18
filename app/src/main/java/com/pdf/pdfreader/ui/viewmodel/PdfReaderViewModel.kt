@@ -117,7 +117,8 @@ class PdfReaderViewModel @Inject constructor(
         private const val TAG = "PdfReaderVM"
         private val MAX_CACHE_SIZE_KB = (Runtime.getRuntime().maxMemory() / 1024 / 4).toInt().coerceAtLeast(80 * 1024)
         private const val MAX_RETRY_BEFORE_REINIT = 2
-        private const val ZOOM_RERENDER_THRESHOLD = 1.5f
+        private const val ZOOM_RERENDER_THRESHOLD = 1.25f
+        private const val MAX_ZOOM_RENDER_SCALE = 4f
     }
 
     private val _uiState = MutableStateFlow(PdfReaderUiState())
@@ -368,10 +369,12 @@ class PdfReaderViewModel @Inject constructor(
 
     fun requestHighResRender(pageIndex: Int, baseWidth: Int, zoomScale: Float) {
         if (zoomScale < ZOOM_RERENDER_THRESHOLD) return
+        // Bound the render scale so a deep zoom can't allocate an enormous bitmap.
+        val clampedScale = zoomScale.coerceAtMost(MAX_ZOOM_RENDER_SCALE)
         viewModelScope.launch {
             val dims = withContext(pdfDispatcher) { pdfRenderer?.getPageDimensions(pageIndex) } ?: return@launch
             val ratio = dims.second.toFloat() / dims.first.toFloat()
-            val targetWidth = (baseWidth * zoomScale).toInt()
+            val targetWidth = (baseWidth * clampedScale).toInt()
             val targetHeight = (targetWidth * ratio).toInt()
             val cacheKey = "${pageIndex}_${targetWidth}x${targetHeight}"
             val cached = bitmapCache.get(cacheKey)
@@ -402,8 +405,12 @@ class PdfReaderViewModel @Inject constructor(
             for (k in keysToRemove) {
                 val state = newStates.remove(k)
                 if (state is PageRenderState.Success) {
-                    val cacheKeys = listOf("${k}_${state.renderedWidth}", "${k}_${state.renderedWidth}x")
-                    if (!cacheKeys.any { key -> bitmapCache.get(key) === state.bitmap } && !state.bitmap.isRecycled) {
+                    // Only recycle if this bitmap is no longer referenced by the cache.
+                    // Cache keys vary (base "page_W" vs high-res "page_WxH"), so match by
+                    // reference rather than reconstructing keys, which previously missed
+                    // high-res bitmaps and could recycle one still held in the cache.
+                    val stillCached = bitmapCache.snapshot().values.any { it === state.bitmap }
+                    if (!stillCached && !state.bitmap.isRecycled) {
                         try { state.bitmap.recycle() } catch (e: Exception) { e.printStackTrace() }
                     }
                 }
@@ -514,8 +521,9 @@ class PdfReaderViewModel @Inject constructor(
     fun getSearchHighlightsForPage(pageIndex: Int, viewWidth: Int, viewHeight: Int): List<Pair<Rect, Boolean>> {
         val state = _uiState.value
         if (!state.isSearchActive || state.searchResults.isEmpty()) return emptyList()
-        return state.searchResults.filter { it.pageIndex == pageIndex }.map { match ->
-            val globalIndex = state.searchResults.indexOf(match)
+        // Single indexed pass (was O(n²): filter + indexOf per match).
+        return state.searchResults.mapIndexedNotNull { globalIndex, match ->
+            if (match.pageIndex != pageIndex) return@mapIndexedNotNull null
             Pair(Rect(match.rect.left * viewWidth, match.rect.top * viewHeight,
                 match.rect.right * viewWidth, match.rect.bottom * viewHeight), globalIndex == state.currentMatchIndex)
         }

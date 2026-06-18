@@ -95,47 +95,50 @@ class ThumbnailManager @Inject constructor(
     }
 
     private fun generateAndSaveThumbnail(path: String, cacheKey: String): Bitmap? {
+        val file = File(path)
+        if (!file.exists()) return null
+
+        var pfd: ParcelFileDescriptor? = null
+        var renderer: PdfRenderer? = null
+        var page: PdfRenderer.Page? = null
         try {
-            val file = File(path)
-            if (!file.exists()) return null
-            
-            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            val renderer = PdfRenderer(pfd)
-            if (renderer.pageCount > 0) {
-                val page = renderer.openPage(0)
-                val bitmap = Bitmap.createBitmap(page.width / 4, page.height / 4, Bitmap.Config.ARGB_8888)
-                
-                // Fill with white background (PDF pages are transparent by default)
-                bitmap.eraseColor(android.graphics.Color.WHITE)
-                
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                
-                // Save to Disk for future sessions
-                saveToDisk(cacheKey, bitmap)
-                
-                // Save to Memory for current session
-                memoryCache.put(cacheKey, bitmap)
-                
-                page.close()
-                renderer.close()
-                pfd.close()
-                return bitmap
-            }
-            renderer.close()
-            pfd.close()
+            pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            renderer = PdfRenderer(pfd)
+            if (renderer.pageCount <= 0) return null
+
+            page = renderer.openPage(0)
+            val bitmap = Bitmap.createBitmap(page.width / 4, page.height / 4, Bitmap.Config.ARGB_8888)
+
+            // Fill with white background (PDF pages are transparent by default)
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+            // Save to Disk for future sessions
+            saveToDisk(cacheKey, bitmap)
+
+            // Save to Memory for current session
+            memoryCache.put(cacheKey, bitmap)
+
+            return bitmap
         } catch (e: Exception) {
             e.printStackTrace()
+            return null
+        } finally {
+            // Always release native resources — leaking these exhausts file descriptors.
+            try { page?.close() } catch (e: Exception) { e.printStackTrace() }
+            try { renderer?.close() } catch (e: Exception) { e.printStackTrace() }
+            try { pfd?.close() } catch (e: Exception) { e.printStackTrace() }
         }
-        return null
     }
 
     private fun saveToDisk(key: String, bitmap: Bitmap) {
         try {
             val file = File(thumbnailDir, "$key.jpg")
-            val outputStream = FileOutputStream(file)
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
-            outputStream.flush()
-            outputStream.close()
+            FileOutputStream(file).use { outputStream ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+                outputStream.flush()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }

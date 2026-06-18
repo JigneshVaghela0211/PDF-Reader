@@ -139,6 +139,21 @@ fun PdfReaderScreen(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    // ─── Crisp-zoom: re-render the focused page at the zoomed resolution ───
+    // graphicsLayer only magnifies the existing bitmap (blurry). When the user
+    // zooms in we render a fresh, higher-resolution bitmap for the current page
+    // so text/graphics stay sharp — similar to Google Drive's PDF viewer.
+    LaunchedEffect(scale, uiState.currentPage) {
+        if (scale > 1f) {
+            // debounce so we don't render mid-gesture / during the zoom animation
+            delay(180)
+            viewModel.requestHighResRender(uiState.currentPage, screenWidthPx, scale)
+        } else {
+            // Zoomed back out — restore the cached base-resolution render
+            viewModel.requestPageRender(uiState.currentPage, screenWidthPx)
+        }
+    }
+
     val isScrolling by remember {
         derivedStateOf { scrollState.isScrollInProgress }
     }
