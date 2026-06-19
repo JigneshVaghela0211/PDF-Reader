@@ -256,7 +256,9 @@ class PdfTextBlockExtractor @Inject constructor() {
             height = ((maxY - minY) / pdfHeight).coerceIn(0f, 1f),
             fontSize = avgFontSize,
             fontName = fontName,
-            words = words
+            words = words,
+            pdfPageWidth = pdfWidth,
+            pdfPageHeight = pdfHeight
         )
     }
 

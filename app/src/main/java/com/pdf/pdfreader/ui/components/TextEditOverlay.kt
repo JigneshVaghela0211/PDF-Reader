@@ -138,6 +138,10 @@ fun TextEditOverlay(
             val rectW = (block.width * pageWidth).toInt().coerceIn(20, MAX_SIZE_PX)
             val rectH = (block.height * pageHeight).toInt().coerceIn(20, MAX_SIZE_PX)
 
+            // Font size is stored in PDF points; scale to on-screen pixels so the
+            // edited text matches the size of the surrounding PDF text.
+            val fontScale = if (block.pdfPageWidth > 0f) pageWidth / block.pdfPageWidth else 1f
+
             val textAlign = when (editedBlock.alignment) {
                 TextAlignment.LEFT -> TextAlign.Start
                 TextAlignment.CENTER -> TextAlign.Center
@@ -170,7 +174,7 @@ fun TextEditOverlay(
                     text = editedBlock.newText,
                     style = TextStyle(
                         color = editedBlock.newColor.copy(alpha = editedBlock.opacity),
-                        fontSize = with(density) { editedBlock.newFontSize.toSp() },
+                        fontSize = with(density) { (editedBlock.newFontSize * fontScale).toSp() },
                         fontWeight = FontWeight.Normal,
                         textAlign = textAlign
                     ),
@@ -224,6 +228,8 @@ fun TextEditOverlay(
 
             Log.d(TAG, "Showing editor for: ${selectedBlock.id} at ($blockX, ${blockY + blockH + 8})")
 
+            val editorFontScale = if (selectedBlock.pdfPageWidth > 0f) pageWidth / selectedBlock.pdfPageWidth else 1f
+
             Box(modifier = Modifier.zIndex(50f)) {
                 TextEditInlineEditor(
                     block = selectedBlock,
@@ -231,6 +237,7 @@ fun TextEditOverlay(
                     offsetX = blockX,
                     offsetY = blockY + blockH + 8,
                     pageWidth = pageWidth.toInt(),
+                    fontScale = editorFontScale,
                     onConfirm = { newText, newFontSize, newColor ->
                         Log.d(TAG, "Text edit confirmed: $newText")
                         onEditTextBlock(selectedBlock.id, newText, newFontSize, newColor)
@@ -256,6 +263,7 @@ private fun TextEditInlineEditor(
     offsetX: Int,
     offsetY: Int,
     pageWidth: Int,
+    fontScale: Float = 1f,
     onConfirm: (String, Float, Color) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -313,7 +321,10 @@ private fun TextEditInlineEditor(
                     .padding(8.dp),
                 textStyle = TextStyle(
                     color = color,
-                    fontSize = with(LocalDensity.current) { fontSize.toSp() },
+                    // Scale PDF points → display px (and keep it readable while typing).
+                    fontSize = with(LocalDensity.current) {
+                        (fontSize * fontScale).coerceAtLeast(14.dp.toPx()).toSp()
+                    },
                     fontWeight = FontWeight.Normal
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

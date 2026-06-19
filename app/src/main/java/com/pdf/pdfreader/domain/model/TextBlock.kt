@@ -23,7 +23,12 @@ data class TextBlock(
     /** Font name from PDF metadata */
     val fontName: String = "Helvetica",
     /** The individual words and their bounding boxes */
-    val words: List<TextWord> = emptyList()
+    val words: List<TextWord> = emptyList(),
+    /** Source PDF page width in points — used to scale font size from points to
+     *  on-screen pixels (display px = fontSize * renderedPageWidthPx / pdfPageWidth). */
+    val pdfPageWidth: Float = 0f,
+    /** Source PDF page height in points. */
+    val pdfPageHeight: Float = 0f
 )
 
 /**
