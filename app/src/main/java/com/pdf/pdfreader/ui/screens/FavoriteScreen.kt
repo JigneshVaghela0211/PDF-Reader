@@ -3,7 +3,6 @@ package com.pdf.pdfreader.ui.screens
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.ui.components.HomeContent
@@ -22,7 +21,12 @@ fun FavoriteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Favorite PDFs") },
+                title = {
+                    ListHeader(
+                        title = "Favorites",
+                        subtitle = "Your starred documents"
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface

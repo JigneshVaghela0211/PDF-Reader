@@ -67,43 +67,51 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings), fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.settings),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PremiumCard()
-
-            SettingsSection(title = stringResource(R.string.general)) {
-                SettingsItem(
+            SettingsCard {
+                SettingsRow(
                     icon = Icons.Default.Language,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = stringResource(R.string.language),
-                    subtitle = when(currentLanguage) {
+                    subtitle = when (currentLanguage) {
                         "hi" -> "हिन्दी"
                         else -> "English"
                     },
                     onClick = { showLanguageDialog = true }
                 )
-                SettingsItem(
-                    icon = Icons.Default.Palette,
+                SettingsDivider()
+                SettingsRow(
+                    icon = Icons.Default.DarkMode,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = stringResource(R.string.theme),
-                    subtitle = when(currentTheme) {
+                    subtitle = when (currentTheme) {
                         AppTheme.LIGHT -> stringResource(R.string.light)
                         AppTheme.DARK -> stringResource(R.string.dark)
                         AppTheme.SYSTEM -> stringResource(R.string.system_default)
@@ -112,33 +120,188 @@ fun SettingsScreen(
                 )
             }
 
-            SettingsSection(title = stringResource(R.string.about)) {
-                SettingsItem(
-                    icon = Icons.Default.PrivacyTip,
+            PremiumCard()
+
+            Text(
+                text = "ABOUT",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+
+            SettingsCard {
+                SettingsRow(
+                    icon = Icons.Default.Shield,
                     title = stringResource(R.string.privacy_policy),
-                    onClick = { /* TODO: Open URL */ }
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = { /* TODO */ }
                 )
-                SettingsItem(
+                SettingsDivider()
+                SettingsRow(
                     icon = Icons.Default.Description,
                     title = stringResource(R.string.terms_of_service),
-                    onClick = { /* TODO: Open URL */ }
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = { /* TODO */ }
                 )
-                SettingsItem(
+                SettingsDivider()
+                SettingsRow(
                     icon = Icons.Default.Info,
                     title = stringResource(R.string.app_version),
-                    subtitle = "1.0.0",
+                    versionBadge = "1.0.0",
                     onClick = {}
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "Made with ❤️ for PDF lovers",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.5.dp,
+        tonalElevation = 0.dp
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+    title: String,
+    subtitle: String? = null,
+    trailingIcon: ImageVector? = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+    versionBadge: String? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+            tint = iconTint
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 1.dp)
+                )
+            }
+        }
+        if (versionBadge != null) {
+            Text(
+                text = versionBadge,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        } else if (trailingIcon != null) {
+            Icon(
+                imageVector = trailingIcon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 52.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        thickness = 0.5.dp
+    )
+}
+
+@Composable
+fun PremiumCard() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
+                )
+            )
+            .padding(18.dp)
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.unlock_premium),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = stringResource(R.string.premium_description),
+                fontSize = 12.5.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White
+            ) {
+                Text(
+                    text = "Upgrade",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE53935),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp)
+                )
+            }
         }
     }
 }
@@ -152,26 +315,61 @@ fun LanguagePickerDialog(
     val languages = listOf("en" to "English", "hi" to "हिन्दी")
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.select_language)) },
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                stringResource(R.string.select_language),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 languages.forEach { (code, name) ->
-                    Row(
+                    val selected = code == currentLanguage
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onLanguageSelected(code) }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onLanguageSelected(code) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        else Color.Transparent,
+                        border = if (selected) androidx.compose.foundation.BorderStroke(
+                            1.5.dp, MaterialTheme.colorScheme.primary
+                        ) else null
                     ) {
-                        RadioButton(selected = code == currentLanguage, onClick = null)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(name, style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Text(
+                                name,
+                                fontSize = 15.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = onDismiss) {
+                Text(
+                    stringResource(R.string.cancel),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     )
 }
@@ -189,142 +387,61 @@ fun ThemePickerDialog(
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.select_theme)) },
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                stringResource(R.string.select_theme),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 themes.forEach { (theme, label) ->
-                    Row(
+                    val selected = theme == currentTheme
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onThemeSelected(theme) }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onThemeSelected(theme) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        else Color.Transparent,
+                        border = if (selected) androidx.compose.foundation.BorderStroke(
+                            1.5.dp, MaterialTheme.colorScheme.primary
+                        ) else null
                     ) {
-                        RadioButton(selected = theme == currentTheme, onClick = null)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            modifier = Modifier.padding(11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Text(
+                                label,
+                                fontSize = 15.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        }
-    )
-}
-
-@Composable
-fun PremiumCard() {
-    val gradient = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-        )
-    )
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Box(modifier = Modifier.background(gradient)) {
-            Row(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.unlock_premium),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.premium_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.2f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        modifier = Modifier.padding(12.dp),
-                        tint = Color.Yellow
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingsSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-        )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            tonalElevation = 1.dp
-        ) {
-            Column { content() }
-        }
-    }
-}
-
-@Composable
-fun SettingsItem(
-    icon: ImageVector,
-    title: String,
-    subtitle: String? = null,
-    onClick: () -> Unit
-) {
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
-        supportingContent = subtitle?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) } },
-        leadingContent = {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.padding(8.dp),
-                    tint = MaterialTheme.colorScheme.primary
+            TextButton(onClick = onDismiss) {
+                Text(
+                    stringResource(R.string.cancel),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-        },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-        },
-        colors = ListItemDefaults.colors(
-            containerColor = Color.Transparent
-        )
+        }
     )
 }

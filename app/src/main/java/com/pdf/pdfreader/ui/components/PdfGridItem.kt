@@ -6,14 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,70 +29,90 @@ fun PdfGridItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer { clip = true }
+            .clip(RoundedCornerShape(18.dp))
             .clickable { onClick(pdf) },
-        shape = RoundedCornerShape(24.dp),
-        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
-        color = MaterialTheme.colorScheme.surface
+        tonalElevation = 0.dp
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.85f)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .height(118.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
             ) {
                 PdfThumbnail(
                     pdf = pdf,
                     thumbnailManager = thumbnailManager,
                     modifier = Modifier.fillMaxSize()
                 )
-                
-                // Content Gradient for better readability
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.05f)),
-                                startY = 0f
-                            )
-                        )
-                )
+
+                if (pdf.isFavorite) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Favorite",
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
 
                 if (pdf.isLocked) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        shape = RoundedCornerShape(bottomEnd = 16.dp),
-                        modifier = Modifier.align(Alignment.TopStart)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.04f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Locked",
-                            modifier = Modifier.padding(6.dp).size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.surface
+                                )
+                            }
+                        }
                     }
                 }
             }
-            
-            Column(modifier = Modifier.padding(12.dp)) {
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                thickness = 0.5.dp
+            )
+
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text(
                     text = pdf.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                
-                Spacer(modifier = Modifier.height(2.dp))
-                
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                val subtitle = if (pdf.isLocked) {
+                    "${pdf.formattedSize} · locked"
+                } else {
+                    pdf.formattedSize
+                }
                 Text(
-                    text = pdf.formattedSize,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                 )
             }
         }

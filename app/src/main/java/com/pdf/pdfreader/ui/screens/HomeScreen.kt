@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -104,6 +105,9 @@ fun HomeScreen(
                 onSearchToggle = { isSearchExpanded = it },
                 onFilterClick = { showFilterSheet = true },
                 onSettingsClick = onNavigateToSettings,
+                viewMode = uiState.viewMode,
+                fileCount = uiState.filteredFiles.size,
+                onViewModeChange = { viewModel.onViewModeChange(it) },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -113,9 +117,9 @@ fun HomeScreen(
                 onClick = { /* TODO: Create PDF logic */ },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Create PDF") }
+                text = { Text("Create PDF", fontWeight = FontWeight.SemiBold) }
             )
         }
     ) { padding ->
