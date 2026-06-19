@@ -1,5 +1,6 @@
 package com.pdf.pdfreader.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -8,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -17,10 +19,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.R
 import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.ui.viewmodel.ViewMode
@@ -189,23 +193,35 @@ fun HomeContent(
         var newName by remember { mutableStateOf(pdf.name.removeSuffix(".pdf")) }
         AlertDialog(
             onDismissRequest = { showRenameDialog = null },
-            title = { Text("Rename PDF") },
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Text("Rename", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
             text = {
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
                     singleLine = true,
-                    label = { Text("New Name") }
+                    suffix = { Text(".pdf", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (newName.isNotBlank()) onRename(pdf, newName)
                     showRenameDialog = null
-                }) { Text("Rename") }
+                }) {
+                    Text("Rename", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showRenameDialog = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { showRenameDialog = null }) {
+                    Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         )
     }
@@ -214,20 +230,65 @@ fun HomeContent(
         val pdf = showDeleteDialog!!
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            title = { Text("Delete PDF") },
-            text = { Text("Are you sure you want to permanently delete '${pdf.name}'?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteConfirm(pdf)
-                        showDeleteDialog = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+            shape = RoundedCornerShape(24.dp),
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(25.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Delete file?", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text(
+                        text = "\"${pdf.name}\" will be permanently removed.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showDeleteDialog = null },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(22.dp)
+                        ) {
+                            Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = {
+                                onDeleteConfirm(pdf)
+                                showDeleteDialog = null
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Delete", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) { Text(stringResource(R.string.cancel)) }
-            }
+            confirmButton = {}
         )
     }
 }

@@ -11,8 +11,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun ColorSelectionDialog(
@@ -24,79 +27,199 @@ fun ColorSelectionDialog(
     var green by remember { mutableFloatStateOf(initialColor.green) }
     var blue by remember { mutableFloatStateOf(initialColor.blue) }
 
-    val predefinedColors = listOf(Color.Red, Color.Blue, Color.Green, Color.Black, Color.Yellow)
+    val predefinedColors = listOf(
+        Color(0xFFE53935), Color(0xFFFB8C00), Color(0xFFFDD835),
+        Color(0xFF43A047), Color(0xFF1E88E5), Color(0xFF8E24AA),
+        Color(0xFF00ACC1), Color(0xFF6D4C41), Color(0xFF1C1B1F),
+        Color(0xFF9E9E9E), Color(0xFFEC407A), Color(0xFFFFFFFF)
+    )
+
+    val currentColor = Color(red, green, blue)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Color") },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                "Select Color",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
-            Column {
-                // Predefined Colors Row
-                Text("Predefined", style = MaterialTheme.typography.labelMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    predefinedColors.forEach { color ->
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (Color(red, green, blue) == color) 3.dp else 1.dp,
-                                    color = if (Color(red, green, blue) == color) MaterialTheme.colorScheme.primary else Color.Gray,
-                                    shape = CircleShape
-                                )
-                                .clickable {
-                                    red = color.red
-                                    green = color.green
-                                    blue = color.blue
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Predefined colors label
+                Text(
+                    text = "PREDEFINED",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                )
+
+                // 6-column color grid
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    predefinedColors.chunked(6).forEach { rowColors ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowColors.forEach { color ->
+                                val isSelected = currentColor == color
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .border(
+                                            width = if (isSelected) 2.dp else if (color == Color.White) 1.dp else 0.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outlineVariant,
+                                            shape = CircleShape
+                                        )
+                                        .clickable {
+                                            red = color.red
+                                            green = color.green
+                                            blue = color.blue
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (color.luminance() > 0.5f) Color.Black
+                                                    else Color.White
+                                                )
+                                        )
+                                    }
                                 }
-                        )
+                            }
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Custom Color Mix
-                Text("Custom Color Mix", style = MaterialTheme.typography.labelMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .background(Color(red, green, blue), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    thickness = 0.5.dp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text("Red", color = Color.Red, style = MaterialTheme.typography.labelMedium)
-                Slider(value = red, onValueChange = { red = it }, colors = SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red))
-                
-                Text("Green", color = Color(0xFF4CAF50), style = MaterialTheme.typography.labelMedium)
-                Slider(value = green, onValueChange = { green = it }, colors = SliderDefaults.colors(thumbColor = Color(0xFF4CAF50), activeTrackColor = Color(0xFF4CAF50)))
-                
-                Text("Blue", color = Color.Blue, style = MaterialTheme.typography.labelMedium)
-                Slider(value = blue, onValueChange = { blue = it }, colors = SliderDefaults.colors(thumbColor = Color.Blue, activeTrackColor = Color.Blue))
+
+                // Custom Color Mix label
+                Text(
+                    text = "CUSTOM COLOR MIX",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                )
+
+                // Color preview + sliders
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(currentColor)
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(12.dp)
+                            )
+                    )
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        ColorSliderRow(
+                            label = "R",
+                            labelColor = Color(0xFFE53935),
+                            value = red,
+                            trackBrush = Brush.horizontalGradient(listOf(Color.Black, Color.Red)),
+                            thumbColor = Color(0xFFE53935),
+                            onValueChange = { red = it }
+                        )
+                        ColorSliderRow(
+                            label = "G",
+                            labelColor = Color(0xFF43A047),
+                            value = green,
+                            trackBrush = Brush.horizontalGradient(listOf(Color.Black, Color(0xFF43A047))),
+                            thumbColor = Color(0xFF43A047),
+                            onValueChange = { green = it }
+                        )
+                        ColorSliderRow(
+                            label = "B",
+                            labelColor = Color(0xFF1E88E5),
+                            value = blue,
+                            trackBrush = Brush.horizontalGradient(listOf(Color.Black, Color(0xFF1E88E5))),
+                            thumbColor = Color(0xFF1E88E5),
+                            onValueChange = { blue = it }
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { 
-                onColorSelected(Color(red, green, blue))
-                onDismiss()
-            }) {
-                Text("Confirm")
+            Button(
+                onClick = {
+                    onColorSelected(currentColor)
+                    onDismiss()
+                },
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("Confirm", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Text("Cancel", fontWeight = FontWeight.SemiBold)
             }
         }
     )
+}
+
+@Composable
+private fun ColorSliderRow(
+    label: String,
+    labelColor: Color,
+    value: Float,
+    trackBrush: Brush,
+    thumbColor: Color,
+    onValueChange: (Float) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = labelColor,
+            modifier = Modifier.width(10.dp)
+        )
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(
+                thumbColor = thumbColor,
+                activeTrackColor = thumbColor,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        )
+    }
+}
+
+private fun Color.luminance(): Float {
+    return 0.2126f * red + 0.7152f * green + 0.0722f * blue
 }

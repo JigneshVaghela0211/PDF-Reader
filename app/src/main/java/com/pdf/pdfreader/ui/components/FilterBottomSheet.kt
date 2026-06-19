@@ -1,10 +1,10 @@
 package com.pdf.pdfreader.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,23 +43,24 @@ fun FilterBottomSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp)
+            .padding(horizontal = 22.dp)
+            .padding(bottom = 26.dp)
             .verticalScroll(rememberScrollState())
     ) {
         Text(
             text = stringResource(R.string.display_filter),
-            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(bottom = 24.dp)
+            fontSize = 19.sp,
+            modifier = Modifier.padding(bottom = 20.dp)
         )
 
-        // View Mode Section
-        FilterSectionTitle(stringResource(R.string.view_mode))
+        // View Mode
+        FilterLabel(stringResource(R.string.view_mode))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             ViewModeCard(
                 title = "List",
@@ -76,91 +78,92 @@ fun FilterBottomSheet(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Sort By Section
-        FilterSectionTitle(stringResource(R.string.sort_by))
-        FlowRow(
-            modifier = Modifier.padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        // Sort By
+        FilterLabel(stringResource(R.string.sort_by))
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SortOptionChip(
+            FilterChip2(
                 label = stringResource(R.string.last_modified),
                 selected = selectedSortType == SortType.LAST_MODIFIED,
                 onClick = { selectedSortType = SortType.LAST_MODIFIED }
             )
-            SortOptionChip(
+            FilterChip2(
                 label = stringResource(R.string.name),
                 selected = selectedSortType == SortType.NAME,
                 onClick = { selectedSortType = SortType.NAME }
             )
-            SortOptionChip(
+            FilterChip2(
                 label = stringResource(R.string.file_size),
                 selected = selectedSortType == SortType.FILE_SIZE,
                 onClick = { selectedSortType = SortType.FILE_SIZE }
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Order Section
-        FilterSectionTitle(stringResource(R.string.order))
+        // Order
+        FilterLabel(stringResource(R.string.order))
+        Spacer(modifier = Modifier.height(10.dp))
         Row(
-            modifier = Modifier.padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SortOptionChip(
+            FilterChip2(
                 label = stringResource(R.string.new_to_old),
                 selected = selectedSortOrder == SortOrder.NEW_TO_OLD,
-                onClick = { selectedSortOrder = SortOrder.NEW_TO_OLD },
-                modifier = Modifier.weight(1f)
+                onClick = { selectedSortOrder = SortOrder.NEW_TO_OLD }
             )
-            SortOptionChip(
+            FilterChip2(
                 label = stringResource(R.string.old_to_new),
                 selected = selectedSortOrder == SortOrder.OLD_TO_NEW,
-                onClick = { selectedSortOrder = SortOrder.OLD_TO_NEW },
-                modifier = Modifier.weight(1f)
+                onClick = { selectedSortOrder = SortOrder.OLD_TO_NEW }
             )
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
-        // Action Buttons
+        // Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TextButton(
+            OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.height(52.dp).weight(1f),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                shape = RoundedCornerShape(24.dp)
             ) {
-                Text(stringResource(R.string.cancel), fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.cancel),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             Button(
                 onClick = { onApply(selectedViewMode, selectedSortType, selectedSortOrder) },
-                modifier = Modifier.height(52.dp).weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(50.dp),
+                shape = RoundedCornerShape(24.dp)
             ) {
                 Text(stringResource(R.string.apply), fontWeight = FontWeight.Bold)
             }
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
 @Composable
-private fun FilterSectionTitle(title: String) {
+private fun FilterLabel(text: String) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Black,
-        letterSpacing = 1.2.sp,
-        modifier = Modifier.padding(bottom = 12.dp)
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.8.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
     )
 }
 
@@ -172,70 +175,73 @@ private fun ViewModeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val selectedBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+    val unselectedBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    val selectedBorder = MaterialTheme.colorScheme.primary
+
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) selectedBg else unselectedBg,
+        border = if (selected)
+            androidx.compose.foundation.BorderStroke(1.5.dp, selectedBorder)
+        else
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.padding(11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(19.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (selected) {
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SortOptionChip(
+private fun FilterChip2(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
-        )
+    val bgColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(bgColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp).padding(end = 4.dp),
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-            )
-        }
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = textColor
+        )
     }
 }

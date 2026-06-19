@@ -48,8 +48,8 @@ fun ViewOptionsSheet(
             // ─── Header ─────────────────────────────────
             Text(
                 text = "View Options",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 19.sp,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
 
@@ -142,18 +142,23 @@ fun ViewOptionsSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             // ─── Manage Pages Button ────────────────────
-            FilledTonalButton(
+            Button(
                 onClick = {
                     onDismiss()
                     onManagePages()
                 },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
             ) {
                 Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Manage Pages", style = MaterialTheme.typography.labelLarge)
+                Text("Manage Pages", fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -164,11 +169,11 @@ fun ViewOptionsSheet(
 @Composable
 private fun SectionLabel(text: String) {
     Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.5.sp
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.8.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
     )
 }
 

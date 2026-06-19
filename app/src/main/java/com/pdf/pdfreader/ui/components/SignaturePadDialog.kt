@@ -8,14 +8,16 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Redo
-import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.LineWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -24,7 +26,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
@@ -43,11 +47,8 @@ fun SignaturePadDialog(
     var currentPoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
     var undoStack by remember { mutableStateOf<List<List<SignatureStroke>>>(emptyList()) }
     var redoStack by remember { mutableStateOf<List<List<SignatureStroke>>>(emptyList()) }
-
-    var selectedColor by remember { mutableStateOf(Color.Black) }
-    var selectedStrokeWidth by remember { mutableStateOf(5f) }
-
-    val colors = listOf(Color.Black, Color(0xFF1565C0), Color(0xFFD32F2F))
+    var selectedStrokeWidth by remember { mutableFloatStateOf(5f) }
+    val selectedColor = Color(0xFF1C1B1F)
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -57,139 +58,32 @@ fun SignaturePadDialog(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
                 .wrapContentHeight(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 24.dp
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Draw Signature", style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onDismissRequest) {
-                        Icon(Icons.Default.Close, "Close")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Toolbar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        colors.forEach { color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(color, RoundedCornerShape(16.dp))
-                                    .border(
-                                        width = if (selectedColor == color) 2.dp else 0.dp,
-                                        color = if (selectedColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .pointerInput(color) {
-                                        detectTapGestures {
-                                            selectedColor = color
-                                            // Apply the colour to the signature already drawn
-                                            // (not just future strokes) so it can be changed
-                                            // before saving.
-                                            if (strokes.isNotEmpty()) {
-                                                strokes = strokes.map { it.copy(color = color) }
-                                            }
-                                        }
-                                    }
-                            )
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(
-                            onClick = {
-                                if (strokes.isNotEmpty()) {
-                                    redoStack = redoStack + listOf(strokes)
-                                    strokes = undoStack.lastOrNull() ?: emptyList()
-                                    undoStack = undoStack.dropLast(1)
-                                }
-                            },
-                            enabled = strokes.isNotEmpty() || undoStack.isNotEmpty() // Actually, undo goes to history
-                        ) {
-                            Icon(Icons.Default.Undo, "Undo")
-                        }
-                        IconButton(
-                            onClick = {
-                                if (redoStack.isNotEmpty()) {
-                                    undoStack = undoStack + listOf(strokes)
-                                    strokes = redoStack.last()
-                                    redoStack = redoStack.dropLast(1)
-                                }
-                            },
-                            enabled = redoStack.isNotEmpty()
-                        ) {
-                            Icon(Icons.Default.Redo, "Redo")
-                        }
-                        IconButton(
-                            onClick = {
-                                undoStack = undoStack + listOf(strokes)
-                                strokes = emptyList()
-                                redoStack = emptyList()
-                            },
-                            enabled = strokes.isNotEmpty()
-                        ) {
-                            Icon(Icons.Default.Clear, "Clear")
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Stroke thickness control
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "Thickness",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "Draw Signature",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
                     )
-                    Slider(
-                        value = selectedStrokeWidth,
-                        onValueChange = {
-                            selectedStrokeWidth = it
-                            // Re-apply thickness to the already-drawn signature so it can
-                            // be adjusted before saving (not only for future strokes).
-                            if (strokes.isNotEmpty()) {
-                                strokes = strokes.map { s -> s.copy(strokeWidth = it) }
-                            }
-                        },
-                        valueRange = 2f..20f,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = selectedColor,
-                            activeTrackColor = selectedColor
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    )
-                    // Live preview circle showing current pen size
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Canvas(modifier = Modifier.size(32.dp)) {
-                            drawCircle(
-                                color = selectedColor,
-                                radius = selectedStrokeWidth / 2f
-                            )
-                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Drawing Canvas
                 var canvasWidth by remember { mutableStateOf(1f) }
@@ -198,9 +92,14 @@ fun SignaturePadDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(250.dp)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFFAFAFA))
+                        .border(
+                            1.5.dp,
+                            MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(14.dp)
+                        )
                         .clipToBounds()
                 ) {
                     Canvas(
@@ -227,43 +126,16 @@ fun SignaturePadDialog(
                                         }
                                         currentPoints = emptyList()
                                     },
-                                    onDragCancel = {
-                                        currentPoints = emptyList()
-                                    }
+                                    onDragCancel = { currentPoints = emptyList() }
                                 )
                             }
                     ) {
                         canvasWidth = size.width
                         canvasHeight = size.height
 
-                        // Draw all finished strokes
                         strokes.forEach { stroke ->
-                            if (stroke.points.size >= 2) {
-                                val path = Path().apply {
-                                    moveTo(stroke.points.first().x, stroke.points.first().y)
-                                    for (i in 1 until stroke.points.size) {
-                                        lineTo(stroke.points[i].x, stroke.points[i].y)
-                                    }
-                                }
-                                drawPath(
-                                    path = path,
-                                    color = stroke.color,
-                                    style = Stroke(
-                                        width = stroke.strokeWidth,
-                                        cap = StrokeCap.Round,
-                                        join = StrokeJoin.Round
-                                    )
-                                )
-                            } else if (stroke.points.size == 1) {
-                                drawCircle(
-                                    color = stroke.color,
-                                    radius = stroke.strokeWidth / 2,
-                                    center = stroke.points.first()
-                                )
-                            }
+                            drawSignatureStroke(stroke)
                         }
-
-                        // Draw current stroke
                         if (currentPoints.size >= 2) {
                             val path = Path().apply {
                                 moveTo(currentPoints.first().x, currentPoints.first().y)
@@ -280,24 +152,130 @@ fun SignaturePadDialog(
                                     join = StrokeJoin.Round
                                 )
                             )
-                        } else if (currentPoints.size == 1) {
-                            drawCircle(
-                                color = selectedColor,
-                                radius = selectedStrokeWidth / 2,
-                                center = currentPoints.first()
-                            )
                         }
                     }
+
+                    // Baseline hint
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        thickness = 1.dp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Undo / Redo / Clear
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (strokes.isNotEmpty()) {
+                                redoStack = redoStack + listOf(strokes)
+                                strokes = undoStack.lastOrNull() ?: emptyList()
+                                undoStack = undoStack.dropLast(1)
+                            }
+                        },
+                        enabled = strokes.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Undo,
+                            contentDescription = "Undo",
+                            tint = if (strokes.isNotEmpty())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(
+                        onClick = {
+                            if (redoStack.isNotEmpty()) {
+                                undoStack = undoStack + listOf(strokes)
+                                strokes = redoStack.last()
+                                redoStack = redoStack.dropLast(1)
+                            }
+                        },
+                        enabled = redoStack.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Redo,
+                            contentDescription = "Redo",
+                            tint = if (redoStack.isNotEmpty())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(
+                        onClick = {
+                            undoStack = undoStack + listOf(strokes)
+                            strokes = emptyList()
+                            redoStack = emptyList()
+                        },
+                        enabled = strokes.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = "Clear",
+                            tint = if (strokes.isNotEmpty())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Thickness slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.LineWeight,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        "Thickness",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Slider(
+                        value = selectedStrokeWidth,
+                        onValueChange = { selectedStrokeWidth = it },
+                        valueRange = 2f..20f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    TextButton(onClick = onDismissRequest) {
-                        Text("Cancel")
+                    OutlinedButton(
+                        onClick = onDismissRequest,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Text("Cancel", fontWeight = FontWeight.SemiBold)
                     }
                     Button(
                         onClick = {
@@ -305,12 +283,42 @@ fun SignaturePadDialog(
                                 onSaveSignature(strokes, canvasWidth, canvasHeight)
                             }
                         },
-                        enabled = strokes.isNotEmpty()
+                        enabled = strokes.isNotEmpty(),
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp)
                     ) {
-                        Text("Save Signature")
+                        Text("Save Signature", fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignatureStroke(stroke: SignatureStroke) {
+    if (stroke.points.size >= 2) {
+        val path = Path().apply {
+            moveTo(stroke.points.first().x, stroke.points.first().y)
+            for (i in 1 until stroke.points.size) {
+                lineTo(stroke.points[i].x, stroke.points[i].y)
+            }
+        }
+        drawPath(
+            path = path,
+            color = stroke.color,
+            style = Stroke(
+                width = stroke.strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+    } else if (stroke.points.size == 1) {
+        drawCircle(
+            color = stroke.color,
+            radius = stroke.strokeWidth / 2,
+            center = stroke.points.first()
+        )
     }
 }

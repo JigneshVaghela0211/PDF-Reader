@@ -3,10 +3,6 @@ package com.pdf.pdfreader.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,9 +21,6 @@ import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.utiles.ThumbnailManager
 
-/**
- * A production-ready Bottom Sheet for PDF file actions.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PdfActionsBottomSheet(
@@ -45,146 +38,149 @@ fun PdfActionsBottomSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 24.dp)
-            .background(MaterialTheme.colorScheme.surface)
+            .padding(bottom = 28.dp)
     ) {
-        // --- 1. FILE PREVIEW ROW (HEADER) ---
+        // Header: thumbnail + file info + info button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Left: Thumbnail
-            Surface(
-                modifier = Modifier.size(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                PdfThumbnail(
-                    pdf = pdf,
-                    thumbnailManager = thumbnailManager,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Center: File Info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = pdf.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = pdf.formattedDate,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 8.dp)
-                            .size(3.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
-                    Text(
-                        text = pdf.formattedSize,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Box(modifier = Modifier.size(width = 48.dp, height = 60.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 3.dp
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .align(Alignment.TopCenter)
+                        )
+                        PdfThumbnail(
+                            pdf = pdf,
+                            thumbnailManager = thumbnailManager,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 4.dp)
+                        )
+                    }
                 }
             }
 
-            // Right: Info Icon
-            IconButton(onClick = { showInfoDialog = true }) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = pdf.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${pdf.formattedSize} · ${pdf.formattedDate}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { showInfoDialog = true },
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     imageVector = Icons.Default.Info,
                     contentDescription = "File Info",
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
 
         HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            thickness = 0.5.dp
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // --- 2. ACTION GRID ---
-        val actions = listOf(
-            ActionItem(Icons.Outlined.Edit, "Rename", onRename),
-            ActionItem(Icons.Outlined.ContentCopy, "Duplicate", onDuplicate),
-            ActionItem(Icons.Outlined.Share, "Share", onShare),
-            ActionItem(
-                if (pdf.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, 
-                "Favorite", 
-                onFavorite,
-                if (pdf.isFavorite) MaterialTheme.colorScheme.primary else null
-            ),
-            ActionItem(Icons.Outlined.Delete, "Delete", onDelete, MaterialTheme.colorScheme.error)
+        // Action rows (vertical list)
+        ActionRow(
+            icon = Icons.Outlined.Edit,
+            label = "Rename",
+            onClick = onRename
         )
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-        ) {
-            items(actions) { action ->
-                ActionButton(action)
-            }
-        }
+        ActionRow(
+            icon = Icons.Outlined.ContentCopy,
+            label = "Duplicate",
+            onClick = onDuplicate
+        )
+        ActionRow(
+            icon = Icons.Outlined.Share,
+            label = "Share",
+            onClick = onShare
+        )
+        ActionRow(
+            icon = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            label = "Favorite",
+            tint = if (pdf.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            onClick = onFavorite
+        )
+        ActionRow(
+            icon = Icons.Outlined.Delete,
+            label = "Delete",
+            tint = MaterialTheme.colorScheme.error,
+            labelColor = MaterialTheme.colorScheme.error,
+            onClick = onDelete
+        )
     }
 
-    // --- FILE INFO DIALOG ---
     if (showInfoDialog) {
-        FileInfoDialog(
-            pdf = pdf,
-            onDismiss = { showInfoDialog = false }
-        )
+        FileInfoDialog(pdf = pdf, onDismiss = { showInfoDialog = false })
     }
 }
 
 @Composable
-fun ActionButton(action: ActionItem) {
-    Column(
+private fun ActionRow(
+    icon: ImageVector,
+    label: String,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
         modifier = Modifier
-            .width(80.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { action.onClick() }
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Icon(
-            imageVector = action.icon,
-            contentDescription = action.label,
-            tint = action.tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(26.dp)
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(22.dp),
+            tint = tint
         )
-        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = action.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = labelColor
         )
     }
 }
-
-data class ActionItem(
-    val icon: ImageVector,
-    val label: String,
-    val onClick: () -> Unit,
-    val tint: Color? = null
-)
 
 @Composable
 fun FileInfoDialog(
@@ -193,40 +189,83 @@ fun FileInfoDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("File Details", fontWeight = FontWeight.Bold) },
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                "File Details",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InfoRow("File Name", pdf.name)
-                InfoRow("Path", pdf.path)
-                InfoRow("Modified", pdf.formattedDate)
-                InfoRow("Size", pdf.formattedSize)
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                InfoRow("PATH", pdf.path)
+                InfoRow("MODIFIED", pdf.formattedDate)
+                InfoRow("SIZE", pdf.formattedSize)
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK", fontWeight = FontWeight.Bold)
+                Text(
+                    "OK",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         },
-        shape = RoundedCornerShape(24.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
 @Composable
 private fun InfoRow(label: String, value: String) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// Keep ActionItem/ActionButton for backwards-compat if referenced elsewhere
+data class ActionItem(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit,
+    val tint: Color? = null
+)
+
+@Composable
+fun ActionButton(action: ActionItem) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { action.onClick() }
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = action.icon,
+            contentDescription = action.label,
+            tint = action.tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(26.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = action.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = action.tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
         )
     }
 }
