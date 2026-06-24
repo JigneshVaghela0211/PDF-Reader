@@ -67,33 +67,25 @@ fun ColorSelectionDialog(
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
+                                        .then(
+                                            if (isSelected)
+                                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                            else Modifier
+                                        )
+                                        .padding(if (isSelected) 4.dp else 0.dp)
                                         .clip(CircleShape)
                                         .background(color)
-                                        .border(
-                                            width = if (isSelected) 2.dp else if (color == Color.White) 1.dp else 0.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.outlineVariant,
-                                            shape = CircleShape
+                                        .then(
+                                            if (!isSelected && color == Color.White)
+                                                Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                            else Modifier
                                         )
                                         .clickable {
                                             red = color.red
                                             green = color.green
                                             blue = color.blue
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isSelected) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    if (color.luminance() > 0.5f) Color.Black
-                                                    else Color.White
-                                                )
-                                        )
-                                    }
-                                }
+                                        }
+                                )
                             }
                         }
                     }
@@ -218,8 +210,4 @@ private fun ColorSliderRow(
             )
         )
     }
-}
-
-private fun Color.luminance(): Float {
-    return 0.2126f * red + 0.7152f * green + 0.0722f * blue
 }
