@@ -175,48 +175,22 @@ private fun ViewModeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val selectedBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-    val unselectedBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-    val selectedBorder = MaterialTheme.colorScheme.primary
+    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) selectedBg else unselectedBg,
-        border = if (selected)
-            androidx.compose.foundation.BorderStroke(1.5.dp, selectedBorder)
-        else
-            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = bg
     ) {
         Row(
-            modifier = Modifier.padding(11.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(19.dp)
-            )
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (selected) {
-                Spacer(modifier = Modifier.weight(1f))
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(17.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(imageVector = if (selected) Icons.Default.Check else icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
+            Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = fg)
         }
     }
 }
@@ -227,21 +201,26 @@ private fun FilterChip2(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bgColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
+    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
+            .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
+        }
         Text(
             text = label,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = textColor
+            color = fg
         )
     }
 }

@@ -2,8 +2,10 @@ package com.pdf.pdfreader.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -32,118 +34,106 @@ fun ViewOptionsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 36.dp)
         ) {
             // ─── Header ─────────────────────────────────
             Text(
                 text = "View Options",
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 19.sp,
-                modifier = Modifier.padding(bottom = 20.dp)
+                fontSize = 20.sp,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            // ─── Section 1: Reading Direction ───────────
-            SectionLabel(text = "Reading Direction")
-            Spacer(modifier = Modifier.height(8.dp))
+            // ─── Reading Direction ───────────────────────
+            SheetSectionLabel("Reading Direction")
+            Spacer(Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                DirectionCard(
+                DirectionChip(
                     icon = Icons.Default.SwapVert,
                     label = "Vertical",
-                    isSelected = viewSettings.readingMode == ReadingMode.VERTICAL,
+                    selected = viewSettings.readingMode == ReadingMode.VERTICAL,
                     onClick = { onSettingsChange(viewSettings.copy(readingMode = ReadingMode.VERTICAL)) },
                     modifier = Modifier.weight(1f)
                 )
-                DirectionCard(
+                DirectionChip(
                     icon = Icons.Default.SwapHoriz,
                     label = "Horizontal",
-                    isSelected = viewSettings.readingMode == ReadingMode.HORIZONTAL,
+                    selected = viewSettings.readingMode == ReadingMode.HORIZONTAL,
                     onClick = { onSettingsChange(viewSettings.copy(readingMode = ReadingMode.HORIZONTAL)) },
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // ─── Section 2: Background Modes ────────────
-            SectionLabel(text = "Background")
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            // ─── Background Mode ────────────────────────
+            SheetSectionLabel("Background")
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    "Original" to BackgroundMode.ORIGINAL,
-                    "Paper" to BackgroundMode.PAPER,
-                    "Eye Care" to BackgroundMode.EYE_COMFORT,
-                    "Invert" to BackgroundMode.INVERT
-                ).forEach { (label, mode) ->
-                    val selected = viewSettings.backgroundMode == mode
-                    BackgroundChip(
+                    Triple("Original", BackgroundMode.ORIGINAL, Color(0xFFFFFFFF)),
+                    Triple("Paper", BackgroundMode.PAPER, Color(0xFFF5F0E1)),
+                    Triple("Eye Care", BackgroundMode.EYE_COMFORT, Color(0xFFF8E8C8)),
+                    Triple("Invert", BackgroundMode.INVERT, Color(0xFF1C1B1F))
+                ).forEach { (label, mode, swatch) ->
+                    BgModeChip(
                         label = label,
-                        selected = selected,
+                        swatch = swatch,
+                        selected = viewSettings.backgroundMode == mode,
                         onClick = { onSettingsChange(viewSettings.copy(backgroundMode = mode)) }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // ─── Section 3: Switches ────────────────────
-            SectionLabel(text = "Options")
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SwitchRow(
+            // ─── Switches ───────────────────────────────
+            SheetSectionLabel("Options")
+            Spacer(Modifier.height(4.dp))
+            SheetSwitchRow(
                 label = "Page by Page",
+                sublabel = "Snap scroll to each page",
                 checked = viewSettings.isPageSnap,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(isPageSnap = it)) }
             )
-
-            SwitchRow(
+            SheetSwitchRow(
                 label = "Keep Screen On",
+                sublabel = "Prevent sleep while reading",
                 checked = viewSettings.keepScreenOn,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(keepScreenOn = it)) }
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // ─── Manage Pages Button ────────────────────
+            // ─── Manage Pages ────────────────────────────
             Button(
-                onClick = {
-                    onDismiss()
-                    onManagePages()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(24.dp),
+                onClick = { onDismiss(); onManagePages() },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
-                Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Manage Pages", fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Manage Pages", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
         }
     }
 }
 
-// ─── Reusable Sub-components ────────────────────────────────────
-
 @Composable
-private fun SectionLabel(text: String) {
+internal fun SheetSectionLabel(text: String) {
     Text(
         text = text.uppercase(),
         fontSize = 11.sp,
@@ -154,81 +144,83 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun DirectionCard(
+private fun DirectionChip(
     icon: ImageVector,
     label: String,
-    isSelected: Boolean,
+    selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bgColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant,
+    val bg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
         label = "dirBg"
     )
-    val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "dirContent"
+    val fg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "dirFg"
     )
-
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = if (isSelected) CardDefaults.outlinedCardBorder() else null
+        color = bg
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = contentColor,
-                modifier = Modifier.size(28.dp)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = contentColor
-            )
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
+            } else {
+                Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(17.dp))
+            }
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = fg)
         }
     }
 }
 
 @Composable
-private fun BackgroundChip(
+private fun BgModeChip(
     label: String,
+    swatch: Color,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
-    Box(
+    Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bg)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(swatch)
+                .then(
+                    if (selected)
+                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    else
+                        Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                )
+        )
         Text(
             text = label,
-            fontSize = 12.5.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = textColor
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-private fun SwitchRow(
+private fun SheetSwitchRow(
     label: String,
+    sublabel: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -236,15 +228,17 @@ private fun SwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 9.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                sublabel,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
