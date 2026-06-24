@@ -313,13 +313,15 @@ fun PdfReaderScreen(
                 visible = editorUiState.isEditMode,
                 currentTool = editorUiState.currentTool,
                 currentColor = editorUiState.currentColor,
+                currentStrokeWidth = editorUiState.currentStrokeWidth,
                 canUndo = editorUiState.canUndo,
                 canRedo = editorUiState.canRedo,
                 onToolChange = editorViewModel::setAnnotationToolWithAutoExtract,
                 onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) },
                 onUndoClick = editorViewModel::undo,
                 onRedoClick = editorViewModel::redo,
-                onColorClick = { showBottomColorPicker = true }
+                onColorClick = { showBottomColorPicker = true },
+                onStrokeWidthChange = editorViewModel::setAnnotationStrokeWidth
             )
         }
     ) { paddingValues ->
