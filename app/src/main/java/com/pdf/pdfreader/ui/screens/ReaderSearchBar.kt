@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,14 +18,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.R
 
-/**
- * Top app bar shown while in-PDF search is active.
- * Extracted from PdfReaderScreen for separation of concerns.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SearchTopBar(
@@ -38,31 +36,44 @@ internal fun SearchTopBar(
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    TopAppBar(
-        title = {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Search pill field
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(22.dp))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Search input field
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                )
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .weight(1f)
-                        .focusRequester(focusRequester)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .focusRequester(focusRequester),
                     textStyle = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 16.sp
+                        fontSize = 14.sp
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     singleLine = true,
@@ -71,67 +82,52 @@ internal fun SearchTopBar(
                             if (query.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.search_pdf_hint),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 16.sp
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    fontSize = 14.sp
                                 )
                             }
                             innerTextField()
                         }
                     }
                 )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Match count
-                if (matchCount > 0 && currentMatch >= 0) {
-                    Text(
-                        text = "${currentMatch + 1}/$matchCount",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                } else if (query.isNotEmpty() && matchCount == 0) {
-                    Text(
-                        text = "0",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-
-                // Navigation arrows
-                IconButton(
-                    onClick = onPrevious,
-                    enabled = matchCount > 0,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Previous match",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onNext,
-                    enabled = matchCount > 0,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Next match",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
-        },
-        navigationIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_search))
+
+            // Match counter
+            if (query.isNotEmpty()) {
+                Text(
+                    text = if (matchCount > 0 && currentMatch >= 0)
+                        "${currentMatch + 1} / $matchCount"
+                    else "0",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (matchCount == 0 && query.isNotEmpty())
+                        MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrolledContainerColor = MaterialTheme.colorScheme.surface
-        )
-    )
+
+            // Prev
+            IconButton(
+                onClick = onPrevious,
+                enabled = matchCount > 0,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous", modifier = Modifier.size(22.dp))
+            }
+
+            // Next
+            IconButton(
+                onClick = onNext,
+                enabled = matchCount > 0,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next", modifier = Modifier.size(22.dp))
+            }
+
+            // Close
+            IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_search), modifier = Modifier.size(22.dp))
+            }
+        }
+    }
 }

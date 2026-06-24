@@ -20,13 +20,20 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.LineWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -280,5 +287,229 @@ fun StrokeWidthSliderExpandable(
                 modifier = Modifier.width(36.dp)
             )
         }
+    }
+}
+
+/**
+ * Design-spec annotation bar: undo | redo | "Editing" | close | [Save]
+ * followed by a scrollable tool-icon row and (when pen/highlight active) a stroke slider.
+ */
+@Composable
+fun AnnotationTopBarDesign(
+    currentTool: AnnotationTool,
+    currentColor: Color,
+    currentStrokeWidth: Float,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    isExporting: Boolean,
+    onToolChange: (AnnotationTool) -> Unit,
+    onColorClick: () -> Unit,
+    onStrokeWidthChange: (Float) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onClose: () -> Unit,
+    onSave: () -> Unit,
+    onSignatureClick: () -> Unit
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+
+    Column {
+        // ── Row 1: undo · redo · "Editing" · close · Save ──────────────
+        Surface(
+            color = surfaceColor,
+            shadowElevation = 0.dp,
+            tonalElevation = 0.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Undo,
+                        contentDescription = "Undo",
+                        tint = if (canUndo) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                IconButton(onClick = onRedo, enabled = canRedo, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Redo,
+                        contentDescription = "Redo",
+                        tint = if (canRedo) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Text(
+                    text = "Editing",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(22.dp))
+                }
+                if (isExporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Surface(
+                        onClick = onSave,
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Text(
+                            text = "Save",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+
+        // ── Row 2: scrollable tool icons ────────────────────────────────
+        Surface(color = surfaceColor) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ToolIconButton(
+                    icon = Icons.Default.Brush,
+                    label = "Pen",
+                    active = currentTool == AnnotationTool.PEN,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE else AnnotationTool.PEN) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.Highlight,
+                    label = "Highlight",
+                    active = currentTool == AnnotationTool.HIGHLIGHTER,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.HIGHLIGHTER) AnnotationTool.NONE else AnnotationTool.HIGHLIGHTER) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.TextFields,
+                    label = "Note",
+                    active = currentTool == AnnotationTool.TEXT,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.TEXT) AnnotationTool.NONE else AnnotationTool.TEXT) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.CleaningServices,
+                    label = "Eraser",
+                    active = currentTool == AnnotationTool.ERASER,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.ERASER) AnnotationTool.NONE else AnnotationTool.ERASER) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.Title,
+                    label = "Text",
+                    active = currentTool == AnnotationTool.EDIT_TEXT,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.EDIT_TEXT) AnnotationTool.NONE else AnnotationTool.EDIT_TEXT) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.Image,
+                    label = "Image",
+                    active = currentTool == AnnotationTool.INSERT_IMAGE,
+                    onClick = { onToolChange(if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE else AnnotationTool.INSERT_IMAGE) }
+                )
+                ToolIconButton(
+                    icon = Icons.Default.Draw,
+                    label = "Sign",
+                    active = false,
+                    onClick = onSignatureClick
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                // Color wheel circle
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(currentColor)
+                        .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                        .clickable(onClick = onColorClick)
+                )
+            }
+        }
+
+        HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+
+        // ── Row 3: stroke width slider (pen / highlighter only) ─────────
+        if (currentTool == AnnotationTool.PEN || currentTool == AnnotationTool.HIGHLIGHTER) {
+            Surface(color = surfaceColor) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.LineWeight,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Slider(
+                        value = currentStrokeWidth,
+                        onValueChange = onStrokeWidthChange,
+                        valueRange = 1f..20f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                    Text(
+                        text = "${currentStrokeWidth.toInt()} px",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(36.dp)
+                    )
+                }
+            }
+            HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
+        }
+    }
+}
+
+@Composable
+private fun ToolIconButton(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val activeColor = MaterialTheme.colorScheme.primary
+    val bgColor = if (active) activeColor.copy(alpha = 0.12f) else Color.Transparent
+
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(21.dp),
+            tint = if (active) activeColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
     }
 }

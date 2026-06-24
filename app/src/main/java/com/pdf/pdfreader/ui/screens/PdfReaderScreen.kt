@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Save
@@ -230,74 +231,22 @@ fun PdfReaderScreen(
             var showMenu by remember { mutableStateOf(false) }
             when {
                 editorUiState.isEditMode -> {
-                    // Slim edit-mode top bar: Close + Save/Export only
-                    // All tools are in the bottom EditingBottomBar — no duplication
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = "Edit Mode",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { editorViewModel.setEditMode(false) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Close Edit Mode")
-                            }
-                        },
-                        actions = {
-                            // Stroke width slider toggle (only for pen/highlighter)
-                            if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
-                                || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
-                            ) {
-                                Text(
-                                    text = "${editorUiState.currentStrokeWidth.toInt()}px",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            
-                            // Export (visible when overlays exist)
-                            if (editorUiState.hasEditableOverlays) {
-                                IconButton(
-                                    onClick = { editorViewModel.exportEditedPdf(screenWidthPx) },
-                                    enabled = !editorUiState.isExporting
-                                ) {
-                                    if (editorUiState.isExporting) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    } else {
-                                        Icon(
-                                            Icons.Default.Save,
-                                            contentDescription = "Export Edited PDF",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                            // Save annotations
-                            IconButton(onClick = { editorViewModel.saveAnnotationsToPdf(screenWidthPx) }) {
-                                Icon(Icons.Default.Save, contentDescription = "Save Annotations")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
+                    com.pdf.pdfreader.ui.components.AnnotationTopBarDesign(
+                        currentTool = editorUiState.currentTool,
+                        currentColor = editorUiState.currentColor,
+                        currentStrokeWidth = editorUiState.currentStrokeWidth,
+                        canUndo = editorUiState.canUndo,
+                        canRedo = editorUiState.canRedo,
+                        isExporting = editorUiState.isExporting,
+                        onToolChange = editorViewModel::setAnnotationToolWithAutoExtract,
+                        onColorClick = { /* handled by bottom bar */ },
+                        onStrokeWidthChange = editorViewModel::setAnnotationStrokeWidth,
+                        onUndo = editorViewModel::undo,
+                        onRedo = editorViewModel::redo,
+                        onClose = { editorViewModel.setEditMode(false) },
+                        onSave = { editorViewModel.saveAnnotationsToPdf(screenWidthPx) },
+                        onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) }
                     )
-                    
-                    // Stroke width slider (expandable below top bar for pen/highlighter)
-                    if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.PEN
-                        || editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.HIGHLIGHTER
-                    ) {
-                        com.pdf.pdfreader.ui.components.StrokeWidthSliderExpandable(
-                            currentStrokeWidth = editorUiState.currentStrokeWidth,
-                            currentColor = editorUiState.currentColor,
-                            onStrokeWidthChange = editorViewModel::setAnnotationStrokeWidth
-                        )
-                    }
                 }
                 uiState.isSearchActive -> {
                     SearchTopBar(
@@ -313,22 +262,13 @@ fun PdfReaderScreen(
                 else -> {
                     TopAppBar(
                         title = {
-                            Column {
-                                Text(
-                                    text = uiState.fileName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                                if (uiState.totalPages > 0) {
-                                    val percent = ((uiState.currentPage + 1).toFloat() / uiState.totalPages * 100).toInt()
-                                    Text(
-                                        text = "${stringResource(R.string.page)} ${uiState.currentPage + 1} ${stringResource(R.string.of)} ${uiState.totalPages}  •  $percent%",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+                            Text(
+                                text = uiState.fileName,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
                         },
                         navigationIcon = {
                             IconButton(onClick = onNavigateBack) {
@@ -336,44 +276,17 @@ fun PdfReaderScreen(
                             }
                         },
                         actions = {
-                            // Search button
                             IconButton(onClick = viewModel::toggleSearch) {
                                 Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
                             }
-                            // Bookmark button
-                            IconButton(onClick = viewModel::toggleBookmark) {
+                            IconButton(onClick = { showViewOptions = true }) {
+                                Icon(Icons.Default.Tune, contentDescription = "View Options")
+                            }
+                            IconButton(onClick = { editorViewModel.setEditMode(true) }) {
                                 Icon(
-                                    imageVector = if (uiState.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = "Bookmark",
-                                    tint = if (uiState.isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            // Overflow menu
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                            }
-                            
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Edit / Annotate") },
-                                    onClick = { 
-                                        showMenu = false
-                                        editorViewModel.setEditMode(true) 
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("View Options") },
-                                    onClick = { 
-                                        showMenu = false
-                                        showViewOptions = true
-                                    },
-                                    leadingIcon = { 
-                                        Icon(Icons.Default.Settings, contentDescription = null)
-                                    }
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit / Annotate",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         },
@@ -805,7 +718,7 @@ fun PdfReaderScreen(
                 }
             }
 
-            // Right-side draggable page scrollbar (replaces the old bottom slider).
+            // Right-side draggable page scrollbar
             com.pdf.pdfreader.ui.components.PageScrollbar(
                 visible = isSliderVisible,
                 currentPage = uiState.currentPage,
@@ -817,6 +730,32 @@ fun PdfReaderScreen(
                 },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
+
+            // Floating page indicator pill at bottom-center
+            if (uiState.totalPages > 0 && !editorUiState.isEditMode) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isSliderVisible,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp),
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut()
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xDD1C1B1F),
+                        shadowElevation = 4.dp
+                    ) {
+                        Text(
+                            text = "Page ${uiState.currentPage + 1} of ${uiState.totalPages}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+            }
 
             if (uiState.isLoading) {
                 CircularProgressIndicator(

@@ -1,30 +1,30 @@
 package com.pdf.pdfreader.ui.components
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.graphics.BitmapFactory
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.foundation.border
-import androidx.compose.runtime.remember
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,46 +39,40 @@ fun SignatureBottomSheet(
     if (visible) {
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 22.dp)
+                    .padding(bottom = 28.dp)
             ) {
-                Row(
+                Text(
+                    text = "Signatures",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 19.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Full-width red Create Signature button
+                Button(
+                    onClick = onCreateNewSignature,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Signatures",
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
-                        fontSize = 19.sp,
-                        modifier = Modifier.weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
-                    Button(
-                        onClick = onCreateNewSignature,
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Create Signature", fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                    }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Create Signature", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
-                if (savedSignatures.isEmpty()) {
-                    Text(
-                        "No saved signatures yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(24.dp)
-                    )
-                } else {
+                if (savedSignatures.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(20.dp))
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -93,9 +87,16 @@ fun SignatureBottomSheet(
                             )
                         }
                     }
+                } else {
+                    Text(
+                        text = "No saved signatures yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .padding(top = 24.dp)
+                            .fillMaxWidth()
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -111,48 +112,49 @@ fun SignatureGridItem(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.5f)
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
     ) {
         val bmp = remember(uri) {
             val path = uri.replace("file://", "")
             BitmapFactory.decodeFile(path)
         }
-        
-        // Recycle bitmap when composable leaves composition
-        androidx.compose.runtime.DisposableEffect(bmp) {
+
+        DisposableEffect(bmp) {
             onDispose {
-                if (bmp != null && !bmp.isRecycled) {
-                    bmp.recycle()
-                }
+                if (bmp != null && !bmp.isRecycled) bmp.recycle()
             }
         }
-        
-        bmp?.let { 
-            androidx.compose.foundation.Image(
+
+        bmp?.let {
+            Image(
                 bitmap = it.asImageBitmap(),
                 contentDescription = "Saved Signature",
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(12.dp)
             )
         }
 
-        IconButton(
-            onClick = onDelete,
+        // Delete badge: white circle with red delete icon
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(32.dp)
-                .padding(4.dp)
+                .padding(6.dp)
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable(onClick = onDelete),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Delete,
                 contentDescription = "Delete",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.error
             )
         }
     }

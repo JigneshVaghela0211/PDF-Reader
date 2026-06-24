@@ -2,13 +2,10 @@ package com.pdf.pdfreader.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +15,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pdf.pdfreader.domain.model.BackgroundMode
@@ -80,39 +76,23 @@ fun ViewOptionsSheet(
 
             // ─── Section 2: Background Modes ────────────
             SectionLabel(text = "Background")
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                BackgroundOption(
-                    label = "Original",
-                    color = Color.White,
-                    borderColor = Color.LightGray,
-                    isSelected = viewSettings.backgroundMode == BackgroundMode.ORIGINAL,
-                    onClick = { onSettingsChange(viewSettings.copy(backgroundMode = BackgroundMode.ORIGINAL)) }
-                )
-                BackgroundOption(
-                    label = "Paper",
-                    color = Color(0xFFF5F0E1),
-                    borderColor = Color(0xFFD4C9A8),
-                    isSelected = viewSettings.backgroundMode == BackgroundMode.PAPER,
-                    onClick = { onSettingsChange(viewSettings.copy(backgroundMode = BackgroundMode.PAPER)) }
-                )
-                BackgroundOption(
-                    label = "Eye Care",
-                    color = Color(0xFFF8E8C8),
-                    borderColor = Color(0xFFD4A96E),
-                    isSelected = viewSettings.backgroundMode == BackgroundMode.EYE_COMFORT,
-                    onClick = { onSettingsChange(viewSettings.copy(backgroundMode = BackgroundMode.EYE_COMFORT)) }
-                )
-                BackgroundOption(
-                    label = "Invert",
-                    color = Color(0xFF1A1A1A),
-                    borderColor = Color(0xFF444444),
-                    isSelected = viewSettings.backgroundMode == BackgroundMode.INVERT,
-                    onClick = { onSettingsChange(viewSettings.copy(backgroundMode = BackgroundMode.INVERT)) }
-                )
+                listOf(
+                    "Original" to BackgroundMode.ORIGINAL,
+                    "Paper" to BackgroundMode.PAPER,
+                    "Eye Care" to BackgroundMode.EYE_COMFORT,
+                    "Invert" to BackgroundMode.INVERT
+                ).forEach { (label, mode) ->
+                    val selected = viewSettings.backgroundMode == mode
+                    BackgroundChip(
+                        label = label,
+                        selected = selected,
+                        onClick = { onSettingsChange(viewSettings.copy(backgroundMode = mode)) }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -122,17 +102,13 @@ fun ViewOptionsSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             SwitchRow(
-                icon = Icons.AutoMirrored.Filled.MenuBook,
                 label = "Page by Page",
-                subtitle = "Snap to page edges",
                 checked = viewSettings.isPageSnap,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(isPageSnap = it)) }
             )
 
             SwitchRow(
-                icon = Icons.Default.LightMode,
                 label = "Keep Screen On",
-                subtitle = "Prevent screen from sleeping",
                 checked = viewSettings.keepScreenOn,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(keepScreenOn = it)) }
             )
@@ -227,54 +203,32 @@ private fun DirectionCard(
 }
 
 @Composable
-private fun BackgroundOption(
+private fun BackgroundChip(
     label: String,
-    color: Color,
-    borderColor: Color,
-    isSelected: Boolean,
+    selected: Boolean,
     onClick: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+    val bg = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(color)
-                .border(
-                    width = if (isSelected) 3.dp else 1.dp,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else borderColor,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isSelected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = null,
-                    tint = if (color == Color(0xFF1A1A1A)) Color.White else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            textAlign = TextAlign.Center,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 12.5.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = textColor
         )
     }
 }
 
 @Composable
 private fun SwitchRow(
-    icon: ImageVector,
     label: String,
-    subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -282,30 +236,23 @@ private fun SwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 10.dp),
+            .padding(vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }
