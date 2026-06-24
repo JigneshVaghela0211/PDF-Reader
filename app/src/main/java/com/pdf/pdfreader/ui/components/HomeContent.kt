@@ -65,6 +65,7 @@ fun HomeContent(
             onDismissRequest = { selectedPdfPath = null },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             PdfActionsBottomSheet(

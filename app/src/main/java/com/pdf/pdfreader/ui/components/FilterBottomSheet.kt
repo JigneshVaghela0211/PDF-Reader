@@ -135,7 +135,7 @@ fun FilterBottomSheet(
                 modifier = Modifier
                     .weight(1f)
                     .height(50.dp),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(100.dp)
             ) {
                 Text(
                     stringResource(R.string.cancel),
@@ -148,7 +148,7 @@ fun FilterBottomSheet(
                 modifier = Modifier
                     .weight(1f)
                     .height(50.dp),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(100.dp)
             ) {
                 Text(stringResource(R.string.apply), fontWeight = FontWeight.Bold)
             }
@@ -175,22 +175,46 @@ private fun ViewModeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val bg = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurface
 
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = bg
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .then(
+                if (selected)
+                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+                else Modifier
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.Center
         ) {
-            Icon(imageVector = if (selected) Icons.Default.Check else icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
-            Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = fg)
+            Icon(imageVector = icon, contentDescription = null, tint = fg, modifier = Modifier.size(19.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = fg
+            )
+        }
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier
+                    .size(17.dp)
+                    .align(Alignment.CenterEnd)
+            )
         }
     }
 }
@@ -201,21 +225,18 @@ private fun FilterChip2(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val bg = if (selected) MaterialTheme.colorScheme.inverseSurface
+    else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.inverseOnSurface
+    else MaterialTheme.colorScheme.onSurface
 
-    Row(
+    Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+            .padding(horizontal = 16.dp, vertical = 9.dp)
     ) {
-        if (selected) {
-            Icon(Icons.Default.Check, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
-        }
         Text(
             text = label,
             fontSize = 13.sp,

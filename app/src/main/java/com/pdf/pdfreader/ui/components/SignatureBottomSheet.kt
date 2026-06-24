@@ -39,7 +39,7 @@ fun SignatureBottomSheet(
     if (visible) {
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -61,7 +61,7 @@ fun SignatureBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(100.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )

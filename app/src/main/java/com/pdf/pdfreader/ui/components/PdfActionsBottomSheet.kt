@@ -109,41 +109,37 @@ fun PdfActionsBottomSheet(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Action rows (vertical list)
         ActionRow(
             icon = Icons.Outlined.Edit,
             label = "Rename",
-            iconBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-            tint = MaterialTheme.colorScheme.primary,
             onClick = onRename
         )
         ActionRow(
             icon = Icons.Outlined.ContentCopy,
             label = "Duplicate",
-            iconBg = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-            tint = MaterialTheme.colorScheme.secondary,
             onClick = onDuplicate
         )
         ActionRow(
             icon = Icons.Outlined.Share,
             label = "Share",
-            iconBg = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
-            tint = MaterialTheme.colorScheme.tertiary,
             onClick = onShare
         )
         ActionRow(
             icon = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
             label = if (pdf.isFavorite) "Remove from Favorites" else "Add to Favorites",
-            iconBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
             tint = MaterialTheme.colorScheme.primary,
             onClick = onFavorite
         )
         ActionRow(
             icon = Icons.Outlined.Delete,
             label = "Delete",
-            iconBg = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
             tint = MaterialTheme.colorScheme.error,
             labelColor = MaterialTheme.colorScheme.error,
             onClick = onDelete
@@ -159,8 +155,7 @@ fun PdfActionsBottomSheet(
 private fun ActionRow(
     icon: ImageVector,
     label: String,
-    iconBg: Color = MaterialTheme.colorScheme.surfaceVariant,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     labelColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
@@ -168,19 +163,11 @@ private fun ActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 22.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(iconBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = tint)
-        }
+        Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(22.dp), tint = tint)
         Text(text = label, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = labelColor)
     }
 }

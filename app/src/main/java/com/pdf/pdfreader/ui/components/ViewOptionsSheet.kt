@@ -23,7 +23,7 @@ import com.pdf.pdfreader.domain.model.BackgroundMode
 import com.pdf.pdfreader.domain.model.ReadingMode
 import com.pdf.pdfreader.domain.model.ViewSettings
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ViewOptionsSheet(
     viewSettings: ViewSettings,
@@ -35,7 +35,7 @@ fun ViewOptionsSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
@@ -79,16 +79,18 @@ fun ViewOptionsSheet(
             // ─── Background Mode ────────────────────────
             SheetSectionLabel("Background")
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(
-                    Triple("Original", BackgroundMode.ORIGINAL, Color(0xFFFFFFFF)),
-                    Triple("Paper", BackgroundMode.PAPER, Color(0xFFF5F0E1)),
-                    Triple("Eye Care", BackgroundMode.EYE_COMFORT, Color(0xFFF8E8C8)),
-                    Triple("Invert", BackgroundMode.INVERT, Color(0xFF1C1B1F))
-                ).forEach { (label, mode, swatch) ->
-                    BgModeChip(
+                    "Original" to BackgroundMode.ORIGINAL,
+                    "Paper" to BackgroundMode.PAPER,
+                    "Eye Care" to BackgroundMode.EYE_COMFORT,
+                    "Invert" to BackgroundMode.INVERT
+                ).forEach { (label, mode) ->
+                    BgModePill(
                         label = label,
-                        swatch = swatch,
                         selected = viewSettings.backgroundMode == mode,
                         onClick = { onSettingsChange(viewSettings.copy(backgroundMode = mode)) }
                     )
@@ -102,13 +104,11 @@ fun ViewOptionsSheet(
             Spacer(Modifier.height(4.dp))
             SheetSwitchRow(
                 label = "Page by Page",
-                sublabel = "Snap scroll to each page",
                 checked = viewSettings.isPageSnap,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(isPageSnap = it)) }
             )
             SheetSwitchRow(
                 label = "Keep Screen On",
-                sublabel = "Prevent sleep while reading",
                 checked = viewSettings.keepScreenOn,
                 onCheckedChange = { onSettingsChange(viewSettings.copy(keepScreenOn = it)) }
             )
@@ -119,14 +119,15 @@ fun ViewOptionsSheet(
             Button(
                 onClick = { onDismiss(); onManagePages() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
-                Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.AutoStories, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Manage Pages", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("Manage Pages", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
         }
     }
@@ -152,67 +153,65 @@ private fun DirectionChip(
     modifier: Modifier = Modifier
 ) {
     val bg by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        else MaterialTheme.colorScheme.surfaceVariant,
         label = "dirBg"
     )
     val fg by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurface,
         label = "dirFg"
     )
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = bg
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .then(
+                if (selected)
+                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+                else Modifier
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (selected) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
-            } else {
-                Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(17.dp))
-            }
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = fg)
+            Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(19.dp))
+            Text(
+                label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = fg
+            )
         }
     }
 }
 
 @Composable
-private fun BgModeChip(
+private fun BgModePill(
     label: String,
-    swatch: Color,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    Column(
+    val bg = if (selected) MaterialTheme.colorScheme.inverseSurface
+    else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (selected) MaterialTheme.colorScheme.inverseOnSurface
+    else MaterialTheme.colorScheme.onSurface
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(swatch)
-                .then(
-                    if (selected)
-                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    else
-                        Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                )
-        )
         Text(
             text = label,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 12.5.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = fg
         )
     }
 }
@@ -220,7 +219,6 @@ private fun BgModeChip(
 @Composable
 private fun SheetSwitchRow(
     label: String,
-    sublabel: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -228,17 +226,15 @@ private fun SheetSwitchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 10.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                sublabel,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-        }
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f)
+        )
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
