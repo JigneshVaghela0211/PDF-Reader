@@ -47,12 +47,16 @@ fun SmartSwipeRefresh(
     val nestedScrollConnection = remember(isRefreshing) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Return consumed offset to prevent the list from scrolling up while retracting
-                return if (available.y < 0 && pullDistance.value > 0) {
+                // Collapse the pull indicator when the user scrolls back up, but only
+                // consume what's needed to retract — never block normal list scroll.
+                if (available.y < 0 && pullDistance.value > 0) {
                     val newOffset = (pullDistance.value + available.y).coerceAtLeast(0f)
                     scope.launch { pullDistance.snapTo(newOffset) }
-                    Offset(0f, available.y)
-                } else Offset.Zero
+                    // Only consume what the retraction actually used, not the full delta
+                    val consumed = newOffset - pullDistance.value
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
             }
 
             override fun onPostScroll(
@@ -60,34 +64,29 @@ fun SmartSwipeRefresh(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                return if (available.y > 0 && source == NestedScrollSource.UserInput) {
+                if (available.y > 0 && source == NestedScrollSource.UserInput && !isRefreshing) {
                     isPulling = true
-                    // Damping calculation
                     val dragPercent = (pullDistance.value / maxDragDist).coerceIn(0f, 1f)
                     val damping = 1f - dragPercent.pow(2)
                     val delta = available.y * damping * 0.5f
-                    
-                    scope.launch { 
-                        pullDistance.snapTo((pullDistance.value + delta).coerceAtMost(maxDragDist)) 
+                    scope.launch {
+                        pullDistance.snapTo((pullDistance.value + delta).coerceAtMost(maxDragDist))
                     }
-                    Offset(0f, available.y)
-                } else Offset.Zero
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 isPulling = false
-                
                 val shouldRefresh = pullDistance.value >= refreshThreshold && !isRefreshing
-                if (shouldRefresh) {
-                    onRefresh()
-                }
-                
-                // Final snap back
+                if (shouldRefresh) onRefresh()
                 val target = if (shouldRefresh || isRefreshing) refreshThreshold else 0f
                 pullDistance.animateTo(
                     targetValue = target,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow, dampingRatio = Spring.DampingRatioLowBouncy)
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy)
                 )
+                // Pass fling velocity through so the list can decelerate naturally
                 return Velocity.Zero
             }
         }

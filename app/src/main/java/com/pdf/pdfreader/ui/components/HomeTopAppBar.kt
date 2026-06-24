@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.*
@@ -39,15 +38,13 @@ fun HomeTopAppBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchToggle: (Boolean) -> Unit,
     onFilterClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     viewMode: ViewMode,
     fileCount: Int,
-    onViewModeChange: (ViewMode) -> Unit,
-    scrollBehavior: TopAppBarScrollBehavior
+    onViewModeChange: (ViewMode) -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = if (scrollBehavior.state.collapsedFraction > 0f) 4.dp else 0.dp
+        shadowElevation = 0.dp
     ) {
         Column {
             AnimatedContent(
@@ -102,10 +99,6 @@ fun HomeTopAppBar(
                         Spacer(modifier = Modifier.width(4.dp))
                         AppBarAction(onClick = onFilterClick) {
                             Icon(Icons.Default.Tune, contentDescription = "Filter", modifier = Modifier.size(21.dp))
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        AppBarAction(onClick = onSettingsClick) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", modifier = Modifier.size(21.dp))
                         }
                     }
                 }

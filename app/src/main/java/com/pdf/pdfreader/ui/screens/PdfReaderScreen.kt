@@ -521,50 +521,52 @@ fun PdfReaderScreen(
                                 if (selectedImage != null) {
                                     val pageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
                                     val pageLayout = pageLayouts.find { it.pageIndex == selectedImage.pageIndex }
-                                    if (pageLayout != null) {
-                                        val sigAnchorTop = pageLayout.offsetInViewport + selectedImage.position.y.toInt()
-                                        val sigW = selectedImage.width * selectedImage.scale
-                                        val sigH = selectedImage.height * selectedImage.scale
-                                        val sigAnchorCenterX = (selectedImage.position.x + sigW / 2f).toInt()
-                                        val sigAnchorBottom = sigAnchorTop + sigH.toInt()
-                                        val sigColor = selectedImage.signatureStrokes?.firstOrNull()?.let {
-                                            androidx.compose.ui.graphics.Color(it.color.toULong())
-                                        } ?: Color.Black
-                                        val sigStrokeWidth = selectedImage.signatureStrokes?.firstOrNull()?.strokeWidth ?: 5f
+                                    // Keep toolbar in composition even when pageLayout is null so that
+                                    // showThicknessPanel / showColorPanel state survives recompose cycles
+                                    // triggered by the async signature re-render. Use visible = false
+                                    // to hide it rather than removing it from the tree.
+                                    val sigW = selectedImage.width * selectedImage.scale
+                                    val sigH = selectedImage.height * selectedImage.scale
+                                    val sigAnchorTop = pageLayout?.let { it.offsetInViewport + selectedImage.position.y.toInt() } ?: 0
+                                    val sigAnchorBottom = sigAnchorTop + sigH.toInt()
+                                    val sigAnchorCenterX = (selectedImage.position.x + sigW / 2f).toInt()
+                                    val sigColor = selectedImage.signatureStrokes?.firstOrNull()?.let {
+                                        androidx.compose.ui.graphics.Color(it.color.toULong())
+                                    } ?: Color.Black
+                                    val sigStrokeWidth = selectedImage.signatureStrokes?.firstOrNull()?.strokeWidth ?: 5f
 
-                                        Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
-                                            com.pdf.pdfreader.ui.components.SignatureEditToolbar(
-                                                visible = true,
-                                                anchorCenterX = sigAnchorCenterX,
-                                                anchorTop = sigAnchorTop,
-                                                anchorBottom = sigAnchorBottom,
-                                                isLocked = selectedImage.isLocked,
-                                                opacity = selectedImage.opacity,
-                                                currentStrokeWidth = sigStrokeWidth,
-                                                currentColor = sigColor,
-                                                hasEditableStrokes = selectedImage.signatureStrokes != null,
-                                                onStrokeWidthChange = { newWidth ->
-                                                    editorViewModel.updateSignatureProperties(
-                                                        selectedImage.id,
-                                                        newStrokeWidth = newWidth
-                                                    )
-                                                },
-                                                onColorChange = { newColor ->
-                                                    editorViewModel.updateSignatureProperties(
-                                                        selectedImage.id,
-                                                        newColor = newColor
-                                                    )
-                                                },
-                                                onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
-                                                onRotateRight = { editorViewModel.rotateImage(selectedImage.id, 90f) },
-                                                onDelete = { editorViewModel.deleteImage(selectedImage.id) },
-                                                onDuplicate = { editorViewModel.duplicateImage(selectedImage.id) },
-                                                onBringToFront = { editorViewModel.bringToFront(selectedImage.id) },
-                                                onSendToBack = { editorViewModel.sendToBack(selectedImage.id) },
-                                                onToggleLock = { editorViewModel.toggleImageLock(selectedImage.id) },
-                                                onOpacityChange = { editorViewModel.setImageOpacity(selectedImage.id, it) }
-                                            )
-                                        }
+                                    Box(modifier = Modifier.fillMaxSize().zIndex(200f)) {
+                                        com.pdf.pdfreader.ui.components.SignatureEditToolbar(
+                                            visible = pageLayout != null,
+                                            anchorCenterX = sigAnchorCenterX,
+                                            anchorTop = sigAnchorTop,
+                                            anchorBottom = sigAnchorBottom,
+                                            isLocked = selectedImage.isLocked,
+                                            opacity = selectedImage.opacity,
+                                            currentStrokeWidth = sigStrokeWidth,
+                                            currentColor = sigColor,
+                                            hasEditableStrokes = selectedImage.signatureStrokes != null,
+                                            onStrokeWidthChange = { newWidth ->
+                                                editorViewModel.updateSignatureProperties(
+                                                    selectedImage.id,
+                                                    newStrokeWidth = newWidth
+                                                )
+                                            },
+                                            onColorChange = { newColor ->
+                                                editorViewModel.updateSignatureProperties(
+                                                    selectedImage.id,
+                                                    newColor = newColor
+                                                )
+                                            },
+                                            onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
+                                            onRotateRight = { editorViewModel.rotateImage(selectedImage.id, 90f) },
+                                            onDelete = { editorViewModel.deleteImage(selectedImage.id) },
+                                            onDuplicate = { editorViewModel.duplicateImage(selectedImage.id) },
+                                            onBringToFront = { editorViewModel.bringToFront(selectedImage.id) },
+                                            onSendToBack = { editorViewModel.sendToBack(selectedImage.id) },
+                                            onToggleLock = { editorViewModel.toggleImageLock(selectedImage.id) },
+                                            onOpacityChange = { editorViewModel.setImageOpacity(selectedImage.id, it) }
+                                        )
                                     }
                                 }
                             }

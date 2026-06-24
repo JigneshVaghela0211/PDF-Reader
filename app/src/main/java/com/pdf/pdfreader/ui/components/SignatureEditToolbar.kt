@@ -65,6 +65,12 @@ fun SignatureEditToolbar(
     var showColorPanel by remember { mutableStateOf(false) }
     var showOpacitySlider by remember { mutableStateOf(false) }
 
+    // Local slider state so the thumb moves immediately while dragging.
+    // The viewmodel re-render is triggered only on drag-end (onValueChangeFinished)
+    // so we don't launch dozens of heavy IO operations mid-drag.
+    var localStrokeWidth by remember(currentStrokeWidth) { mutableFloatStateOf(currentStrokeWidth) }
+    var localOpacity by remember(opacity) { mutableFloatStateOf(opacity) }
+
     val signatureColors = listOf(
         Color.Black,
         Color(0xFF1565C0), Color(0xFFD32F2F), Color(0xFF2E7D32),
@@ -167,19 +173,20 @@ fun SignatureEditToolbar(
             AnimatedVisibility(visible = showThicknessPanel) {
                 PanelSurface(maxWidth) {
                     Text(
-                        text = "${currentStrokeWidth.toInt()}px",
+                        text = "${localStrokeWidth.toInt()}px",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Slider(
-                        value = currentStrokeWidth,
-                        onValueChange = onStrokeWidthChange,
+                        value = localStrokeWidth,
+                        onValueChange = { localStrokeWidth = it },
+                        onValueChangeFinished = { onStrokeWidthChange(localStrokeWidth) },
                         valueRange = 2f..20f,
                         modifier = Modifier.width(150.dp),
                         colors = SliderDefaults.colors(thumbColor = currentColor, activeTrackColor = currentColor)
                     )
                     Canvas(modifier = Modifier.size(24.dp)) {
-                        drawCircle(color = currentColor, radius = currentStrokeWidth / 2f)
+                        drawCircle(color = currentColor, radius = localStrokeWidth / 2f)
                     }
                 }
             }
@@ -211,13 +218,14 @@ fun SignatureEditToolbar(
             AnimatedVisibility(visible = showOpacitySlider) {
                 PanelSurface(maxWidth) {
                     Text(
-                        text = "${(opacity * 100).toInt()}%",
+                        text = "${(localOpacity * 100).toInt()}%",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Slider(
-                        value = opacity,
-                        onValueChange = onOpacityChange,
+                        value = localOpacity,
+                        onValueChange = { localOpacity = it },
+                        onValueChangeFinished = { onOpacityChange(localOpacity) },
                         valueRange = 0.1f..1f,
                         modifier = Modifier.width(150.dp),
                         colors = SliderDefaults.colors(

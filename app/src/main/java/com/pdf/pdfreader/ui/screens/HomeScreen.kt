@@ -12,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -38,7 +37,6 @@ fun HomeScreen(
     var isSearchExpanded by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showFilterSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -96,7 +94,6 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             HomeTopAppBar(
                 isSearchExpanded = isSearchExpanded,
@@ -104,11 +101,9 @@ fun HomeScreen(
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
                 onSearchToggle = { isSearchExpanded = it },
                 onFilterClick = { showFilterSheet = true },
-                onSettingsClick = onNavigateToSettings,
                 viewMode = uiState.viewMode,
                 fileCount = uiState.filteredFiles.size,
-                onViewModeChange = { viewModel.onViewModeChange(it) },
-                scrollBehavior = scrollBehavior
+                onViewModeChange = { viewModel.onViewModeChange(it) }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
