@@ -782,7 +782,12 @@ class PdfEditorViewModel @Inject constructor(
                 if (command.before == null) _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.after.id }) }
                 else { val n = stateToTextNote(command.before, command.pageIndex); _uiState.update { s -> s.copy(annotations = s.annotations.map { if (it.id == n.id) n else it }) } }
             }
-            is AnnotationCommand.EditTextCommand -> _uiState.update { s -> s.copy(editedTextBlocks = s.editedTextBlocks.filter { it.originalBlock.id != command.after.blockId }) }
+            is AnnotationCommand.EditTextCommand -> _uiState.update { s ->
+                // If the block was edited for the first time, undo removes the edit.
+                // If it was re-edited (before != null), undo restores the previous edit.
+                val restored = command.before?.let { editedBlockFromState(it) }
+                s.copy(editedTextBlocks = applyEditedBlock(s.editedTextBlocks, command.after.blockId, restored))
+            }
             is AnnotationCommand.MoveImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.beforeX, command.beforeY)) else it }) }
             is AnnotationCommand.ResizeImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.beforeX, command.beforeY), width = command.beforeWidth, height = command.beforeHeight) else it }) }
             is AnnotationCommand.RotateImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(rotation = command.beforeRotation) else it }) }
@@ -803,7 +808,10 @@ class PdfEditorViewModel @Inject constructor(
             is AnnotationCommand.RemoveAnnotation -> _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.annotationId }) }
             is AnnotationCommand.UpdateAnnotation -> { val snap = CommandSerializer.deserializeSnapshot(command.newPayload); snapshotToAnnotation(snap)?.let { na -> _uiState.update { s -> s.copy(annotations = s.annotations.map { if (it.id == command.annotationId) na else it }) } } }
             is AnnotationCommand.TextCommand -> { val n = stateToTextNote(command.after, command.pageIndex); _uiState.update { s -> val ex = s.annotations.find { it.id == n.id }; if (ex != null) s.copy(annotations = s.annotations.map { if (it.id == n.id) n else it }) else s.copy(annotations = s.annotations + n) } }
-            is AnnotationCommand.EditTextCommand -> { /* redo text edit — restore after state */ }
+            is AnnotationCommand.EditTextCommand -> _uiState.update { s ->
+                val restored = editedBlockFromState(command.after)
+                s.copy(editedTextBlocks = applyEditedBlock(s.editedTextBlocks, command.after.blockId, restored))
+            }
             is AnnotationCommand.MoveImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.afterX, command.afterY)) else it }) }
             is AnnotationCommand.ResizeImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.afterX, command.afterY), width = command.afterWidth, height = command.afterHeight) else it }) }
             is AnnotationCommand.RotateImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(rotation = command.afterRotation) else it }) }
@@ -815,6 +823,47 @@ class PdfEditorViewModel @Inject constructor(
             is AnnotationCommand.CompositeCommand -> command.commands.forEach { applyRedoCommand(it) }
             else -> {}
         }
+    }
+
+    /**
+     * Inserts/replaces (or removes when [edited] is null) the edited block for [blockId]
+     * in the current list, preserving order.
+     */
+    private fun applyEditedBlock(
+        current: List<EditedTextBlock>,
+        blockId: String,
+        edited: EditedTextBlock?
+    ): List<EditedTextBlock> {
+        val without = current.filter { it.originalBlock.id != blockId }
+        return if (edited == null) without else without + edited
+    }
+
+    /**
+     * Reconstructs an [EditedTextBlock] from a persisted [EditTextState]. Uses the live
+     * [TextBlock] from state when available (richer metadata: font, words, page size),
+     * otherwise rebuilds a minimal block from the state geometry.
+     */
+    private fun editedBlockFromState(state: AnnotationCommand.EditTextState): EditedTextBlock {
+        val originalBlock = _uiState.value.textBlocks.values.flatten()
+            .find { it.id == state.blockId }
+            ?: TextBlock(
+                id = state.blockId,
+                pageIndex = 0,
+                text = state.originalText,
+                x = state.x, y = state.y, width = state.width, height = state.height,
+                fontSize = state.originalFontSize
+            )
+        val alignment = runCatching { TextAlignment.valueOf(state.alignment) }
+            .getOrDefault(TextAlignment.LEFT)
+        return EditedTextBlock(
+            originalBlock = originalBlock,
+            newText = state.newText,
+            newFontSize = state.newFontSize,
+            newColor = Color(state.newColor.toULong()),
+            opacity = state.opacity,
+            isLocked = state.isLocked,
+            alignment = alignment
+        )
     }
 
     // ─── Export ───────────────────────────────────────────────────

@@ -163,10 +163,8 @@ fun TextEditOverlay(
                         width = with(density) { rectW.toDp() },
                         height = with(density) { rectH.toDp() }
                     )
-                    // White background to hide original PDF text underneath
-                    // NO border — this should look like the text was modified in-place,
-                    // not like a new element was added on top.
-                    .background(Color.White)
+                    // No white masking: the real text is replaced in the content stream on
+                    // export. This is only an in-editor preview of the new text.
                     .graphicsLayer { this.alpha = alpha }
                     .padding(1.dp)
             ) {

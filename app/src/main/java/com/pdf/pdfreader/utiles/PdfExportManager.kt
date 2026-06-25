@@ -8,7 +8,6 @@ import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.ImageElement
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
-import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import kotlinx.coroutines.Dispatchers
@@ -20,10 +19,12 @@ import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
 /**
- * Exports the edited PDF by merging text and image overlays onto the original PDF.
+ * Exports the edited PDF by applying text edits and image inserts to the original PDF.
  *
  * Strategy:
- * - Text edits: Draw white rectangle over original text area, then draw new text on top
+ * - Text edits: real content-stream modification via [PdfTextReplacementEngine] — the actual
+ *   PDF text object is replaced (no white box, no overlay). See that class for the tiered
+ *   font-preservation strategy.
  * - Image inserts: Convert URI → bitmap → PDImageXObject, draw at specified position with rotation
  * - Saves as a NEW file: `<original_name>_edited.pdf` (never modifies the original)
  * - Memory-safe: Processes one page at a time, recycles bitmaps immediately
@@ -35,6 +36,9 @@ class PdfExportManager @Inject constructor() {
         private const val TAG = "PdfExportManager"
         private const val MAX_IMAGE_DIMENSION = 2048
     }
+
+    private val textReplacementEngine = PdfTextReplacementEngine()
+    private val saveManager = PdfSaveManager()
 
     /**
      * Export the edited PDF.
@@ -60,8 +64,7 @@ class PdfExportManager @Inject constructor() {
                 return@withContext null
             }
 
-            // Generate output path
-            val outputPath = generateOutputPath(originalPath)
+            val outputPath = saveManager.outputPathFor(originalPath)
             Log.d(TAG, "Exporting to: $outputPath")
 
             PDDocument.load(originalFile).use { document ->
@@ -82,20 +85,26 @@ class PdfExportManager @Inject constructor() {
                     val pdfHeight = cropBox.height
                     val scaleX = pdfWidth / viewWidth.toFloat()
 
-                    PDPageContentStream(
-                        document, page,
-                        PDPageContentStream.AppendMode.APPEND, true, true
-                    ).use { cs ->
-                        // ─── Process Text Edits ─────────────────────────
-                        textEditsByPage[pageIdx]?.forEach { editedBlock ->
-                            coroutineContext.ensureActive()
-                            drawTextEdit(cs, editedBlock, pdfWidth, pdfHeight)
-                        }
+                    // ─── Real text replacement (modifies the content stream) ──
+                    // Must run before opening the APPEND stream for images, since
+                    // replacing text calls page.setContents(), which would otherwise
+                    // drop any appended image content.
+                    textEditsByPage[pageIdx]?.forEach { editedBlock ->
+                        coroutineContext.ensureActive()
+                        textReplacementEngine.replaceText(document, pageIdx, editedBlock)
+                    }
 
-                        // ─── Process Image Inserts ──────────────────────
-                        imagesByPage[pageIdx]?.forEach { imageElement ->
-                            coroutineContext.ensureActive()
-                            drawImage(context, document, cs, imageElement, pdfWidth, pdfHeight, scaleX)
+                    // ─── Image inserts (appended overlay content) ─────────────
+                    val pageImages = imagesByPage[pageIdx]
+                    if (!pageImages.isNullOrEmpty()) {
+                        PDPageContentStream(
+                            document, page,
+                            PDPageContentStream.AppendMode.APPEND, true, true
+                        ).use { cs ->
+                            pageImages.forEach { imageElement ->
+                                coroutineContext.ensureActive()
+                                drawImage(context, document, cs, imageElement, pdfWidth, pdfHeight, scaleX)
+                            }
                         }
                     }
                 }
@@ -110,70 +119,6 @@ class PdfExportManager @Inject constructor() {
             Log.e(TAG, "Export failed", e)
             null
         }
-    }
-
-    /**
-     * Draw a text edit onto the PDF page:
-     * 1. Draw white rectangle to hide original text
-     * 2. Draw new text on top
-     */
-    private fun drawTextEdit(
-        cs: PDPageContentStream,
-        editedBlock: EditedTextBlock,
-        pdfWidth: Float,
-        pdfHeight: Float
-    ) {
-        val block = editedBlock.originalBlock
-
-        // Calculate PDF coordinates (PDF origin is bottom-left)
-        val rectX = block.x * pdfWidth
-        val rectY = pdfHeight - (block.y * pdfHeight) - (block.height * pdfHeight)
-        val rectW = block.width * pdfWidth
-        val rectH = block.height * pdfHeight
-
-        // Step 1: Draw white rectangle to cover original text
-        cs.saveGraphicsState()
-        cs.setNonStrokingColor(255, 255, 255)
-        cs.addRect(rectX - 1f, rectY - 1f, rectW + 2f, rectH + 2f)
-        cs.fill()
-        cs.restoreGraphicsState()
-
-        // Step 2: Draw new text
-        val color = editedBlock.newColor
-        val fontSize = editedBlock.newFontSize
-
-        cs.beginText()
-        cs.setNonStrokingColor(
-            (color.red * 255).toInt(),
-            (color.green * 255).toInt(),
-            (color.blue * 255).toInt()
-        )
-
-        // Use closest available standard font
-        val font = PDType1Font.HELVETICA
-        cs.setFont(font, fontSize)
-
-        // Position text at the top-left of the original block area
-        // Adjust for baseline (font ascent)
-        val textY = rectY + rectH - fontSize
-        cs.newLineAtOffset(rectX, textY)
-
-        // Handle multi-line text
-        val lines = editedBlock.newText.split("\n")
-        for ((lineIdx, line) in lines.withIndex()) {
-            if (lineIdx > 0) {
-                cs.newLineAtOffset(0f, -fontSize * 1.2f)
-            }
-            try {
-                cs.showText(line)
-            } catch (e: Exception) {
-                // Some characters might not be supported by Type1 font
-                Log.w(TAG, "Failed to render text line: '$line'", e)
-                val sanitized = line.replace(Regex("[^\\x20-\\x7E]"), "?")
-                try { cs.showText(sanitized) } catch (_: Exception) {}
-            }
-        }
-        cs.endText()
     }
 
     /**
@@ -276,15 +221,5 @@ class PdfExportManager @Inject constructor() {
             }
         }
         return sampleSize
-    }
-
-    /**
-     * Generate output file path: `<name>_edited.pdf`
-     */
-    private fun generateOutputPath(originalPath: String): String {
-        val file = File(originalPath)
-        val name = file.nameWithoutExtension
-        val parent = file.parentFile?.absolutePath ?: file.absolutePath
-        return "$parent/${name}_edited.pdf"
     }
 }
