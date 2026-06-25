@@ -1,6 +1,7 @@
 package com.pdf.pdfreader.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -113,21 +114,28 @@ fun ViewOptionsSheet(
                 onCheckedChange = { onSettingsChange(viewSettings.copy(keepScreenOn = it)) }
             )
 
-            Spacer(Modifier.height(24.dp))
-
             // ─── Manage Pages ────────────────────────────
-            Button(
-                onClick = { onDismiss(); onManagePages() },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                )
-            ) {
-                Icon(Icons.Default.AutoStories, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Manage Pages", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            // Only offered when at least one page-management feature is available.
+            val pageManagementAvailable = PdfEditorFeatureConfig.ENABLE_ROTATE_PAGE ||
+                PdfEditorFeatureConfig.ENABLE_EXTRACT_PAGE ||
+                PdfEditorFeatureConfig.ENABLE_DELETE_PAGE ||
+                PdfEditorFeatureConfig.ENABLE_INSERT_PAGE ||
+                PdfEditorFeatureConfig.ENABLE_REORDER_PAGE
+            if (pageManagementAvailable) {
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = { onDismiss(); onManagePages() },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                ) {
+                    Icon(Icons.Default.AutoStories, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Manage Pages", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                }
             }
         }
     }

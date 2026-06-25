@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
 import com.pdf.pdfreader.ui.viewmodel.ManagePagesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,37 +95,44 @@ fun ManagePagesScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        ActionItem(
-                            icon = Icons.Default.RotateRight,
-                            label = "Rotate",
-                            onClick = {
-                                viewModel.rotateSelectedPages(90) { success ->
-                                    if (success) Toast.makeText(context, "Pages rotated", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
-                        ActionItem(
-                            icon = Icons.Default.FileDownload,
-                            label = "Extract",
-                            onClick = {
-                                val downloadsStr = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath
-                                viewModel.extractSelectedPages(downloadsStr) { path ->
-                                    if (path != null) {
-                                        Toast.makeText(context, "Extracted to Downloads", Toast.LENGTH_LONG).show()
+                        // Page-management actions are gated by PdfEditorFeatureConfig.
+                        if (PdfEditorFeatureConfig.ENABLE_ROTATE_PAGE) {
+                            ActionItem(
+                                icon = Icons.Default.RotateRight,
+                                label = "Rotate",
+                                onClick = {
+                                    viewModel.rotateSelectedPages(90) { success ->
+                                        if (success) Toast.makeText(context, "Pages rotated", Toast.LENGTH_SHORT).show()
                                     }
                                 }
-                            }
-                        )
-                        ActionItem(
-                            icon = Icons.Default.Delete,
-                            label = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
-                            onClick = {
-                                viewModel.deleteSelectedPages { success ->
-                                    if (success) Toast.makeText(context, "Pages deleted", Toast.LENGTH_SHORT).show()
+                            )
+                        }
+                        if (PdfEditorFeatureConfig.ENABLE_EXTRACT_PAGE) {
+                            ActionItem(
+                                icon = Icons.Default.FileDownload,
+                                label = "Extract",
+                                onClick = {
+                                    val downloadsStr = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath
+                                    viewModel.extractSelectedPages(downloadsStr) { path ->
+                                        if (path != null) {
+                                            Toast.makeText(context, "Extracted to Downloads", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
+                        if (PdfEditorFeatureConfig.ENABLE_DELETE_PAGE) {
+                            ActionItem(
+                                icon = Icons.Default.Delete,
+                                label = "Delete",
+                                tint = MaterialTheme.colorScheme.error,
+                                onClick = {
+                                    viewModel.deleteSelectedPages { success ->
+                                        if (success) Toast.makeText(context, "Pages deleted", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }

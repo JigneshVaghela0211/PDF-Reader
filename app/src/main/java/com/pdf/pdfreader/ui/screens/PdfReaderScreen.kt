@@ -276,8 +276,10 @@ fun PdfReaderScreen(
                             }
                         },
                         actions = {
-                            IconButton(onClick = viewModel::toggleSearch) {
-                                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
+                            if (com.pdf.pdfreader.core.config.PdfEditorFeatureConfig.ENABLE_SEARCH) {
+                                IconButton(onClick = viewModel::toggleSearch) {
+                                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
+                                }
                             }
                             IconButton(onClick = { showViewOptions = true }) {
                                 Icon(Icons.Default.Tune, contentDescription = "View Options")

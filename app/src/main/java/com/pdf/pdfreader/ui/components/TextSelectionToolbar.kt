@@ -24,6 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pdf.pdfreader.core.model.EditorFeature
+import com.pdf.pdfreader.core.model.FeatureBadge
+import com.pdf.pdfreader.presentation.editor.ToolbarFeatureProvider
 
 private val ToolbarBg = Color(0xFF1C1B1F)
 private val ToolbarDivider = Color(0xFF444444)
@@ -56,20 +59,32 @@ fun TextSelectionToolbar(
                 .background(ToolbarBg, RoundedCornerShape(14.dp))
                 .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
+            // Visibility/availability of each action is governed by PdfEditorFeatureConfig;
+            // DISABLED actions are dropped here so dividers never bracket an empty slot.
+            val actions = listOf(
+                SelectionEntry(EditorFeature.COPY_TEXT, Icons.Default.ContentCopy, "Copy", onCopy),
+                SelectionEntry(EditorFeature.EDIT_TEXT, Icons.Default.Edit, "Edit", onEdit),
+                SelectionEntry(EditorFeature.HIGHLIGHT, Icons.Default.Highlight, "Highlight", onHighlight, Color(0xFFFFD54A)),
+                SelectionEntry(EditorFeature.UNDERLINE, Icons.Default.FormatUnderlined, "Underline", onUnderline),
+                SelectionEntry(EditorFeature.STRIKETHROUGH, Icons.Default.FormatStrikethrough, "Strike", onStrikethrough),
+            ).map { it to ToolbarFeatureProvider.uiModel(it.feature) }
+                .filter { (_, model) -> model.visible }
+
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SelectionAction(Icons.Default.ContentCopy, "Copy", onCopy)
-                SelectionDivider()
-                SelectionAction(Icons.Default.Edit, "Edit", onEdit)
-                SelectionDivider()
-                SelectionAction(Icons.Default.Highlight, "Highlight", onHighlight, tint = Color(0xFFFFD54A))
-                SelectionDivider()
-                SelectionAction(Icons.Default.FormatUnderlined, "Underline", onUnderline)
-                SelectionDivider()
-                SelectionAction(Icons.Default.FormatStrikethrough, "Strike", onStrikethrough)
+                actions.forEachIndexed { index, (entry, model) ->
+                    if (index > 0) SelectionDivider()
+                    SelectionAction(
+                        icon = entry.icon,
+                        label = entry.label,
+                        onClick = { if (model.interactive) entry.onClick() },
+                        tint = entry.tint,
+                        badge = model.badge
+                    )
+                }
             }
         }
     }
@@ -85,35 +100,48 @@ private fun SelectionDivider() {
     )
 }
 
+/** One configurable entry in the selection toolbar. */
+private data class SelectionEntry(
+    val feature: EditorFeature,
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit,
+    val tint: Color = ToolbarText
+)
+
 @Composable
 private fun SelectionAction(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
-    tint: Color = ToolbarText
+    tint: Color = ToolbarText,
+    badge: FeatureBadge = FeatureBadge.NONE
 ) {
-    Surface(
-        onClick = onClick,
-        color = Color.Transparent,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+    Box {
+        Surface(
+            onClick = onClick,
+            color = Color.Transparent,
+            shape = RoundedCornerShape(8.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(19.dp),
-                tint = tint
-            )
-            Text(
-                text = label,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
-                color = ToolbarText
-            )
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    modifier = Modifier.size(19.dp),
+                    tint = tint
+                )
+                Text(
+                    text = label,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ToolbarText
+                )
+            }
         }
+        FeatureBadgeDecoration(badge)
     }
 }

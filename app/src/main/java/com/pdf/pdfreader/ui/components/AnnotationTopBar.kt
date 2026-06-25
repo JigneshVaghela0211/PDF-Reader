@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pdf.pdfreader.core.model.EditorFeature
+import com.pdf.pdfreader.presentation.editor.ToolbarFeatureProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,17 +191,18 @@ fun AnnotationToolButtons(
     onToolChange: (AnnotationTool) -> Unit,
     onSignatureClick: () -> Unit
 ) {
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE else AnnotationTool.PEN) }) {
-        Icon(Icons.Default.Brush, contentDescription = "Pen", tint = if (currentTool == AnnotationTool.PEN) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    // Availability for every tool comes from PdfEditorFeatureConfig via the provider.
+    FeatureIconButton(EditorFeature.FREEHAND_DRAWING, Icons.Default.Brush, "Pen", currentTool == AnnotationTool.PEN) {
+        onToolChange(if (currentTool == AnnotationTool.PEN) AnnotationTool.NONE else AnnotationTool.PEN)
     }
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.HIGHLIGHTER) AnnotationTool.NONE else AnnotationTool.HIGHLIGHTER) }) {
-        Icon(Icons.Default.Highlight, contentDescription = "Highlighter", tint = if (currentTool == AnnotationTool.HIGHLIGHTER) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.HIGHLIGHT, Icons.Default.Highlight, "Highlighter", currentTool == AnnotationTool.HIGHLIGHTER) {
+        onToolChange(if (currentTool == AnnotationTool.HIGHLIGHTER) AnnotationTool.NONE else AnnotationTool.HIGHLIGHTER)
     }
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.TEXT) AnnotationTool.NONE else AnnotationTool.TEXT) }) {
-        Icon(Icons.Default.TextFields, contentDescription = "Text Note", tint = if (currentTool == AnnotationTool.TEXT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.ADD_TEXT, Icons.Default.TextFields, "Text Note", currentTool == AnnotationTool.TEXT) {
+        onToolChange(if (currentTool == AnnotationTool.TEXT) AnnotationTool.NONE else AnnotationTool.TEXT)
     }
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.ERASER) AnnotationTool.NONE else AnnotationTool.ERASER) }) {
-        Icon(Icons.Default.CleaningServices, contentDescription = "Eraser", tint = if (currentTool == AnnotationTool.ERASER) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.ERASER, Icons.Default.CleaningServices, "Eraser", currentTool == AnnotationTool.ERASER) {
+        onToolChange(if (currentTool == AnnotationTool.ERASER) AnnotationTool.NONE else AnnotationTool.ERASER)
     }
     // Vertical divider between annotation tools and editor tools
     Spacer(modifier = Modifier.width(2.dp))
@@ -211,16 +214,43 @@ fun AnnotationToolButtons(
     )
     Spacer(modifier = Modifier.width(2.dp))
     // Edit existing text
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.EDIT_TEXT) AnnotationTool.NONE else AnnotationTool.EDIT_TEXT) }) {
-        Icon(Icons.Default.EditNote, contentDescription = "Edit Text", tint = if (currentTool == AnnotationTool.EDIT_TEXT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.EDIT_TEXT, Icons.Default.EditNote, "Edit Text", currentTool == AnnotationTool.EDIT_TEXT) {
+        onToolChange(if (currentTool == AnnotationTool.EDIT_TEXT) AnnotationTool.NONE else AnnotationTool.EDIT_TEXT)
     }
     // Insert image
-    IconButton(onClick = { onToolChange(if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE else AnnotationTool.INSERT_IMAGE) }) {
-        Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Insert Image", tint = if (currentTool == AnnotationTool.INSERT_IMAGE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.INSERT_IMAGE, Icons.Default.AddPhotoAlternate, "Insert Image", currentTool == AnnotationTool.INSERT_IMAGE) {
+        onToolChange(if (currentTool == AnnotationTool.INSERT_IMAGE) AnnotationTool.NONE else AnnotationTool.INSERT_IMAGE)
     }
     // Signature
-    IconButton(onClick = onSignatureClick) {
-        Icon(androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_edit), contentDescription = "Signature", tint = MaterialTheme.colorScheme.onSurface)
+    FeatureIconButton(EditorFeature.SIGNATURE, Icons.Default.Draw, "Signature", active = false, onActivate = onSignatureClick)
+}
+
+/**
+ * Top-bar icon button gated by [PdfEditorFeatureConfig] via [ToolbarFeatureProvider].
+ * Hidden when DISABLED; badged + non-interactive for COMING_SOON / PREMIUM.
+ */
+@Composable
+private fun FeatureIconButton(
+    feature: EditorFeature,
+    icon: ImageVector,
+    description: String,
+    active: Boolean,
+    onActivate: () -> Unit
+) {
+    val model = remember(feature) { ToolbarFeatureProvider.uiModel(feature) }
+    if (!model.visible) return
+    Box {
+        IconButton(
+            onClick = { if (model.interactive) onActivate() },
+            enabled = model.interactive
+        ) {
+            Icon(
+                icon,
+                contentDescription = description,
+                tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+        FeatureBadgeDecoration(model.badge)
     }
 }
 

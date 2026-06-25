@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
+import com.pdf.pdfreader.core.model.EditorFeature
 import com.pdf.pdfreader.data.local.CommandSerializer
 import com.pdf.pdfreader.domain.model.*
 import com.pdf.pdfreader.domain.usecase.UndoRedoManager
@@ -105,7 +107,24 @@ class PdfEditorViewModel @Inject constructor(
 
     // ─── Edit Mode & Tool State ──────────────────────────────────
 
-    fun setEditMode(isEditMode: Boolean) { _uiState.update { it.copy(isEditMode = isEditMode) } }
+    fun setEditMode(isEditMode: Boolean) {
+        _uiState.update {
+            if (isEditMode) {
+                it.copy(isEditMode = true)
+            } else {
+                // Exiting edit mode: reset the active tool so overlay-based tools like
+                // EDIT_TEXT (which highlights every text block in light yellow) stop
+                // rendering, and clear any in-progress selections.
+                it.copy(
+                    isEditMode = false,
+                    currentTool = AnnotationTool.NONE,
+                    selectedTextBlockId = null,
+                    selectedImageId = null,
+                    selectedImageIds = emptySet()
+                )
+            }
+        }
+    }
     fun setAnnotationTool(tool: AnnotationTool) { _uiState.update { it.copy(currentTool = tool) } }
     fun setAnnotationColor(color: Color) { _uiState.update { it.copy(currentColor = color) } }
     fun setAnnotationStrokeWidth(width: Float) { _uiState.update { it.copy(currentStrokeWidth = width) } }
@@ -296,6 +315,7 @@ class PdfEditorViewModel @Inject constructor(
     fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
 
     fun copySelectedText(context: android.content.Context) {
+        if (!PdfEditorFeatureConfig.ENABLE_COPY_TEXT) return
         val sel = _uiState.value.textSelection ?: return
         val text = sel.selectedWords.joinToString(" ") { it.text }
         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -304,6 +324,7 @@ class PdfEditorViewModel @Inject constructor(
     }
 
     fun editSelectedText() {
+        if (!PdfEditorFeatureConfig.ENABLE_EDIT_TEXT) return
         val sel = _uiState.value.textSelection ?: return
         val words = sel.selectedWords
         if (words.isEmpty()) return
@@ -322,6 +343,12 @@ class PdfEditorViewModel @Inject constructor(
     }
 
     fun annotateSelectedText(type: PdfAnnotation.MarkupType) {
+        val markupFeature = when (type) {
+            PdfAnnotation.MarkupType.HIGHLIGHT -> EditorFeature.HIGHLIGHT
+            PdfAnnotation.MarkupType.UNDERLINE -> EditorFeature.UNDERLINE
+            PdfAnnotation.MarkupType.STRIKETHROUGH -> EditorFeature.STRIKETHROUGH
+        }
+        if (!PdfEditorFeatureConfig.isEnabled(markupFeature)) return
         val sel = _uiState.value.textSelection ?: return
         val rects = sel.selectedWords.map { w ->
             androidx.compose.ui.geometry.Rect(w.x, w.y, w.x + w.width, w.y + w.height)
@@ -365,6 +392,7 @@ class PdfEditorViewModel @Inject constructor(
     }
 
     fun insertSignatureAsImage(uri: String) {
+        if (!PdfEditorFeatureConfig.ENABLE_SIGNATURE) return
         viewModelScope.launch {
             // If editable stroke data was persisted for this signature, insert it as an
             // editable signature (thickness / colour can be changed). Otherwise fall back
@@ -433,6 +461,7 @@ class PdfEditorViewModel @Inject constructor(
     // ─── Image Element Operations ────────────────────────────────
 
     fun addImage(uri: Uri, pageIndex: Int, viewWidth: Int) {
+        if (!PdfEditorFeatureConfig.ENABLE_INSERT_IMAGE) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val inputStream = getApplication<Application>().contentResolver.openInputStream(uri)
