@@ -224,3 +224,24 @@ This document breaks down the systematic architectural upgrades made across the 
 ### Verification:
 - `./gradlew assembleDebug` → BUILD SUCCESSFUL
 - Device smoke-test recommended: long-press a word selects only that word; drag start/end handles to expand across words/lines; copy + markup actions.
+
+---
+
+## Phase: Extract word-selection helpers into `selection/` package
+
+Followed Option 1 (improve, don't rebuild). The existing `PdfEditorViewModel`, `TextSelectionOverlay`, `TextSelectionToolbar`, `PdfEditorFeatureConfig`, and `PDAnnotationTextMarkup` engine all stay. Logic that had accumulated in the ViewModel/overlay was moved into small single-responsibility helpers; nothing was duplicated.
+
+New package `com.pdf.pdfreader.selection`:
+- `model/PdfSelectableWord.kt` — **typealias for the existing `TextWord`** (deliberately not a parallel model — the extractor and markup engine already use `TextWord`).
+- `model/PdfSelectionRange.kt` — immutable selection value object (startWord, endWord, words, bounds).
+- `hit/PdfWordHitTester.kt` — pure touch→single-word hit test (relocated from `utiles/`).
+- `range/PdfSelectionRangeManager.kt` — pure range + bounds math: `single` / `between` / `of` (replaces the short-lived `domain/usecase/SelectionRangeUseCase`).
+- `clipboard/PdfClipboardManager.kt` — builds clipboard text from selected words (moved out of the ViewModel).
+
+ViewModel cleanup (`PdfEditorViewModel`): injects `PdfSelectionRangeManager` + `PdfClipboardManager`; `startTextSelection` / `moveSelectionStart` / `moveSelectionEnd` / `selectAllText` / `finalizeTextSelection` now just map a `PdfSelectionRange` onto the existing `TextSelectionState` via one private `applyRange`; `copySelectedText` delegates to the clipboard manager. No coordinate/word-search/range math remains in the ViewModel.
+
+`TextSelectionOverlay` only changed its `PdfWordHitTester` import. Deleted: `utiles/PdfWordHitTester.kt`, `domain/usecase/SelectionRangeUseCase.kt`.
+
+### Verification:
+- `./gradlew assembleDebug` → BUILD SUCCESSFUL
+- Device smoke-test: long-press a word selects only that word; drag start/end handles to expand; Copy/Highlight/Underline/Strikethrough act on the selected words only.

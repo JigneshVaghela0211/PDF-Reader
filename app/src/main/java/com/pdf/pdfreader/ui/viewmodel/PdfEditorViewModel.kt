@@ -72,7 +72,8 @@ class PdfEditorViewModel @Inject constructor(
     private val textBlockExtractor: PdfTextBlockExtractor,
     private val pdfExportManager: PdfExportManager,
     private val signatureManager: com.pdf.pdfreader.domain.repository.SignatureManager,
-    private val selectionRange: com.pdf.pdfreader.domain.usecase.SelectionRangeUseCase
+    private val selectionRangeManager: com.pdf.pdfreader.selection.range.PdfSelectionRangeManager,
+    private val clipboardManager: com.pdf.pdfreader.selection.clipboard.PdfClipboardManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -290,23 +291,11 @@ class PdfEditorViewModel @Inject constructor(
     // ─── Text Selection ──────────────────────────────────────────
 
     /**
-     * Begin a selection from a long-press on a single [word]. Both handles anchor to that word, and
-     * its bounds are computed immediately so the start/end handles render right away.
+     * Begin a selection from a long-press on a single [word]. Both handles anchor to that word so
+     * they render immediately. Range math lives in [selectionRangeManager].
      */
     fun startTextSelection(pageIndex: Int, word: TextWord, allWords: List<TextWord>) {
-        val words = listOf(word)
-        _uiState.update { state ->
-            state.copy(
-                interactionMode = InteractionMode.SELECT_TEXT,
-                textSelection = TextSelectionState(
-                    pageIndex = pageIndex,
-                    selectedWords = words,
-                    bounds = selectionRange.boundsOf(words),
-                    startWord = word,
-                    endWord = word
-                )
-            )
-        }
+        applyRange(pageIndex, selectionRangeManager.single(word), enterSelectMode = true)
     }
 
     /** Drag the start handle: move the start anchor to [word], keeping the end anchor fixed. */
@@ -314,7 +303,7 @@ class PdfEditorViewModel @Inject constructor(
         val sel = _uiState.value.textSelection ?: return
         if (sel.pageIndex != pageIndex) return
         val anchor = sel.endWord ?: sel.selectedWords.lastOrNull() ?: return
-        applyRange(sel, allWords, newStart = word, newEnd = anchor)
+        applyRange(pageIndex, selectionRangeManager.between(allWords, word, anchor))
     }
 
     /** Drag the end handle: move the end anchor to [word], keeping the start anchor fixed. */
@@ -322,25 +311,25 @@ class PdfEditorViewModel @Inject constructor(
         val sel = _uiState.value.textSelection ?: return
         if (sel.pageIndex != pageIndex) return
         val anchor = sel.startWord ?: sel.selectedWords.firstOrNull() ?: return
-        applyRange(sel, allWords, newStart = anchor, newEnd = word)
+        applyRange(pageIndex, selectionRangeManager.between(allWords, anchor, word))
     }
 
+    /** Map a computed [PdfSelectionRange] onto the existing [TextSelectionState] UI contract. */
     private fun applyRange(
-        sel: TextSelectionState,
-        allWords: List<TextWord>,
-        newStart: TextWord,
-        newEnd: TextWord
+        pageIndex: Int,
+        range: com.pdf.pdfreader.selection.model.PdfSelectionRange?,
+        enterSelectMode: Boolean = false
     ) {
-        val range = selectionRange.rangeBetween(allWords, newStart, newEnd)
-        if (range.isEmpty()) return
-        // range is in reading order; first/last become the actual start/end anchors.
-        _uiState.update {
-            it.copy(
-                textSelection = sel.copy(
-                    selectedWords = range,
-                    bounds = selectionRange.boundsOf(range),
-                    startWord = range.first(),
-                    endWord = range.last()
+        if (range == null) return
+        _uiState.update { state ->
+            state.copy(
+                interactionMode = if (enterSelectMode) InteractionMode.SELECT_TEXT else state.interactionMode,
+                textSelection = TextSelectionState(
+                    pageIndex = pageIndex,
+                    selectedWords = range.words,
+                    bounds = range.bounds,
+                    startWord = range.startWord,
+                    endWord = range.endWord
                 )
             )
         }
@@ -349,7 +338,7 @@ class PdfEditorViewModel @Inject constructor(
     fun finalizeTextSelection() {
         val sel = _uiState.value.textSelection ?: return
         if (sel.selectedWords.isEmpty()) { clearTextSelection(); return }
-        _uiState.update { it.copy(textSelection = sel.copy(bounds = selectionRange.boundsOf(sel.selectedWords))) }
+        applyRange(sel.pageIndex, selectionRangeManager.of(sel.selectedWords))
     }
 
     fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
@@ -364,18 +353,7 @@ class PdfEditorViewModel @Inject constructor(
             .flatMap { it.words }
             .sortedWith(compareBy({ it.y }, { it.x }))
         if (pageWords.isEmpty()) return
-        _uiState.update {
-            it.copy(
-                interactionMode = InteractionMode.SELECT_TEXT,
-                textSelection = TextSelectionState(
-                    pageIndex = sel.pageIndex,
-                    selectedWords = pageWords,
-                    bounds = selectionRange.boundsOf(pageWords),
-                    startWord = pageWords.first(),
-                    endWord = pageWords.last()
-                )
-            )
-        }
+        applyRange(sel.pageIndex, selectionRangeManager.of(pageWords), enterSelectMode = true)
     }
 
     /**
@@ -386,22 +364,9 @@ class PdfEditorViewModel @Inject constructor(
     fun copySelectedText(context: android.content.Context): Boolean {
         if (!PdfEditorFeatureConfig.ENABLE_COPY_TEXT) return false
         val words = _uiState.value.textSelection?.selectedWords ?: return false
-        if (words.isEmpty()) return false
-
-        val sb = StringBuilder()
-        var prev: TextWord? = null
-        for (w in words) {
-            prev?.let { sb.append(if (w.y - it.y > it.height * 0.6f) "\n" else " ") }
-            sb.append(w.text)
-            prev = w
-        }
-        val text = sb.toString()
-        if (text.isBlank()) return false
-
-        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("PDF Text", text))
-        clearTextSelection()
-        return true
+        val copied = clipboardManager.copy(context, words)
+        if (copied) clearTextSelection()
+        return copied
     }
 
     fun editSelectedText() {

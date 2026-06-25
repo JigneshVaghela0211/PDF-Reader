@@ -16,7 +16,7 @@ import com.pdf.pdfreader.domain.model.InteractionMode
 import com.pdf.pdfreader.domain.model.TextBlock
 import com.pdf.pdfreader.domain.model.TextWord
 import com.pdf.pdfreader.ui.viewmodel.TextSelectionState
-import com.pdf.pdfreader.utiles.PdfWordHitTester
+import com.pdf.pdfreader.selection.hit.PdfWordHitTester
 
 private const val TAG = "TextSelectionOverlay"
 
