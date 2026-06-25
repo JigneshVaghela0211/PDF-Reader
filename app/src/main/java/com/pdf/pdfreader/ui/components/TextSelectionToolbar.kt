@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ fun TextSelectionToolbar(
     offsetX: Int,
     offsetY: Int,
     onCopy: () -> Unit,
+    onSelectAll: () -> Unit,
     onEdit: () -> Unit,
     onHighlight: () -> Unit,
     onUnderline: () -> Unit,
@@ -63,6 +65,7 @@ fun TextSelectionToolbar(
             // DISABLED actions are dropped here so dividers never bracket an empty slot.
             val actions = listOf(
                 SelectionEntry(EditorFeature.COPY_TEXT, Icons.Default.ContentCopy, "Copy", onCopy),
+                SelectionEntry(EditorFeature.COPY_TEXT, Icons.Default.SelectAll, "Select All", onSelectAll),
                 SelectionEntry(EditorFeature.EDIT_TEXT, Icons.Default.Edit, "Edit", onEdit),
                 SelectionEntry(EditorFeature.HIGHLIGHT, Icons.Default.Highlight, "Highlight", onHighlight, Color(0xFFFFD54A)),
                 SelectionEntry(EditorFeature.UNDERLINE, Icons.Default.FormatUnderlined, "Underline", onUnderline),

@@ -688,6 +688,7 @@ fun PdfReaderScreen(
                                             android.widget.Toast.LENGTH_SHORT
                                         ).show()
                                     },
+                                    onSelectAll = { editorViewModel.selectAllText() },
                                     onEdit = { editorViewModel.editSelectedText() },
                                     onHighlight = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
                                     onUnderline = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },

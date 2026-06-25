@@ -322,6 +322,30 @@ class PdfEditorViewModel @Inject constructor(
     fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
 
     /**
+     * Select every word on the page the user is currently selecting on. Lets the user grab a long
+     * passage (or the whole page) in one tap instead of dragging across — and past — the screen.
+     */
+    fun selectAllText() {
+        val sel = _uiState.value.textSelection ?: return
+        val pageWords = (_uiState.value.textBlocks[sel.pageIndex] ?: return)
+            .flatMap { it.words }
+            .sortedWith(compareBy({ it.y }, { it.x }))
+        if (pageWords.isEmpty()) return
+        val minX = pageWords.minOf { it.x }; val minY = pageWords.minOf { it.y }
+        val maxX = pageWords.maxOf { it.x + it.width }; val maxY = pageWords.maxOf { it.y + it.height }
+        _uiState.update {
+            it.copy(
+                interactionMode = InteractionMode.SELECT_TEXT,
+                textSelection = TextSelectionState(
+                    pageIndex = sel.pageIndex,
+                    selectedWords = pageWords,
+                    bounds = androidx.compose.ui.geometry.Rect(minX, minY, maxX, maxY)
+                )
+            )
+        }
+    }
+
+    /**
      * Copy the current text selection to the Android clipboard, preserving spaces and inserting
      * line breaks between visual lines (words are in reading order, so a downward jump in y marks
      * a new line). Returns true if something was actually copied — the UI uses this to confirm.
