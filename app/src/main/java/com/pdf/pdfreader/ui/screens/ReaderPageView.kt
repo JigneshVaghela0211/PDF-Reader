@@ -220,7 +220,11 @@ fun PdfPage(
                         }
 
                         // ─── Text Selection Overlay (Chunk 2, 3) ────
-                        if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.NONE && !editorUiState.isEditMode && pageSize != IntSize.Zero) {
+                        // Enabled whenever we're reading (not in edit mode): long-press text to
+                        // select → Copy / Highlight / Underline / Strikethrough. The default tool
+                        // is PEN, so gating on NONE here previously hid selection until an edit
+                        // session had reset the tool — markup was effectively unreachable.
+                        if (!editorUiState.isEditMode && pageSize != IntSize.Zero) {
                             val pageTextBlocks = editorUiState.textBlocks[pageIndex] ?: emptyList()
                             if (pageTextBlocks.isNotEmpty()) {
                                 com.pdf.pdfreader.ui.components.TextSelectionOverlay(

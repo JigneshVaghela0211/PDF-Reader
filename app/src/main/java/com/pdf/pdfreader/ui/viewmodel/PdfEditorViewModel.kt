@@ -97,6 +97,11 @@ class PdfEditorViewModel @Inject constructor(
                 it.copy(canUndo = undoRedoManager.canUndo.value, canRedo = undoRedoManager.canRedo.value)
             }
         }
+        // Proactively extract text words so long-press text selection (and the
+        // Highlight / Underline / Strikethrough popup) works in plain reading mode,
+        // not only after the Edit Text tool has been opened. Runs async; safe no-op
+        // if already extracted.
+        extractTextBlocks()
     }
 
     fun setCurrentPage(page: Int) { currentPage = page }
@@ -316,13 +321,30 @@ class PdfEditorViewModel @Inject constructor(
 
     fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
 
-    fun copySelectedText(context: android.content.Context) {
-        if (!PdfEditorFeatureConfig.ENABLE_COPY_TEXT) return
-        val sel = _uiState.value.textSelection ?: return
-        val text = sel.selectedWords.joinToString(" ") { it.text }
+    /**
+     * Copy the current text selection to the Android clipboard, preserving spaces and inserting
+     * line breaks between visual lines (words are in reading order, so a downward jump in y marks
+     * a new line). Returns true if something was actually copied — the UI uses this to confirm.
+     */
+    fun copySelectedText(context: android.content.Context): Boolean {
+        if (!PdfEditorFeatureConfig.ENABLE_COPY_TEXT) return false
+        val words = _uiState.value.textSelection?.selectedWords ?: return false
+        if (words.isEmpty()) return false
+
+        val sb = StringBuilder()
+        var prev: TextWord? = null
+        for (w in words) {
+            prev?.let { sb.append(if (w.y - it.y > it.height * 0.6f) "\n" else " ") }
+            sb.append(w.text)
+            prev = w
+        }
+        val text = sb.toString()
+        if (text.isBlank()) return false
+
         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         cm.setPrimaryClip(android.content.ClipData.newPlainText("PDF Text", text))
         clearTextSelection()
+        return true
     }
 
     fun editSelectedText() {
@@ -333,9 +355,15 @@ class PdfEditorViewModel @Inject constructor(
         
         val blocksOnPage = _uiState.value.textBlocks[sel.pageIndex] ?: emptyList()
         val firstWord = words.first()
-        val block = blocksOnPage.find { b ->
-            firstWord.x >= b.x && firstWord.y >= b.y &&
-            (firstWord.x + firstWord.width) <= (b.x + b.width + 0.05f)
+        val cx = firstWord.x + firstWord.width / 2f
+        val cy = firstWord.y + firstWord.height / 2f
+        // Prefer the block whose bounds contain the word's center; otherwise pick the nearest
+        // block so Edit always lands on something rather than silently doing nothing.
+        val block = blocksOnPage.firstOrNull { b ->
+            cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height
+        } ?: blocksOnPage.minByOrNull { b ->
+            val bcx = b.x + b.width / 2f; val bcy = b.y + b.height / 2f
+            (bcx - cx) * (bcx - cx) + (bcy - cy) * (bcy - cy)
         }
         clearTextSelection()
         if (block != null) {

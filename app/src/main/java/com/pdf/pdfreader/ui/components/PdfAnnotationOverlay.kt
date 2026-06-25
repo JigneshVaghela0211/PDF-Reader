@@ -166,31 +166,40 @@ fun PdfAnnotationOverlay(
                 }
                 is PdfAnnotation.TextNote -> { /* handled by MovableTextNote composable */ }
                 is PdfAnnotation.TextMarkup -> {
+                    // Markup rects are normalized (0..1) selection bounds; scale them to this
+                    // page's pixel size. (Drawing them raw would place a sub-pixel speck at the
+                    // top-left corner — i.e. nothing visible.)
                     val rectColor = annotation.color
+                    val w = size.width
+                    val h = size.height
                     annotation.rects.forEach { rect ->
+                        val left = rect.left * w
+                        val right = rect.right * w
+                        val top = rect.top * h
+                        val bottom = rect.bottom * h
                         when (annotation.type) {
                             com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT -> {
                                 drawRect(
                                     color = rectColor,
-                                    topLeft = rect.topLeft,
-                                    size = rect.size
+                                    topLeft = Offset(left, top),
+                                    size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
                                 )
                             }
                             com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE -> {
-                                val y = rect.bottom + 2f
+                                val y = bottom + 2f
                                 drawLine(
                                     color = rectColor,
-                                    start = Offset(rect.left, y),
-                                    end = Offset(rect.right, y),
+                                    start = Offset(left, y),
+                                    end = Offset(right, y),
                                     strokeWidth = 3f
                                 )
                             }
                             com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH -> {
-                                val y = rect.top + rect.height / 2f
+                                val y = top + (bottom - top) / 2f
                                 drawLine(
                                     color = rectColor,
-                                    start = Offset(rect.left, y),
-                                    end = Offset(rect.right, y),
+                                    start = Offset(left, y),
+                                    end = Offset(right, y),
                                     strokeWidth = 3f
                                 )
                             }

@@ -680,7 +680,14 @@ fun PdfReaderScreen(
                                     visible = true,
                                     offsetX = textSel.bounds.left.toInt(),
                                     offsetY = toolbarGlobalY.coerceAtLeast(0),
-                                    onCopy = { editorViewModel.copySelectedText(context) },
+                                    onCopy = {
+                                        val copied = editorViewModel.copySelectedText(context)
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (copied) "Copied to clipboard" else "Nothing to copy",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
                                     onEdit = { editorViewModel.editSelectedText() },
                                     onHighlight = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
                                     onUnderline = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },
