@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -96,10 +95,6 @@ fun HomeTopAppBar(
                         AppBarAction(onClick = { onSearchToggle(true) }) {
                             Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(21.dp))
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        AppBarAction(onClick = onFilterClick) {
-                            Icon(Icons.Default.Tune, contentDescription = "Filter", modifier = Modifier.size(21.dp))
-                        }
                     }
                 }
             }
@@ -108,8 +103,9 @@ fun HomeTopAppBar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 16.dp, bottom = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(start = 20.dp, end = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "$fileCount documents",
@@ -118,6 +114,14 @@ fun HomeTopAppBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                         modifier = Modifier.weight(1f)
                     )
+                    SubtleAction(onClick = onFilterClick) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "Filter",
+                            modifier = Modifier.size(19.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     ViewModeToggle(viewMode = viewMode, onViewModeChange = onViewModeChange)
                 }
             }
@@ -150,68 +154,52 @@ private fun AppBarAction(
 }
 
 @Composable
-private fun ViewModeToggle(
-    viewMode: ViewMode,
-    onViewModeChange: (ViewMode) -> Unit
-) {
-    val activeColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-    val pillBg = MaterialTheme.colorScheme.surfaceVariant
-    val activePillBg = MaterialTheme.colorScheme.surface
-
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(pillBg)
-            .padding(3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        ViewToggleButton(
-            selected = viewMode == ViewMode.GRID,
-            background = if (viewMode == ViewMode.GRID) activePillBg else Color.Transparent,
-            onClick = { onViewModeChange(ViewMode.GRID) }
-        ) {
-            Icon(
-                Icons.Default.GridView,
-                contentDescription = "Grid",
-                modifier = Modifier.size(18.dp),
-                tint = if (viewMode == ViewMode.GRID) activeColor else inactiveColor
-            )
-        }
-        ViewToggleButton(
-            selected = viewMode == ViewMode.LIST,
-            background = if (viewMode == ViewMode.LIST) activePillBg else Color.Transparent,
-            onClick = { onViewModeChange(ViewMode.LIST) }
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ViewList,
-                contentDescription = "List",
-                modifier = Modifier.size(18.dp),
-                tint = if (viewMode == ViewMode.LIST) activeColor else inactiveColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun ViewToggleButton(
-    selected: Boolean,
-    background: Color,
+private fun SubtleAction(
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .size(width = 32.dp, height = 30.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(background)
-            .then(
-                if (selected) Modifier else Modifier
-            ),
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        IconButton(onClick = onClick, modifier = Modifier.size(30.dp)) {
+        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
             content()
+        }
+    }
+}
+
+@Composable
+private fun ViewModeToggle(
+    viewMode: ViewMode,
+    onViewModeChange: (ViewMode) -> Unit
+) {
+    val isGrid = viewMode == ViewMode.GRID
+    SubtleAction(
+        onClick = { onViewModeChange(if (isGrid) ViewMode.LIST else ViewMode.GRID) }
+    ) {
+        AnimatedContent(
+            targetState = isGrid,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "view_mode_toggle"
+        ) { grid ->
+            if (grid) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ViewList,
+                    contentDescription = "Switch to list view",
+                    modifier = Modifier.size(19.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Icon(
+                    Icons.Default.GridView,
+                    contentDescription = "Switch to grid view",
+                    modifier = Modifier.size(19.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

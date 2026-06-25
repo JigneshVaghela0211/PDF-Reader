@@ -1,31 +1,24 @@
 package com.pdf.pdfreader.ui.components
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
-import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmartSwipeRefresh(
     isRefreshing: Boolean,
@@ -35,91 +28,40 @@ fun SmartSwipeRefresh(
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    
-    val refreshThreshold = with(density) { 80.dp.toPx() }
-    val maxDragDist = with(density) { 200.dp.toPx() }
-    
-    val pullDistance = remember { Animatable(0f) }
-    var isPulling by remember { mutableStateOf(false) }
-    
-    // Using a more robust connection that handles all scroll phases
-    val nestedScrollConnection = remember(isRefreshing) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Collapse the pull indicator when the user scrolls back up, but only
-                // consume what's needed to retract — never block normal list scroll.
-                if (available.y < 0 && pullDistance.value > 0) {
-                    val newOffset = (pullDistance.value + available.y).coerceAtLeast(0f)
-                    scope.launch { pullDistance.snapTo(newOffset) }
-                    // Only consume what the retraction actually used, not the full delta
-                    val consumed = newOffset - pullDistance.value
-                    return Offset(0f, consumed)
-                }
-                return Offset.Zero
-            }
+    val state = rememberPullToRefreshState()
 
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (available.y > 0 && source == NestedScrollSource.UserInput && !isRefreshing) {
-                    isPulling = true
-                    val dragPercent = (pullDistance.value / maxDragDist).coerceIn(0f, 1f)
-                    val damping = 1f - dragPercent.pow(2)
-                    val delta = available.y * damping * 0.5f
-                    scope.launch {
-                        pullDistance.snapTo((pullDistance.value + delta).coerceAtMost(maxDragDist))
-                    }
-                    return Offset(0f, available.y)
-                }
-                return Offset.Zero
-            }
+    val refreshThresholdDp = 80.dp
+    val refreshThreshold = with(density) { refreshThresholdDp.toPx() }
 
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                isPulling = false
-                val shouldRefresh = pullDistance.value >= refreshThreshold && !isRefreshing
-                if (shouldRefresh) onRefresh()
-                val target = if (shouldRefresh || isRefreshing) refreshThreshold else 0f
-                pullDistance.animateTo(
-                    targetValue = target,
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium, dampingRatio = Spring.DampingRatioNoBouncy)
-                )
-                // Pass fling velocity through so the list can decelerate naturally
-                return Velocity.Zero
-            }
-        }
-    }
-
-    // Secondary state sync to ensure closure when viewmodel completes
-    LaunchedEffect(isRefreshing) {
-        if (!isRefreshing && pullDistance.value > 0 && !isPulling) {
-            pullDistance.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-        } else if (isRefreshing && pullDistance.value < refreshThreshold) {
-            pullDistance.animateTo(refreshThreshold, spring(stiffness = Spring.StiffnessMediumLow))
-        }
-    }
+    // The Material3 modifier owns the gesture: it engages reliably from the very
+    // top, applies natural drag resistance, and animates the release/settle and the
+    // "hold while refreshing" states for us. We only read distanceFraction to drive
+    // the custom header (1f == threshold reached, >1f == pulled past it).
+    val pullDistance = state.distanceFraction * refreshThreshold
+    val pullPercent = state.distanceFraction.coerceAtLeast(0f)
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .clipToBounds()
-            .nestedScroll(nestedScrollConnection)
+            .pullToRefresh(
+                isRefreshing = isRefreshing,
+                state = state,
+                threshold = refreshThresholdDp,
+                onRefresh = onRefresh
+            )
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        val pullPercent = (pullDistance.value / refreshThreshold).coerceAtLeast(0f)
-        
-        // --- THE HEADER: Only visible when and for the amount pulled ---
-        if (pullDistance.value > 0.5f) {
+        // --- THE HEADER: only visible for the amount pulled ---
+        if (pullDistance > 0.5f) {
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(with(density) { (pullDistance.value * 1.5f).toDp() })
+                    .height(with(density) { (pullDistance * 1.5f).toDp() })
             ) {
                 val width = size.width
-                val height = pullDistance.value
-                
+                val height = pullDistance
+
                 val path = Path().apply {
                     moveTo(0f, 0f)
                     lineTo(width, 0f)
@@ -127,16 +69,16 @@ fun SmartSwipeRefresh(
                     quadraticTo(width / 2, height * (1f + (pullPercent * 0.1f).coerceAtMost(0.3f)), 0f, height * 0.85f)
                     close()
                 }
-                
+
                 drawPath(path = path, color = headerColor)
             }
-            
-            // Header Content Box
+
+            // Header content box
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(with(density) { refreshThreshold.toDp() })
-                    .offset { IntOffset(0, (pullDistance.value - refreshThreshold).roundToInt() / 2) }
+                    .offset { IntOffset(0, (pullDistance - refreshThreshold).roundToInt() / 2) }
                     .graphicsLayer { alpha = pullPercent.coerceAtMost(1f) },
                 contentAlignment = Alignment.Center
             ) {
@@ -164,11 +106,13 @@ fun SmartSwipeRefresh(
             }
         }
 
-        // --- THE CONTENT: Displaced purely by pullDistance ---
+        // --- THE CONTENT: displaced by the pull amount. Reading distanceFraction
+        // inside the offset lambda keeps the displacement in the layout phase, so the
+        // content subtree is not recomposed on every frame of the drag. ---
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(0, pullDistance.value.roundToInt()) }
+                .offset { IntOffset(0, (state.distanceFraction * refreshThreshold).roundToInt()) }
         ) {
             content()
         }
