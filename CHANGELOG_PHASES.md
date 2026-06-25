@@ -199,3 +199,28 @@ This document breaks down the systematic architectural upgrades made across the 
 ### Verification:
 - `./gradlew assembleDebug` → BUILD SUCCESSFUL (Exit 0)
 - Installed on SM-G990E device via `./gradlew installDebug`
+
+---
+
+## Phase: Word-level text selection + draggable handles
+
+**Problem:** Tapping a word selected the entire line/paragraph. Root cause was in `PdfTextBlockExtractor.createTextBlock` — words were split only when the glyph gap exceeded `WORD_GAP_THRESHOLD` (5pt), but the extractor keeps literal space characters, so the gap was never reached mid-line and each line collapsed into one giant `TextWord`. The selection stack itself was already word-based.
+
+- `com.pdf.pdfreader.utiles.PdfTextBlockExtractor.kt`
+  - **Change:** Word breaking is now whitespace-aware — a blank char commits the current word and is excluded from word bounds (still kept in block text). Glyph-gap split retained as a fallback for spaceless PDFs.
+  - **Reason:** Each visible token becomes its own `TextWord`, so a tap hits exactly one word.
+
+- `com.pdf.pdfreader.utiles.PdfWordHitTester.kt` (**NEW**) — pure touch→word hit test, extracted out of the Composable.
+- `com.pdf.pdfreader.domain.usecase.SelectionRangeUseCase.kt` (**NEW**) — pure inclusive-range + bounds math; order-independent so handles can cross.
+- `com.pdf.pdfreader.ui.components.SelectionHandle.kt` (**NEW**) — draggable Adobe/Xodo-style handle reporting absolute page-pixel drag position.
+
+- `com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel.kt`
+  - **Change:** `TextSelectionState` gained `startWord`/`endWord` anchors (nullable, defaulted).
+- `com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel.kt`
+  - **Change:** `updateTextSelection` replaced by `moveSelectionStart`/`moveSelectionEnd`; handlers delegate to `SelectionRangeUseCase` (injected). `startTextSelection`/`selectAllText` set both anchors and compute bounds immediately.
+- `com.pdf.pdfreader.ui.components.TextSelectionOverlay.kt`
+  - **Change:** Long-press selects one word and shows two persistent handles; dragging a handle hit-tests the word under it and moves that anchor. Continuous long-press-drag still extends the end. Copy/Highlight/Underline/Strikethrough toolbar + real `PDAnnotationTextMarkup` export unchanged.
+
+### Verification:
+- `./gradlew assembleDebug` → BUILD SUCCESSFUL
+- Device smoke-test recommended: long-press a word selects only that word; drag start/end handles to expand across words/lines; copy + markup actions.

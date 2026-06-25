@@ -71,7 +71,8 @@ class PdfEditorViewModel @Inject constructor(
     private val undoRedoManager: UndoRedoManager,
     private val textBlockExtractor: PdfTextBlockExtractor,
     private val pdfExportManager: PdfExportManager,
-    private val signatureManager: com.pdf.pdfreader.domain.repository.SignatureManager
+    private val signatureManager: com.pdf.pdfreader.domain.repository.SignatureManager,
+    private val selectionRange: com.pdf.pdfreader.domain.usecase.SelectionRangeUseCase
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -288,35 +289,67 @@ class PdfEditorViewModel @Inject constructor(
 
     // ─── Text Selection ──────────────────────────────────────────
 
+    /**
+     * Begin a selection from a long-press on a single [word]. Both handles anchor to that word, and
+     * its bounds are computed immediately so the start/end handles render right away.
+     */
     fun startTextSelection(pageIndex: Int, word: TextWord, allWords: List<TextWord>) {
+        val words = listOf(word)
         _uiState.update { state ->
             state.copy(
                 interactionMode = InteractionMode.SELECT_TEXT,
                 textSelection = TextSelectionState(
-                    pageIndex = pageIndex, selectedWords = listOf(word), bounds = null
+                    pageIndex = pageIndex,
+                    selectedWords = words,
+                    bounds = selectionRange.boundsOf(words),
+                    startWord = word,
+                    endWord = word
                 )
             )
         }
     }
 
-    fun updateTextSelection(pageIndex: Int, endWord: TextWord, allWords: List<TextWord>) {
+    /** Drag the start handle: move the start anchor to [word], keeping the end anchor fixed. */
+    fun moveSelectionStart(pageIndex: Int, word: TextWord, allWords: List<TextWord>) {
         val sel = _uiState.value.textSelection ?: return
         if (sel.pageIndex != pageIndex) return
-        val startWord = sel.selectedWords.firstOrNull() ?: return
-        val startIdx = allWords.indexOf(startWord); val endIdx = allWords.indexOf(endWord)
-        if (startIdx == -1 || endIdx == -1) return
-        val actualStart = minOf(startIdx, endIdx); val actualEnd = maxOf(startIdx, endIdx)
-        val selectedRange = allWords.subList(actualStart, actualEnd + 1)
-        _uiState.update { it.copy(textSelection = sel.copy(selectedWords = selectedRange)) }
+        val anchor = sel.endWord ?: sel.selectedWords.lastOrNull() ?: return
+        applyRange(sel, allWords, newStart = word, newEnd = anchor)
+    }
+
+    /** Drag the end handle: move the end anchor to [word], keeping the start anchor fixed. */
+    fun moveSelectionEnd(pageIndex: Int, word: TextWord, allWords: List<TextWord>) {
+        val sel = _uiState.value.textSelection ?: return
+        if (sel.pageIndex != pageIndex) return
+        val anchor = sel.startWord ?: sel.selectedWords.firstOrNull() ?: return
+        applyRange(sel, allWords, newStart = anchor, newEnd = word)
+    }
+
+    private fun applyRange(
+        sel: TextSelectionState,
+        allWords: List<TextWord>,
+        newStart: TextWord,
+        newEnd: TextWord
+    ) {
+        val range = selectionRange.rangeBetween(allWords, newStart, newEnd)
+        if (range.isEmpty()) return
+        // range is in reading order; first/last become the actual start/end anchors.
+        _uiState.update {
+            it.copy(
+                textSelection = sel.copy(
+                    selectedWords = range,
+                    bounds = selectionRange.boundsOf(range),
+                    startWord = range.first(),
+                    endWord = range.last()
+                )
+            )
+        }
     }
 
     fun finalizeTextSelection() {
         val sel = _uiState.value.textSelection ?: return
         if (sel.selectedWords.isEmpty()) { clearTextSelection(); return }
-        val minX = sel.selectedWords.minOf { it.x }; val minY = sel.selectedWords.minOf { it.y }
-        val maxX = sel.selectedWords.maxOf { it.x + it.width }; val maxY = sel.selectedWords.maxOf { it.y + it.height }
-        val bounds = androidx.compose.ui.geometry.Rect(minX, minY, maxX, maxY)
-        _uiState.update { it.copy(textSelection = sel.copy(bounds = bounds)) }
+        _uiState.update { it.copy(textSelection = sel.copy(bounds = selectionRange.boundsOf(sel.selectedWords))) }
     }
 
     fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
@@ -331,15 +364,15 @@ class PdfEditorViewModel @Inject constructor(
             .flatMap { it.words }
             .sortedWith(compareBy({ it.y }, { it.x }))
         if (pageWords.isEmpty()) return
-        val minX = pageWords.minOf { it.x }; val minY = pageWords.minOf { it.y }
-        val maxX = pageWords.maxOf { it.x + it.width }; val maxY = pageWords.maxOf { it.y + it.height }
         _uiState.update {
             it.copy(
                 interactionMode = InteractionMode.SELECT_TEXT,
                 textSelection = TextSelectionState(
                     pageIndex = sel.pageIndex,
                     selectedWords = pageWords,
-                    bounds = androidx.compose.ui.geometry.Rect(minX, minY, maxX, maxY)
+                    bounds = selectionRange.boundsOf(pageWords),
+                    startWord = pageWords.first(),
+                    endWord = pageWords.last()
                 )
             )
         }

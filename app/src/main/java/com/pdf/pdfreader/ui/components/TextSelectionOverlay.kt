@@ -15,10 +15,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.pdf.pdfreader.domain.model.InteractionMode
 import com.pdf.pdfreader.domain.model.TextBlock
 import com.pdf.pdfreader.domain.model.TextWord
-import com.pdf.pdfreader.ui.viewmodel.PdfReaderViewModel
 import com.pdf.pdfreader.ui.viewmodel.TextSelectionState
+import com.pdf.pdfreader.utiles.PdfWordHitTester
 
 private const val TAG = "TextSelectionOverlay"
+
+private val HANDLE_COLOR = Color(0xFF2196F3)
 
 @Composable
 fun TextSelectionOverlay(
@@ -33,30 +35,18 @@ fun TextSelectionOverlay(
 ) {
     if (pageWidth <= 0 || pageHeight <= 0) return
 
-    val density = androidx.compose.ui.platform.LocalDensity.current
-
-    // Extract all words and sort them structurally (top to bottom, left to right)
+    // Extract all words and sort them in reading order (top to bottom, left to right).
     val allWords = remember(textBlocks) {
         textBlocks
             .flatMap { it.words }
             .sortedWith(compareBy({ it.y }, { it.x }))
     }
 
-    // Hit testing function
-    fun findWordAt(offset: Offset): TextWord? {
-        val normX = offset.x / pageWidth
-        val normY = offset.y / pageHeight
-        // Small padding for easier tap target
-        val touchPadding = 15f / pageWidth 
+    fun findWordAt(offset: Offset): TextWord? =
+        PdfWordHitTester.wordAt(offset, pageWidth, pageHeight, allWords)
 
-        return allWords.firstOrNull { word ->
-            normX >= word.x - touchPadding && normX <= word.x + word.width + touchPadding &&
-            normY >= word.y - touchPadding && normY <= word.y + word.height + touchPadding
-        }
-    }
-
-    // Gather bounding rects for the selected words
-    val selectedRects = remember(textSelection) {
+    // Bounding rects for the selected words, in page pixels.
+    val selectedRects = remember(textSelection, pageWidth, pageHeight) {
         if (textSelection?.pageIndex == pageIndex) {
             textSelection.selectedWords.map { word ->
                 Rect(
@@ -71,10 +61,12 @@ fun TextSelectionOverlay(
         }
     }
 
+    val hasSelection = textSelection?.pageIndex == pageIndex && textSelection.selectedWords.isNotEmpty()
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Gesture listener
+            // Long-press to select a word, then drag (still in the same gesture) extends the end.
             .pointerInput(allWords, interactionMode) {
                 if (interactionMode != InteractionMode.NONE && interactionMode != InteractionMode.SELECT_TEXT) {
                     return@pointerInput
@@ -87,7 +79,6 @@ fun TextSelectionOverlay(
                             Log.d(TAG, "Selection gesture started at word: ${word.text}")
                             editorViewModel.startTextSelection(pageIndex, word, allWords)
                         } else {
-                            // If user long presses empty space, maybe clear selection?
                             editorViewModel.clearTextSelection()
                         }
                     },
@@ -95,7 +86,7 @@ fun TextSelectionOverlay(
                         change.consume()
                         val word = findWordAt(change.position)
                         if (word != null && textSelection?.pageIndex == pageIndex) {
-                            editorViewModel.updateTextSelection(pageIndex, word, allWords)
+                            editorViewModel.moveSelectionEnd(pageIndex, word, allWords)
                         }
                     },
                     onDragEnd = {
@@ -117,17 +108,43 @@ fun TextSelectionOverlay(
                 )
             }
     ) {
-        // Draw selection highlights
+        // Draw selection highlights.
         if (selectedRects.isNotEmpty()) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 selectedRects.forEach { rect ->
                     drawRect(
-                        color = Color(0xFF2196F3).copy(alpha = 0.3f),
+                        color = HANDLE_COLOR.copy(alpha = 0.3f),
                         topLeft = rect.topLeft,
                         size = rect.size
                     )
                 }
             }
+        }
+
+        // Draggable start/end handles, anchored to the first/last selected word.
+        if (hasSelection) {
+            val startWord = textSelection!!.startWord ?: textSelection.selectedWords.first()
+            val endWord = textSelection.endWord ?: textSelection.selectedWords.last()
+
+            SelectionHandle(
+                centerX = startWord.x * pageWidth,
+                centerY = (startWord.y + startWord.height) * pageHeight,
+                color = HANDLE_COLOR,
+                onDrag = { pageOffset ->
+                    findWordAt(pageOffset)?.let { editorViewModel.moveSelectionStart(pageIndex, it, allWords) }
+                },
+                onDragEnd = { editorViewModel.finalizeTextSelection() }
+            )
+
+            SelectionHandle(
+                centerX = (endWord.x + endWord.width) * pageWidth,
+                centerY = (endWord.y + endWord.height) * pageHeight,
+                color = HANDLE_COLOR,
+                onDrag = { pageOffset ->
+                    findWordAt(pageOffset)?.let { editorViewModel.moveSelectionEnd(pageIndex, it, allWords) }
+                },
+                onDragEnd = { editorViewModel.finalizeTextSelection() }
+            )
         }
     }
 }

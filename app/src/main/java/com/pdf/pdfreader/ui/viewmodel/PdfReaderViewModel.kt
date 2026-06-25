@@ -63,7 +63,11 @@ data class SearchMatch(
 data class TextSelectionState(
     val pageIndex: Int,
     val selectedWords: List<com.pdf.pdfreader.domain.model.TextWord>,
-    val bounds: androidx.compose.ui.geometry.Rect?
+    val bounds: androidx.compose.ui.geometry.Rect?,
+    // The two anchor words the start/end handles map to. selectedWords is the inclusive range
+    // between them in reading order. Null only for legacy/empty selections.
+    val startWord: com.pdf.pdfreader.domain.model.TextWord? = null,
+    val endWord: com.pdf.pdfreader.domain.model.TextWord? = null
 )
 
 data class PdfReaderUiState(

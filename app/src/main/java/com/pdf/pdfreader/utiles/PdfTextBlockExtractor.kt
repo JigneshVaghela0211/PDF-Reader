@@ -213,9 +213,18 @@ class PdfTextBlockExtractor @Inject constructor() {
 
         for ((lineIdx, line) in lines.withIndex()) {
             for ((charIdx, cp) in line.withIndex()) {
+                // A literal whitespace character ends the current word. The space itself is never
+                // part of any word's bounds (otherwise an entire line collapses into one "word"),
+                // but it is preserved in the block text.
+                if (cp.char.isBlank()) {
+                    commitWord()
+                    textBuilder.append(' ')
+                    continue
+                }
                 if (charIdx > 0) {
                     val prev = line[charIdx - 1]
                     val gap = cp.x - (prev.x + prev.width)
+                    // Fallback split for PDFs that lack literal spaces between words.
                     if (gap > WORD_GAP_THRESHOLD) {
                         textBuilder.append(' ')
                         commitWord()
