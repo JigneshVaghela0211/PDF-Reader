@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.LineWeight
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +49,16 @@ fun SignaturePadDialog(
     var undoStack by remember { mutableStateOf<List<List<SignatureStroke>>>(emptyList()) }
     var redoStack by remember { mutableStateOf<List<List<SignatureStroke>>>(emptyList()) }
     var selectedStrokeWidth by remember { mutableFloatStateOf(5f) }
-    val selectedColor = Color(0xFF1C1B1F)
+    // Global, live attributes — apply to the whole signature, even after it's drawn
+    var selectedColor by remember { mutableStateOf(Color(0xFF1C1B1F)) }
+    val signatureColors = remember {
+        listOf(
+            Color(0xFF1C1B1F), // Black
+            Color(0xFF1A56DB), // Blue
+            Color(0xFFD32F2F), // Red
+            Color(0xFF2E7D32)  // Green
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -134,7 +144,7 @@ fun SignaturePadDialog(
                         canvasHeight = size.height
 
                         strokes.forEach { stroke ->
-                            drawSignatureStroke(stroke)
+                            drawSignatureStroke(stroke, selectedColor, selectedStrokeWidth)
                         }
                         if (currentPoints.size >= 2) {
                             val path = Path().apply {
@@ -261,6 +271,51 @@ fun SignaturePadDialog(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Color picker — applies live to the whole signature
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Palette,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        "Color",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        signatureColors.forEach { color ->
+                            val isSelected = color == selectedColor
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected)
+                                            MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .pointerInput(Unit) {
+                                        detectTapGestures { selectedColor = color }
+                                    }
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Buttons
@@ -280,7 +335,12 @@ fun SignaturePadDialog(
                     Button(
                         onClick = {
                             if (strokes.isNotEmpty()) {
-                                onSaveSignature(strokes, canvasWidth, canvasHeight)
+                                // Apply the current (possibly changed) color & thickness
+                                // to the whole signature before saving.
+                                val finalStrokes = strokes.map {
+                                    it.copy(color = selectedColor, strokeWidth = selectedStrokeWidth)
+                                }
+                                onSaveSignature(finalStrokes, canvasWidth, canvasHeight)
                             }
                         },
                         enabled = strokes.isNotEmpty(),
@@ -297,7 +357,11 @@ fun SignaturePadDialog(
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignatureStroke(stroke: SignatureStroke) {
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignatureStroke(
+    stroke: SignatureStroke,
+    color: Color,
+    strokeWidth: Float
+) {
     if (stroke.points.size >= 2) {
         val path = Path().apply {
             moveTo(stroke.points.first().x, stroke.points.first().y)
@@ -307,17 +371,17 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSignatureStroke
         }
         drawPath(
             path = path,
-            color = stroke.color,
+            color = color,
             style = Stroke(
-                width = stroke.strokeWidth,
+                width = strokeWidth,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
         )
     } else if (stroke.points.size == 1) {
         drawCircle(
-            color = stroke.color,
-            radius = stroke.strokeWidth / 2,
+            color = color,
+            radius = strokeWidth / 2,
             center = stroke.points.first()
         )
     }
