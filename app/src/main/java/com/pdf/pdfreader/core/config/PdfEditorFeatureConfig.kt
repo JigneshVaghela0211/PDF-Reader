@@ -62,19 +62,19 @@ object PdfEditorFeatureConfig {
         EditorFeature.IMAGE_DELETE to FeatureState.ENABLED,
 
         // ─── PAGE MANAGEMENT ───
-        EditorFeature.INSERT_PAGE to FeatureState.COMING_SOON,
+        EditorFeature.INSERT_PAGE to FeatureState.BETA, // insert blank / duplicate page (PdfPageManager)
         EditorFeature.DELETE_PAGE to FeatureState.ENABLED,
         EditorFeature.ROTATE_PAGE to FeatureState.ENABLED,
         EditorFeature.EXTRACT_PAGE to FeatureState.ENABLED,
-        EditorFeature.REORDER_PAGE to FeatureState.COMING_SOON,
+        EditorFeature.REORDER_PAGE to FeatureState.BETA, // drag-to-reorder grid (PdfPageManager.reorder)
 
         // ─── PDF TOOLS ───
         EditorFeature.SEARCH to FeatureState.ENABLED,
         EditorFeature.COPY_TEXT to FeatureState.ENABLED,
-        EditorFeature.OCR to FeatureState.COMING_SOON,
-        EditorFeature.COMPRESS to FeatureState.COMING_SOON,
-        EditorFeature.MERGE to FeatureState.COMING_SOON,
-        EditorFeature.SPLIT to FeatureState.COMING_SOON,
+        EditorFeature.OCR to FeatureState.BETA, // PdfOcrEngine (ML Kit) + PDF Tools sheet
+        EditorFeature.COMPRESS to FeatureState.BETA, // PdfCompressionEngine + PDF Tools sheet
+        EditorFeature.MERGE to FeatureState.BETA,    // PdfMergeEngine + PDF Tools sheet
+        EditorFeature.SPLIT to FeatureState.BETA,    // PdfSplitEngine + PDF Tools sheet
         EditorFeature.AI_SUMMARY to FeatureState.PREMIUM,
 
         // ─── SAVE OPTIONS ───
@@ -87,7 +87,6 @@ object PdfEditorFeatureConfig {
     /** Overrides applied only on DEBUG builds — enable experimental features for testing. */
     private val debugOverrides: Map<EditorFeature, FeatureState> = mapOf(
         EditorFeature.REAL_PDF_TEXT_EDITING to FeatureState.BETA,
-        EditorFeature.OCR to FeatureState.BETA,
     )
 
     /** Overrides applied only on RELEASE builds — keep non-production features hidden. */

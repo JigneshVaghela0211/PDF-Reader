@@ -100,6 +100,9 @@ dependencies {
     // Gson for JSON serialization
     implementation(libs.gson)
 
+    // ML Kit on-device text recognition (Latin) for OCR / searchable scanned PDFs
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 

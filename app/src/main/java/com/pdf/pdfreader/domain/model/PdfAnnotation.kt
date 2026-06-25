@@ -22,7 +22,9 @@ sealed class PdfAnnotation {
         val text: String,
         val position: Offset,
         val color: Color,
-        val fontSize: Float
+        val fontSize: Float,
+        /** Rotation in degrees, clockwise on screen (0/90/180/270 or custom). */
+        val rotation: Float = 0f
     ) : PdfAnnotation()
     
     enum class MarkupType {

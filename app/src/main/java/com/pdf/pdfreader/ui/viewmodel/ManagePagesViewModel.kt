@@ -7,6 +7,7 @@ import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdf.pdfreader.domain.repository.PdfRepository
+import com.pdf.pdfreader.utiles.PdfPageManager
 import com.pdf.pdfreader.utiles.PdfPageRenderer
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +36,8 @@ data class ManagePagesState(
 @HiltViewModel
 class ManagePagesViewModel @Inject constructor(
     application: Application,
-    private val pdfRepository: PdfRepository
+    private val pdfRepository: PdfRepository,
+    private val pageManager: PdfPageManager
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ManagePagesState())
@@ -223,6 +225,75 @@ class ManagePagesViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = false) }
                 onComplete(null)
             }
+        }
+    }
+
+    /**
+     * Insert a blank page immediately after the highest selected page (or at the end of the
+     * document when nothing is selected). Reuses [PdfPageManager]; the produced file replaces
+     * the original in place, matching delete/rotate behaviour.
+     */
+    fun insertBlankPage(onComplete: (Boolean) -> Unit) {
+        val sel = _uiState.value.selectedPages
+        val insertAt = sel.maxOrNull()?.plus(1) ?: _uiState.value.totalPages
+        runPageOp({ path -> pageManager.insertBlankPage(path, insertAt) }, onComplete)
+    }
+
+    /**
+     * Duplicate every selected page; each copy is placed directly after its original. Implemented
+     * as a reorder whose page list repeats the selected indices.
+     */
+    fun duplicateSelectedPages(onComplete: (Boolean) -> Unit) {
+        val sel = _uiState.value.selectedPages
+        if (sel.isEmpty()) { onComplete(false); return }
+        val order = buildList {
+            for (i in 0 until _uiState.value.totalPages) {
+                add(i)
+                if (i in sel) add(i)
+            }
+        }
+        runPageOp({ path -> pageManager.reorder(path, order) }, onComplete)
+    }
+
+    /**
+     * Persist a new page order. [newOrder] is the list of original 0-based page indices in their
+     * desired sequence (a permutation of 0 until totalPages). No-op if it equals the identity order.
+     */
+    fun reorderPages(newOrder: List<Int>, onComplete: (Boolean) -> Unit) {
+        val identity = (0 until _uiState.value.totalPages).toList()
+        if (newOrder == identity) { onComplete(false); return }
+        runPageOp({ path -> pageManager.reorder(path, newOrder) }, onComplete)
+    }
+
+    /**
+     * Run a [PdfPageManager] operation that yields a sibling file, then move it over the original
+     * and reload. Keeps the in-place editing model the screen already uses for delete/rotate.
+     */
+    private fun runPageOp(
+        op: suspend (path: String) -> PdfPageManager.PageResult?,
+        onComplete: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            val path = _uiState.value.filePath
+            val ok = try {
+                val result = op(path)
+                if (result == null) false
+                else withContext(Dispatchers.IO) {
+                    val produced = File(result.outputPath)
+                    val original = File(path)
+                    produced.exists() && produced.renameTo(original)
+                }
+            } catch (e: Exception) {
+                Log.e("ManagePagesVM", "Page operation failed", e)
+                false
+            }
+            thumbnailCache.evictAll()
+            _uiState.update {
+                it.copy(isSaving = false, selectedPages = emptySet(), hasModifications = ok || it.hasModifications)
+            }
+            if (ok) initialize(path)
+            onComplete(ok)
         }
     }
 

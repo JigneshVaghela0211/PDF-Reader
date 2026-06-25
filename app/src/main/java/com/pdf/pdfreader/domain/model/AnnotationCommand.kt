@@ -44,6 +44,21 @@ sealed class AnnotationCommand {
     ) : AnnotationCommand()
 
     /**
+     * Command for adding a text-markup annotation (highlight / underline / strikeout).
+     * Rects are normalized (0..1) selection rects; [markupType] is a [PdfAnnotation.MarkupType] name.
+     */
+    data class AddMarkupCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val annotationId: String,
+        val rects: List<SerializableRect>,
+        val color: Long,
+        val markupType: String
+    ) : AnnotationCommand()
+
+    /**
      * Command for removing an annotation.
      * Stores a JSON snapshot of the removed annotation so it can be re-added on undo.
      */
@@ -76,7 +91,9 @@ sealed class AnnotationCommand {
         val color: Long,
         val fontSize: Float,
         val positionX: Float,
-        val positionY: Float
+        val positionY: Float,
+        /** Rotation in degrees (clockwise on screen). Default 0 for back-compat with old payloads. */
+        val rotation: Float = 0f
     )
 
     data class TextCommand(
@@ -285,4 +302,9 @@ sealed class AnnotationCommand {
  * Lightweight serializable offset without Compose dependency.
  */
 data class SerializableOffset(val x: Float, val y: Float)
+
+/**
+ * Lightweight serializable rectangle (normalized PDF-space coords) without Compose dependency.
+ */
+data class SerializableRect(val left: Float, val top: Float, val right: Float, val bottom: Float)
 

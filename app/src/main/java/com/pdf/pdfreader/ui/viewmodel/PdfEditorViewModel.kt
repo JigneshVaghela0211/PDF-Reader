@@ -183,7 +183,8 @@ class PdfEditorViewModel @Inject constructor(
         return AnnotationCommand.TextState(
             id = note.id, text = note.text,
             color = note.color.value.toLong(), fontSize = note.fontSize,
-            positionX = note.position.x, positionY = note.position.y
+            positionX = note.position.x, positionY = note.position.y,
+            rotation = note.rotation
         )
     }
 
@@ -193,7 +194,8 @@ class PdfEditorViewModel @Inject constructor(
             text = state.text,
             position = Offset(state.positionX, state.positionY),
             color = Color(state.color.toULong()),
-            fontSize = state.fontSize
+            fontSize = state.fontSize,
+            rotation = state.rotation
         )
     }
 
@@ -799,6 +801,7 @@ class PdfEditorViewModel @Inject constructor(
         when (command) {
             is AnnotationCommand.AddPath -> _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.annotationId }) }
             is AnnotationCommand.AddTextNote -> _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.annotationId }) }
+            is AnnotationCommand.AddMarkupCommand -> _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.annotationId }) }
             is AnnotationCommand.RemoveAnnotation -> {
                 val snap = CommandSerializer.deserializeSnapshot(command.removedAnnotationPayload)
                 snapshotToAnnotation(snap)?.let { a -> _uiState.update { it.copy(annotations = it.annotations + a) } }
@@ -834,6 +837,7 @@ class PdfEditorViewModel @Inject constructor(
         when (command) {
             is AnnotationCommand.AddPath -> { val a = PdfAnnotation.Path(id = command.annotationId, pageIndex = command.pageIndex, points = command.points.map { Offset(it.x, it.y) }, color = Color(command.color.toULong()), strokeWidth = command.strokeWidth, isHighlighter = command.isHighlighter); _uiState.update { it.copy(annotations = it.annotations + a) } }
             is AnnotationCommand.AddTextNote -> { val a = PdfAnnotation.TextNote(id = command.annotationId, pageIndex = command.pageIndex, text = command.text, position = Offset(command.positionX, command.positionY), color = Color(command.color.toULong()), fontSize = command.fontSize); _uiState.update { it.copy(annotations = it.annotations + a) } }
+            is AnnotationCommand.AddMarkupCommand -> { val a = markupFromCommand(command); _uiState.update { s -> if (s.annotations.any { it.id == a.id }) s else s.copy(annotations = s.annotations + a) } }
             is AnnotationCommand.RemoveAnnotation -> _uiState.update { s -> s.copy(annotations = s.annotations.filter { it.id != command.annotationId }) }
             is AnnotationCommand.UpdateAnnotation -> { val snap = CommandSerializer.deserializeSnapshot(command.newPayload); snapshotToAnnotation(snap)?.let { na -> _uiState.update { s -> s.copy(annotations = s.annotations.map { if (it.id == command.annotationId) na else it }) } } }
             is AnnotationCommand.TextCommand -> { val n = stateToTextNote(command.after, command.pageIndex); _uiState.update { s -> val ex = s.annotations.find { it.id == n.id }; if (ex != null) s.copy(annotations = s.annotations.map { if (it.id == n.id) n else it }) else s.copy(annotations = s.annotations + n) } }
@@ -927,12 +931,33 @@ class PdfEditorViewModel @Inject constructor(
                                         cs.beginText()
                                         cs.setNonStrokingColor((ann.color.red * 255).toInt(), (ann.color.green * 255).toInt(), (ann.color.blue * 255).toInt())
                                         cs.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, ann.fontSize * scaleX)
-                                        cs.newLineAtOffset(ann.position.x * scaleX, pdfHeight - (ann.position.y * scaleX) - (ann.fontSize * scaleX))
+                                        val tx = ann.position.x * scaleX
+                                        val ty = pdfHeight - (ann.position.y * scaleX) - (ann.fontSize * scaleX)
+                                        // Compose rotationZ is clockwise (screen y-down); PDF text rotation is
+                                        // counter-clockwise (y-up), so negate the angle. Pivot at the baseline origin.
+                                        if (ann.rotation != 0f) {
+                                            cs.setTextRotation(Math.toRadians(-ann.rotation.toDouble()), tx.toDouble(), ty.toDouble())
+                                        } else {
+                                            cs.newLineAtOffset(tx, ty)
+                                        }
                                         cs.showText(ann.text); cs.endText()
                                     }
-                                    is PdfAnnotation.TextMarkup -> { /* PDFBox export for markup TBD */ }
+                                    // Markup (highlight/underline/strikeout) is a real
+                                    // page-level annotation object, not content-stream
+                                    // drawing — added after this stream closes below.
+                                    is PdfAnnotation.TextMarkup -> Unit
                                 }
                             }
+                        }
+
+                        // ─── Real text-markup annotations (page-level) ──────────
+                        // Written as PDF Highlight/Underline/StrikeOut annotation
+                        // objects with QuadPoints so other viewers (Acrobat, Chrome,
+                        // Preview) recognise and can edit/remove them. Markup rects are
+                        // normalized (0..1), so they map straight to PDF points and do
+                        // not use the view-pixel scaleX path above.
+                        pageAnns.filterIsInstance<PdfAnnotation.TextMarkup>().forEach { markup ->
+                            writeMarkupAnnotation(page, markup, cropBox.width, pdfHeight)
                         }
                     }
                     document.save(file)
@@ -940,6 +965,70 @@ class PdfEditorViewModel @Inject constructor(
                 Log.d(TAG, "Annotations saved to PDF")
             } catch (e: Exception) { Log.e(TAG, "Failed to save annotations", e) }
         }
+    }
+
+    /**
+     * Write one [PdfAnnotation.TextMarkup] as a real PDF text-markup annotation
+     * (Highlight / Underline / StrikeOut) on [page].
+     *
+     * The selection rects are normalized (0..1, origin top-left like the renderer), so they
+     * convert directly to PDF user-space points (origin bottom-left) — no view-pixel scaling.
+     * QuadPoints are emitted in Acrobat's expected order (top-left, top-right, bottom-left,
+     * bottom-right) per word so highlights wrap each word tightly. Opacity is carried on /CA;
+     * [com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.constructAppearances]
+     * generates the appearance stream so viewers without auto-rendering still show it.
+     */
+    private fun writeMarkupAnnotation(
+        page: com.tom_roush.pdfbox.pdmodel.PDPage,
+        markup: PdfAnnotation.TextMarkup,
+        pdfWidth: Float,
+        pdfHeight: Float
+    ) {
+        if (markup.rects.isEmpty()) return
+
+        val subType = when (markup.type) {
+            PdfAnnotation.MarkupType.HIGHLIGHT ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
+            PdfAnnotation.MarkupType.UNDERLINE ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_UNDERLINE
+            PdfAnnotation.MarkupType.STRIKETHROUGH ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_STRIKEOUT
+        }
+        val annotation = com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup(subType)
+
+        val quads = ArrayList<Float>(markup.rects.size * 8)
+        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+        for (r in markup.rects) {
+            val left = r.left * pdfWidth
+            val right = r.right * pdfWidth
+            val top = pdfHeight - r.top * pdfHeight
+            val bottom = pdfHeight - r.bottom * pdfHeight
+            quads.add(left); quads.add(top)      // top-left
+            quads.add(right); quads.add(top)     // top-right
+            quads.add(left); quads.add(bottom)   // bottom-left
+            quads.add(right); quads.add(bottom)  // bottom-right
+            if (left < minX) minX = left
+            if (right > maxX) maxX = right
+            if (bottom < minY) minY = bottom
+            if (top > maxY) maxY = top
+        }
+        annotation.setQuadPoints(quads.toFloatArray())
+
+        // Full-opacity RGB; transparency is applied via /CA so the colour stays true.
+        annotation.setColor(
+            com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor(
+                floatArrayOf(markup.color.red, markup.color.green, markup.color.blue),
+                com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB.INSTANCE
+            )
+        )
+        annotation.cosObject.setFloat(com.tom_roush.pdfbox.cos.COSName.CA, markup.color.alpha)
+        annotation.setRectangle(
+            com.tom_roush.pdfbox.pdmodel.common.PDRectangle(minX, minY, maxX - minX, maxY - minY)
+        )
+        annotation.setPrinted(true)
+        annotation.constructAppearances()
+        page.annotations.add(annotation)
     }
 
     fun exportEditedPdf(viewWidth: Int) {
@@ -980,7 +1069,13 @@ class PdfEditorViewModel @Inject constructor(
                 positionX = annotation.position.x, positionY = annotation.position.y,
                 color = annotation.color.value.toLong(), fontSize = annotation.fontSize
             )
-            is PdfAnnotation.TextMarkup -> null
+            is PdfAnnotation.TextMarkup -> AnnotationCommand.AddMarkupCommand(
+                id = java.util.UUID.randomUUID().toString(), pdfPath = pdfFilePath,
+                pageIndex = annotation.pageIndex, timestamp = System.currentTimeMillis(),
+                annotationId = annotation.id,
+                rects = annotation.rects.map { SerializableRect(it.left, it.top, it.right, it.bottom) },
+                color = annotation.color.value.toLong(), markupType = annotation.type.name
+            )
         }
     }
 
@@ -997,10 +1092,21 @@ class PdfEditorViewModel @Inject constructor(
                 text = command.text, position = Offset(command.positionX, command.positionY),
                 color = Color(command.color.toULong()), fontSize = command.fontSize
             )
+            is AnnotationCommand.AddMarkupCommand -> markupFromCommand(command)
             is AnnotationCommand.TextCommand -> stateToTextNote(command.after, command.pageIndex)
             else -> null
         }
     }
+
+    /** Reconstruct a [PdfAnnotation.TextMarkup] from its persisted command. */
+    private fun markupFromCommand(command: AnnotationCommand.AddMarkupCommand): PdfAnnotation.TextMarkup =
+        PdfAnnotation.TextMarkup(
+            id = command.annotationId, pageIndex = command.pageIndex,
+            rects = command.rects.map { androidx.compose.ui.geometry.Rect(it.left, it.top, it.right, it.bottom) },
+            color = Color(command.color.toULong()),
+            type = runCatching { PdfAnnotation.MarkupType.valueOf(command.markupType) }
+                .getOrDefault(PdfAnnotation.MarkupType.HIGHLIGHT)
+        )
 
     private fun serializeAnnotation(annotation: PdfAnnotation): String {
         return when (annotation) {
@@ -1016,7 +1122,11 @@ class PdfEditorViewModel @Inject constructor(
                 positionY = annotation.position.y, color = annotation.color.value.toLong(),
                 fontSize = annotation.fontSize
             )
-            is PdfAnnotation.TextMarkup -> ""
+            is PdfAnnotation.TextMarkup -> CommandSerializer.serializeMarkupAnnotation(
+                annotationId = annotation.id, pageIndex = annotation.pageIndex,
+                rects = annotation.rects.map { SerializableRect(it.left, it.top, it.right, it.bottom) },
+                color = annotation.color.value.toLong(), markupType = annotation.type.name
+            )
         }
     }
 
@@ -1037,6 +1147,16 @@ class PdfEditorViewModel @Inject constructor(
                     id = snapshot.annotationId, pageIndex = snapshot.pageIndex,
                     text = data.text, position = Offset(data.positionX, data.positionY),
                     color = Color(data.color.toULong()), fontSize = data.fontSize
+                )
+            }
+            CommandSerializer.TYPE_ADD_MARKUP -> {
+                val data = snapshot.markupData ?: return null
+                PdfAnnotation.TextMarkup(
+                    id = snapshot.annotationId, pageIndex = snapshot.pageIndex,
+                    rects = data.rects.map { androidx.compose.ui.geometry.Rect(it.left, it.top, it.right, it.bottom) },
+                    color = Color(data.color.toULong()),
+                    type = runCatching { PdfAnnotation.MarkupType.valueOf(data.markupType) }
+                        .getOrDefault(PdfAnnotation.MarkupType.HIGHLIGHT)
                 )
             }
             else -> null

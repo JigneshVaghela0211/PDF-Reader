@@ -53,11 +53,16 @@ fun HomeContent(
     var showRenameDialog by remember { mutableStateOf<PdfFile?>(null) }
     var showDeleteDialog by remember { mutableStateOf<PdfFile?>(null) }
     var selectedPdfPath by remember { mutableStateOf<String?>(null) }
-    val selectedPdf = remember(selectedPdfPath, files) { 
-        files.find { it.path == selectedPdfPath } 
+    var toolsPdfPath by remember { mutableStateOf<String?>(null) }
+    val selectedPdf = remember(selectedPdfPath, files) {
+        files.find { it.path == selectedPdfPath }
     }
-    
+    val toolsPdf = remember(toolsPdfPath, files) {
+        files.find { it.path == toolsPdfPath }
+    }
+
     val sheetState = rememberModalBottomSheetState()
+    val toolsSheetState = rememberModalBottomSheetState()
     
     if (selectedPdf != null) {
         val pdf = selectedPdf
@@ -84,11 +89,30 @@ fun HomeContent(
                     selectedPdfPath = null
                 },
                 onFavorite = { onFavorite(pdf) },
-                onDelete = { 
+                onDelete = {
                     showDeleteDialog = pdf
                     selectedPdfPath = null
                 },
+                onTools = {
+                    toolsPdfPath = pdf.path
+                    selectedPdfPath = null
+                },
                 onDismiss = { selectedPdfPath = null }
+            )
+        }
+    }
+
+    if (toolsPdf != null) {
+        ModalBottomSheet(
+            onDismissRequest = { toolsPdfPath = null },
+            sheetState = toolsSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            PdfToolsBottomSheet(
+                pdf = toolsPdf,
+                onDismiss = { toolsPdfPath = null }
             )
         }
     }

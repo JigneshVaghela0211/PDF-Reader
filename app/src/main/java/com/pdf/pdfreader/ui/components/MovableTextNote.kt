@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
 import androidx.compose.material3.Icon
@@ -35,7 +36,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -72,7 +75,7 @@ fun MovableTextNote(
     var beforeState by remember { mutableStateOf<AnnotationCommand.TextState?>(null) }
     
     val currentState = remember(note) {
-        AnnotationCommand.TextState(note.id, note.text, note.color.value.toLong(), note.fontSize, note.position.x, note.position.y)
+        AnnotationCommand.TextState(note.id, note.text, note.color.value.toLong(), note.fontSize, note.position.x, note.position.y, note.rotation)
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -198,6 +201,15 @@ fun MovableTextNote(
                         ) {
                             Icon(Icons.Default.TextIncrease, contentDescription = "Increase Font Size", modifier = Modifier.size(20.dp))
                         }
+                        // Rotate in 90° steps (gated by the centralized feature config).
+                        if (PdfEditorFeatureConfig.ENABLE_TEXT_ROTATION) {
+                            IconButton(
+                                onClick = { onCommit(currentState, currentState.copy(rotation = (note.rotation + 90f) % 360f)) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.RotateRight, contentDescription = "Rotate 90°", modifier = Modifier.size(20.dp))
+                            }
+                        }
                         // Delete Button
                         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Delete Text", tint = Color.Red, modifier = Modifier.size(20.dp))
@@ -209,6 +221,7 @@ fun MovableTextNote(
             // Text Rendering / Input Field
             Box(
                 modifier = Modifier
+                    .graphicsLayer { rotationZ = note.rotation }
                     .background(
                         color = if (isTyping) Color(0xAAFFFFFF) else Color.Transparent,
                         shape = RoundedCornerShape(8.dp)

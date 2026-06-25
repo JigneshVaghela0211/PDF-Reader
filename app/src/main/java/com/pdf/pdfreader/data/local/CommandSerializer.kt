@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import com.pdf.pdfreader.domain.model.AnnotationCommand
 import com.pdf.pdfreader.domain.model.SerializableOffset
+import com.pdf.pdfreader.domain.model.SerializableRect
 
 /**
  * Utility for converting [AnnotationCommand] to/from Room-storable format.
@@ -21,6 +22,7 @@ object CommandSerializer {
 
     const val TYPE_ADD_PATH = "ADD_PATH"
     const val TYPE_ADD_TEXT = "ADD_TEXT"
+    const val TYPE_ADD_MARKUP = "ADD_MARKUP"
     const val TYPE_REMOVE = "REMOVE"
     const val TYPE_UPDATE = "UPDATE"
     const val TYPE_TEXT_COMMAND = "TEXT_COMMAND"
@@ -41,6 +43,7 @@ object CommandSerializer {
     fun getType(command: AnnotationCommand): String = when (command) {
         is AnnotationCommand.AddPath -> TYPE_ADD_PATH
         is AnnotationCommand.AddTextNote -> TYPE_ADD_TEXT
+        is AnnotationCommand.AddMarkupCommand -> TYPE_ADD_MARKUP
         is AnnotationCommand.RemoveAnnotation -> TYPE_REMOVE
         is AnnotationCommand.UpdateAnnotation -> TYPE_UPDATE
         is AnnotationCommand.TextCommand -> TYPE_TEXT_COMMAND
@@ -78,6 +81,8 @@ object CommandSerializer {
                 fontSize = command.fontSize
             )
         )
+
+        is AnnotationCommand.AddMarkupCommand -> gson.toJson(command)
 
         is AnnotationCommand.RemoveAnnotation -> gson.toJson(
             RemovePayload(
@@ -141,6 +146,10 @@ object CommandSerializer {
                     color = p.color,
                     fontSize = p.fontSize
                 )
+            }
+
+            TYPE_ADD_MARKUP -> {
+                gson.fromJson(entity.payload, AnnotationCommand.AddMarkupCommand::class.java)
             }
 
             TYPE_REMOVE -> {
@@ -274,6 +283,24 @@ object CommandSerializer {
     )
 
     /**
+     * Serialize a PdfAnnotation.TextMarkup to a JSON snapshot string.
+     */
+    fun serializeMarkupAnnotation(
+        annotationId: String,
+        pageIndex: Int,
+        rects: List<SerializableRect>,
+        color: Long,
+        markupType: String
+    ): String = gson.toJson(
+        AnnotationSnapshot(
+            type = TYPE_ADD_MARKUP,
+            annotationId = annotationId,
+            pageIndex = pageIndex,
+            markupData = MarkupPayload(annotationId, rects, color, markupType)
+        )
+    )
+
+    /**
      * Deserialize a snapshot JSON back to determine the annotation type and data.
      */
     fun deserializeSnapshot(json: String): AnnotationSnapshot {
@@ -299,6 +326,13 @@ object CommandSerializer {
         val fontSize: Float
     )
 
+    data class MarkupPayload(
+        val annotationId: String,
+        val rects: List<SerializableRect>,
+        val color: Long,
+        val markupType: String
+    )
+
     data class RemovePayload(
         val annotationId: String,
         val removedAnnotationPayload: String
@@ -318,6 +352,7 @@ object CommandSerializer {
         val annotationId: String,
         val pageIndex: Int,
         val pathData: AddPathPayload? = null,
-        val textData: AddTextPayload? = null
+        val textData: AddTextPayload? = null,
+        val markupData: MarkupPayload? = null
     )
 }

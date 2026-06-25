@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
+import com.pdf.pdfreader.core.model.EditorFeature
 import com.pdf.pdfreader.domain.model.PdfFile
 import com.pdf.pdfreader.utiles.ThumbnailManager
 
@@ -32,8 +34,14 @@ fun PdfActionsBottomSheet(
     onShare: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
+    onTools: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Show the PDF Tools entry only when at least one tool is visible per the feature config.
+    val toolsVisible = PdfEditorFeatureConfig.isVisible(EditorFeature.MERGE) ||
+        PdfEditorFeatureConfig.isVisible(EditorFeature.SPLIT) ||
+        PdfEditorFeatureConfig.isVisible(EditorFeature.COMPRESS) ||
+        PdfEditorFeatureConfig.isVisible(EditorFeature.OCR)
     var showInfoDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -131,6 +139,14 @@ fun PdfActionsBottomSheet(
             label = "Share",
             onClick = onShare
         )
+        if (toolsVisible) {
+            ActionRow(
+                icon = Icons.Outlined.Build,
+                label = "PDF Tools",
+                tint = MaterialTheme.colorScheme.primary,
+                onClick = onTools
+            )
+        }
         ActionRow(
             icon = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
             label = if (pdf.isFavorite) "Remove from Favorites" else "Add to Favorites",
