@@ -378,22 +378,14 @@ private fun GlobalImageElementView(
 
                                         if (delta != Offset.Zero) {
                                             hasDragged = true
-                                            // The image is rotated via graphicsLayer, so this
-                                            // delta is in the element's LOCAL (rotated) space.
-                                            // Rotate it back into viewport space so a rotated
-                                            // image drags in the direction the finger moves.
-                                            val screenDelta = if (element.rotation == 0f) {
-                                                delta
-                                            } else {
-                                                val rad = Math.toRadians(element.rotation.toDouble())
-                                                val cos = kotlin.math.cos(rad).toFloat()
-                                                val sin = kotlin.math.sin(rad).toFloat()
-                                                Offset(
-                                                    delta.x * cos - delta.y * sin,
-                                                    delta.x * sin + delta.y * cos
-                                                )
-                                            }
-                                            onMoveBy(screenDelta)
+                                            // positionChange() is already in VIEWPORT space, and
+                                            // position is applied via Modifier.offset OUTSIDE the
+                                            // rotation graphicsLayer, so the raw delta tracks the
+                                            // finger at every angle. Translation is centralized in
+                                            // ImageTransformEngine (via the ViewModel) — the view
+                                            // does no rotation/drag math. Rotating the delta here
+                                            // was the bug that inverted drag after rotation.
+                                            onMoveBy(delta)
                                         }
                                     } else {
                                         change.consume()

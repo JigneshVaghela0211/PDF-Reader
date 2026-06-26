@@ -61,7 +61,7 @@ val model = ToolbarFeatureProvider.uiModel(EditorFeature.EDIT_TEXT)
 `PdfEditorFeatureConfig` layers build-variant overrides on top of the production baseline:
 
 - **Debug** (`BuildConfig.DEBUG`): enables experimental features for testing
-  (e.g. `REAL_PDF_TEXT_EDITING` → `BETA`, `OCR` → `BETA`).
+  (`REAL_PDF_TEXT_EDITING` → `BETA`).
 - **Release**: only production-ready features (experimental ones forced to `DISABLED`).
 
 ### Available feature switches
@@ -108,21 +108,21 @@ Defaults below are the **production baseline** (debug builds may upgrade experim
 #### Page Management
 | Switch | Feature | Default |
 |---|---|---|
-| `ENABLE_INSERT_PAGE` | `INSERT_PAGE` | COMING_SOON |
+| `ENABLE_INSERT_PAGE` | `INSERT_PAGE` | BETA |
 | `ENABLE_DELETE_PAGE` | `DELETE_PAGE` | ENABLED |
 | `ENABLE_ROTATE_PAGE` | `ROTATE_PAGE` | ENABLED |
 | `ENABLE_EXTRACT_PAGE` | `EXTRACT_PAGE` | ENABLED |
-| `ENABLE_REORDER_PAGE` | `REORDER_PAGE` | COMING_SOON |
+| `ENABLE_REORDER_PAGE` | `REORDER_PAGE` | BETA |
 
 #### PDF Tools
 | Switch | Feature | Default |
 |---|---|---|
 | `ENABLE_SEARCH` | `SEARCH` | ENABLED |
 | `ENABLE_COPY_TEXT` | `COPY_TEXT` | ENABLED |
-| `ENABLE_OCR` | `OCR` | COMING_SOON (BETA in debug) |
-| `ENABLE_COMPRESS` | `COMPRESS` | COMING_SOON |
-| `ENABLE_MERGE` | `MERGE` | COMING_SOON |
-| `ENABLE_SPLIT` | `SPLIT` | COMING_SOON |
+| `ENABLE_OCR` | `OCR` | BETA |
+| `ENABLE_COMPRESS` | `COMPRESS` | BETA |
+| `ENABLE_MERGE` | `MERGE` | BETA |
+| `ENABLE_SPLIT` | `SPLIT` | BETA |
 | `ENABLE_AI_SUMMARY` | `AI_SUMMARY` | PREMIUM |
 
 #### Save Options

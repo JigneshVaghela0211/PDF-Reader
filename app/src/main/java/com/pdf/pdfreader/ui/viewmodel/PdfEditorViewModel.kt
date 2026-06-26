@@ -12,6 +12,8 @@ import com.pdf.pdfreader.core.model.EditorFeature
 import com.pdf.pdfreader.data.local.CommandSerializer
 import com.pdf.pdfreader.domain.model.*
 import com.pdf.pdfreader.domain.usecase.UndoRedoManager
+import com.pdf.pdfreader.feature.pdf_image.domain.usecase.RotateImageUseCase
+import com.pdf.pdfreader.feature.pdf_image.domain.usecase.UpdateImagePositionUseCase
 import com.pdf.pdfreader.ui.components.AnnotationTool
 import com.pdf.pdfreader.utiles.PdfExportManager
 import com.pdf.pdfreader.utiles.PdfTextBlockExtractor
@@ -614,8 +616,10 @@ class PdfEditorViewModel @Inject constructor(
             for (i in list.indices) {
                 val elem = list[i]; if (!moveIds.contains(elem.id)) continue
                 val vis = 0.2f
-                val clampedX = kotlin.math.round((elem.position.x + delta.x).coerceIn(-elem.width * elem.scale * (1f - vis), cachedScreenWidth - elem.width * elem.scale * vis))
-                val clampedY = kotlin.math.round((elem.position.y + delta.y).coerceIn(-elem.height * elem.scale * (1f - vis), cachedScreenHeight - elem.height * elem.scale * vis))
+                // New viewport position from the centralized engine (no rotation math here).
+                val moved = UpdateImagePositionUseCase(elem, delta)
+                val clampedX = kotlin.math.round(moved.x.coerceIn(-elem.width * elem.scale * (1f - vis), cachedScreenWidth - elem.width * elem.scale * vis))
+                val clampedY = kotlin.math.round(moved.y.coerceIn(-elem.height * elem.scale * (1f - vis), cachedScreenHeight - elem.height * elem.scale * vis))
                 if (clampedX != elem.position.x || clampedY != elem.position.y) { list[i] = elem.copy(position = Offset(clampedX, clampedY)); changed = true }
             }
             if (changed) s.copy(imageElements = list) else s
@@ -745,7 +749,7 @@ class PdfEditorViewModel @Inject constructor(
 
     fun rotateImage(id: String, degrees: Float) {
         val el = _uiState.value.imageElements.find { it.id == id } ?: return
-        val after = (el.rotation + degrees) % 360f
+        val after = RotateImageUseCase(el, degrees)
         _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == id) it.copy(rotation = after) else it }) }
         viewModelScope.launch { undoRedoManager.execute(AnnotationCommand.RotateImageCommand(
             id = java.util.UUID.randomUUID().toString(), pdfPath = pdfFilePath,
