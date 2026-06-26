@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,6 +113,13 @@ fun ManagePagesScreen(
                     } else if (PdfEditorFeatureConfig.ENABLE_REORDER_PAGE &&
                         uiState.selectedPages.isEmpty() && uiState.totalPages > 1
                     ) {
+                        IconButton(onClick = {
+                            viewModel.reversePages { success ->
+                                if (success) Toast.makeText(context, "Pages reversed", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Icon(Icons.Default.ImportExport, contentDescription = "Reverse page order")
+                        }
                         IconButton(onClick = {
                             orderedPages = (0 until uiState.totalPages).toList()
                             reorderMode = true

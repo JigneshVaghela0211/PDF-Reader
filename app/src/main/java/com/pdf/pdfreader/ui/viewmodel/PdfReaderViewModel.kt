@@ -91,7 +91,9 @@ data class PdfReaderUiState(
     val searchQuery: String = "",
     val searchResults: List<SearchMatch> = emptyList(),
     val currentMatchIndex: Int = -1,
-    val totalMatchCount: Int = 0
+    val totalMatchCount: Int = 0,
+    val searchCaseSensitive: Boolean = false,
+    val searchWholeWord: Boolean = false
 ) {
     /** Convenience: true when background mode is INVERT */
     val isNightMode: Boolean get() = viewSettings.backgroundMode == BackgroundMode.INVERT
@@ -446,20 +448,63 @@ class PdfReaderViewModel @Inject constructor(
 
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+        rerunSearch(debounce = true)
+    }
+
+    /** Toggle case-sensitive matching and re-run the current query. */
+    fun toggleSearchCaseSensitive() {
+        _uiState.update { it.copy(searchCaseSensitive = !it.searchCaseSensitive) }
+        rerunSearch(debounce = false)
+    }
+
+    /** Toggle whole-word matching and re-run the current query. */
+    fun toggleSearchWholeWord() {
+        _uiState.update { it.copy(searchWholeWord = !it.searchWholeWord) }
+        rerunSearch(debounce = false)
+    }
+
+    private fun rerunSearch(debounce: Boolean) {
+        val query = _uiState.value.searchQuery
         searchJob?.cancel()
         if (query.isBlank()) {
             _uiState.update { it.copy(searchResults = emptyList(), currentMatchIndex = -1, totalMatchCount = 0) }
             return
         }
         searchJob = viewModelScope.launch {
-            delay(300)
+            if (debounce) delay(300)
             searchInPdf(query)
         }
+    }
+
+    /**
+     * Finds every match range of [query] inside [text], honoring case sensitivity and
+     * whole-word boundaries. Whole-word means the match is not flanked by letters/digits.
+     */
+    private fun matchRangesIn(
+        text: String, query: String, caseSensitive: Boolean, wholeWord: Boolean
+    ): List<IntRange> {
+        if (query.isEmpty()) return emptyList()
+        val haystack = if (caseSensitive) text else text.lowercase()
+        val needle = if (caseSensitive) query else query.lowercase()
+        val ranges = mutableListOf<IntRange>()
+        var idx = haystack.indexOf(needle)
+        while (idx >= 0) {
+            val end = idx + needle.length
+            val boundaryOk = !wholeWord || (
+                (idx == 0 || !haystack[idx - 1].isLetterOrDigit()) &&
+                (end >= haystack.length || !haystack[end].isLetterOrDigit())
+            )
+            if (boundaryOk) ranges.add(idx until end)
+            idx = haystack.indexOf(needle, idx + 1)
+        }
+        return ranges
     }
 
     private suspend fun searchInPdf(query: String) {
         val path = _uiState.value.filePath
         if (path.isEmpty()) return
+        val caseSensitive = _uiState.value.searchCaseSensitive
+        val wholeWord = _uiState.value.searchWholeWord
         val allMatches = mutableListOf<SearchMatch>()
         withContext(Dispatchers.IO) {
             try {
@@ -475,11 +520,9 @@ class PdfReaderViewModel @Inject constructor(
                         val pdfHeight = cropBox.height
                         val stripper = object : com.tom_roush.pdfbox.text.PDFTextStripper() {
                             override fun writeString(text: String, textPositions: List<com.tom_roush.pdfbox.text.TextPosition>) {
-                                val lowerText = text.lowercase()
-                                val lowerQuery = query.lowercase()
-                                var startIndex = lowerText.indexOf(lowerQuery)
-                                while (startIndex >= 0) {
-                                    val endIndex = startIndex + lowerQuery.length
+                                for (range in matchRangesIn(text, query, caseSensitive, wholeWord)) {
+                                    val startIndex = range.first
+                                    val endIndex = range.last + 1
                                     var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
                                     var maxX = Float.MIN_VALUE; var maxY = Float.MIN_VALUE
                                     for (i in startIndex until endIndex) {
@@ -493,9 +536,8 @@ class PdfReaderViewModel @Inject constructor(
                                     }
                                     if (minX < Float.MAX_VALUE) {
                                         allMatches.add(SearchMatch(pageIdx, Rect(minX / pdfWidth, minY / pdfHeight, maxX / pdfWidth, maxY / pdfHeight),
-                                            text.substring(startIndex, (startIndex + lowerQuery.length).coerceAtMost(text.length))))
+                                            text.substring(startIndex, endIndex.coerceAtMost(text.length))))
                                     }
-                                    startIndex = lowerText.indexOf(lowerQuery, startIndex + 1)
                                 }
                             }
                         }
@@ -544,9 +586,32 @@ class PdfReaderViewModel @Inject constructor(
     }
     fun onPasswordChange(p: String) { _uiState.update { it.copy(password = p) } }
 
+    private var positionSaveJob: Job? = null
+
     fun updateCurrentPage(page: Int) {
         if (page != _uiState.value.currentPage) {
             _uiState.update { s -> s.copy(currentPage = page, isBookmarked = s.bookmarks.any { it.pageIndex == page }) }
+            persistReadingPosition(page)
+        }
+    }
+
+    /**
+     * Persists the current reading position so the document re-opens where the user
+     * left off. Debounced because [updateCurrentPage] fires on every scroll tick.
+     * The read side already exists in [initialize] (lastOpenedPage); this is the
+     * previously-missing write side.
+     */
+    private fun persistReadingPosition(page: Int) {
+        val path = _uiState.value.filePath
+        if (path.isEmpty()) return
+        positionSaveJob?.cancel()
+        positionSaveJob = viewModelScope.launch {
+            delay(500)
+            try {
+                pdfRepository.updateLastOpenedPage(path, page)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to persist reading position", e)
+            }
         }
     }
 
@@ -563,6 +628,12 @@ class PdfReaderViewModel @Inject constructor(
         viewModelScope.launch {
             if (uiState.value.isBookmarked) pdfRepository.removeBookmark(path, page) else pdfRepository.addBookmark(path, page)
         }
+    }
+
+    /** Remove the bookmark on a specific page (used by the bookmarks list). */
+    fun removeBookmarkAt(pageIndex: Int) {
+        val path = uiState.value.filePath; if (path.isEmpty()) return
+        viewModelScope.launch { pdfRepository.removeBookmark(path, pageIndex) }
     }
 
     fun toggleNightMode() {

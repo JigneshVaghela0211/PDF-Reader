@@ -29,6 +29,10 @@ internal fun SearchTopBar(
     query: String,
     matchCount: Int,
     currentMatch: Int,
+    caseSensitive: Boolean,
+    wholeWord: Boolean,
+    onToggleCaseSensitive: () -> Unit,
+    onToggleWholeWord: () -> Unit,
     onQueryChange: (String) -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -92,6 +96,11 @@ internal fun SearchTopBar(
                 )
             }
 
+            // Case-sensitive toggle
+            SearchToggle(label = "Aa", active = caseSensitive, onClick = onToggleCaseSensitive)
+            // Whole-word toggle
+            SearchToggle(label = "W", active = wholeWord, onClick = onToggleWholeWord)
+
             // Match counter
             if (query.isNotEmpty()) {
                 Text(
@@ -128,6 +137,32 @@ internal fun SearchTopBar(
             IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_search), modifier = Modifier.size(22.dp))
             }
+        }
+    }
+}
+
+/** Compact on/off pill used for the case-sensitive and whole-word search toggles. */
+@Composable
+private fun SearchToggle(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val bg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = bg,
+        modifier = Modifier.size(width = 34.dp, height = 30.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = fg
+            )
         }
     }
 }

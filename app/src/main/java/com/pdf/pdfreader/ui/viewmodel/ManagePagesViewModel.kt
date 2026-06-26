@@ -265,6 +265,13 @@ class ManagePagesViewModel @Inject constructor(
         runPageOp({ path -> pageManager.reorder(path, newOrder) }, onComplete)
     }
 
+    /** Reverse the entire page order (last page becomes first). No-op for 0/1-page documents. */
+    fun reversePages(onComplete: (Boolean) -> Unit) {
+        val n = _uiState.value.totalPages
+        if (n <= 1) { onComplete(false); return }
+        runPageOp({ path -> pageManager.reorder(path, (n - 1 downTo 0).toList()) }, onComplete)
+    }
+
     /**
      * Run a [PdfPageManager] operation that yields a sibling file, then move it over the original
      * and reload. Keeps the in-place editing model the screen already uses for delete/rotate.

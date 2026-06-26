@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
@@ -175,6 +177,16 @@ fun PdfReaderScreen(
     var isSliderVisible by remember { mutableStateOf(false) }
     var sliderInteractionTime by remember { mutableLongStateOf(0L) }
     var showViewOptions by remember { mutableStateOf(false) }
+    var showGoToPage by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
+    var showAnnotations by remember { mutableStateOf(false) }
+
+    // Jump to a page from go-to-page / bookmarks, keeping the page indicator in sync.
+    val jumpToPage: (Int) -> Unit = { page ->
+        val target = page.coerceIn(0, (uiState.totalPages - 1).coerceAtLeast(0))
+        viewModel.updateCurrentPage(target)
+        coroutineScope.launch { scrollState.scrollToItem(target) }
+    }
 
     val viewSettings = uiState.viewSettings
 
@@ -253,6 +265,10 @@ fun PdfReaderScreen(
                         query = uiState.searchQuery,
                         matchCount = uiState.totalMatchCount,
                         currentMatch = uiState.currentMatchIndex,
+                        caseSensitive = uiState.searchCaseSensitive,
+                        wholeWord = uiState.searchWholeWord,
+                        onToggleCaseSensitive = viewModel::toggleSearchCaseSensitive,
+                        onToggleWholeWord = viewModel::toggleSearchWholeWord,
                         onQueryChange = viewModel::updateSearchQuery,
                         onNext = viewModel::navigateToNextMatch,
                         onPrevious = viewModel::navigateToPreviousMatch,
@@ -281,6 +297,14 @@ fun PdfReaderScreen(
                                     Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_in_pdf))
                                 }
                             }
+                            IconButton(onClick = viewModel::toggleBookmark) {
+                                Icon(
+                                    if (uiState.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Bookmark page",
+                                    tint = if (uiState.isBookmarked) MaterialTheme.colorScheme.primary
+                                    else LocalContentColor.current
+                                )
+                            }
                             IconButton(onClick = { showViewOptions = true }) {
                                 Icon(Icons.Default.Tune, contentDescription = "View Options")
                             }
@@ -289,6 +313,29 @@ fun PdfReaderScreen(
                                     Icons.Default.Edit,
                                     contentDescription = "Edit / Annotate",
                                     tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Go to page") },
+                                    onClick = { showMenu = false; showGoToPage = true },
+                                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Bookmarks") },
+                                    onClick = { showMenu = false; showBookmarks = true },
+                                    leadingIcon = { Icon(Icons.Default.Bookmarks, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Annotations") },
+                                    onClick = { showMenu = false; showAnnotations = true },
+                                    leadingIcon = { Icon(Icons.Default.Highlight, contentDescription = null) }
                                 )
                             }
                         },
@@ -821,6 +868,36 @@ fun PdfReaderScreen(
                     onNavigateToManagePages(uiState.filePath)
                 },
                 onDismiss = { showViewOptions = false }
+            )
+        }
+
+        // ─── Go To Page ──────────────────────────────────────────
+        if (showGoToPage && uiState.totalPages > 0) {
+            com.pdf.pdfreader.feature.reader.presentation.component.GoToPageDialog(
+                totalPages = uiState.totalPages,
+                currentPage = uiState.currentPage,
+                onConfirm = jumpToPage,
+                onDismiss = { showGoToPage = false }
+            )
+        }
+
+        // ─── Bookmarks List ──────────────────────────────────────
+        if (showBookmarks) {
+            com.pdf.pdfreader.feature.reader.presentation.component.BookmarksSheet(
+                bookmarks = uiState.bookmarks,
+                onJumpToPage = jumpToPage,
+                onRemoveBookmark = { page -> viewModel.removeBookmarkAt(page) },
+                onDismiss = { showBookmarks = false }
+            )
+        }
+
+        // ─── Annotation List ─────────────────────────────────────
+        if (showAnnotations) {
+            com.pdf.pdfreader.feature.annotation.presentation.component.AnnotationListSheet(
+                annotations = editorUiState.annotations,
+                onJumpToPage = jumpToPage,
+                onDelete = { id -> editorViewModel.removeAnnotation(id) },
+                onDismiss = { showAnnotations = false }
             )
         }
 

@@ -3,6 +3,22 @@
 Native Android PDF reader & editor — 100% Kotlin, Jetpack Compose + Material 3, Hilt DI.
 See [CLAUDE.md](CLAUDE.md) for build/run and architecture details.
 
+## Package structure (migration in progress)
+
+The codebase is moving from a **layer-first** layout (`ui/`, `domain/`, `data/`, `utiles/`)
+to a **feature-first** one, gradually — new feature work lands under `feature/<name>/` while
+existing working code stays in place until it's touched:
+
+```
+feature/
+  reader/presentation/component/      ← BookmarksSheet, GoToPageDialog
+  annotation/presentation/component/  ← AnnotationListSheet
+```
+
+The legacy fragment-based DI scaffold (`base/` package + `di/ActivityModule`) was unused and
+has been removed; the app is single-Activity Compose (`ui/MainActivity`). `viewBinding` is off
+(Compose-only UI).
+
 ## PDF Editor Feature Configuration
 
 All PDF-editing capabilities are governed by a **single source of truth**:
