@@ -76,15 +76,21 @@ Status legend: ✅ Completed · 🟡 Partial · 🔵 UI Only · 🟣 Backend Onl
   (only single edited-block replacement exists during export).
 - _Sizeable: needs a formatting toolbar + matching export support._
 
-## Chunk 6 — Image Editing 🟡 (analysis only)
+## Chunk 6 — Image Editing 🟡→ (Flip implemented)
 
 - ✅ Insert / Move / Resize / Rotate / Delete / Opacity / Layer order / Lock / Group.
-- ❌ Crop, **Flip**, Replace. (Flip is the cheapest next win: `ImageElement.flipH/flipV` + render + export + command.)
+- **Flip** ❌→✅ — `ImageElement.flipHorizontal/flipVertical`, `FlipImageCommand` (undoable + serialized
+  as `FLIP_IMAGE`), `graphicsLayer` scaleX/scaleY=-1 render, baked into PDF export via
+  `PdfExportManager.applyFlip`, flip buttons in `ImageEditToolbar`. Mapping centralized in
+  `feature/image/domain/ImageElementStateMapper`.
+- ❌ Crop, Replace (still deferred).
 
-## Chunk 7 — Signature 🟡 (analysis only)
+## Chunk 7 — Signature 🟡→ (Date Stamp / Initials implemented)
 
 - ✅ Draw, Saved signatures, Resize, Rotate, Color, Thickness (vector strokes).
-- ❌ Initials, Date Stamp (confirmed absent).
+- **Date Stamp** ❌→✅ and **Initials** ❌→✅ — inserted as movable, undoable text notes
+  (`PdfEditorViewModel.insertDateStamp` / `insertInitials` / `insertTextNote`), reached from the
+  Signature sheet; initials via `feature/signature/presentation/component/InitialsDialog`.
 
 ## Chunk 8 — Page Management 🟡 (partially implemented)
 
@@ -108,10 +114,13 @@ Status legend: ✅ Completed · 🟡 Partial · 🔵 UI Only · 🟣 Backend Onl
 
 - All ❌. No LLM backend by decision; `AI_SUMMARY` stays a PREMIUM placeholder.
 
-## Chunk 12 — File Manager 🟡 (analysis only)
+## Chunk 12 — File Manager 🟡→ (Tags/Labels implemented)
 
 - ✅ Favorites, Recent (Room-backed).
-- ❌ Tags, Labels, Hidden, Secure Folder, Duplicate detection (need Room schema additions + filter UI).
+- **Tags / Labels** ❌→✅ — `pdf_files.tags` column (Room **v8→v9** migration, preserved across
+  re-sync), `PdfFile.tags: List<String>`, `PdfRepository.updateTags`, editor via
+  `feature/filemanager/presentation/component/TagEditorDialog` reached from the file actions sheet.
+- ❌ Hidden, Secure Folder, Duplicate detection, filter-by-tag (deferred).
 
 ## Chunk 13 — Export / Import ❌ (report only — by decision)
 
@@ -128,7 +137,10 @@ Status legend: ✅ Completed · 🟡 Partial · 🔵 UI Only · 🟣 Backend Onl
 - ✅ Deleted dead `base/` package (12 files) + `di/ActivityModule.kt` (its only consumer);
   verified `MainActivity : AppCompatActivity` and zero injections of `Navigator`/`FragmentHandler`/`BaseActivity`.
 - ✅ Removed unused `viewBinding = true` (UI is 100% Compose).
-- ⏳ Remaining: split god classes (`PdfEditorViewModel`, `PdfReaderScreen`, `FileUtils`) — one per focused pass.
+- ✅ God-class split (first safe slice): extracted the duplicated `ImageElement`↔`ImageState` mapping
+  out of `PdfEditorViewModel` into `feature/image/domain/ImageElementStateMapper`.
+- ⏳ Remaining (incremental, needs device testing): continue splitting `PdfEditorViewModel`
+  (undo/redo apply blocks, export/markup writers), `PdfReaderScreen`, `FileUtils`.
 
 ---
 
@@ -136,13 +148,22 @@ Status legend: ✅ Completed · 🟡 Partial · 🔵 UI Only · 🟣 Backend Onl
 
 ```
 feature/
-  reader/presentation/component/      BookmarksSheet, GoToPageDialog
-  annotation/presentation/component/  AnnotationListSheet
+  reader/presentation/component/       BookmarksSheet, GoToPageDialog
+  annotation/presentation/component/   AnnotationListSheet
+  signature/presentation/component/    InitialsDialog
+  filemanager/presentation/component/  TagEditorDialog
+  image/domain/                        ImageElementStateMapper
 ```
 
-## Suggested next contained wins (no new infra / no further input needed)
+## Suggested next contained wins — ✅ all four done
 
-1. **Image Flip** (Ch6)
-2. **Signature Date Stamp / Initials** (Ch7)
-3. **File Tags / Labels** (Ch12, Room migration)
-4. **`PdfEditorViewModel` god-class split** (Ch15)
+1. ✅ **Image Flip** (Ch6)
+2. ✅ **Signature Date Stamp / Initials** (Ch7)
+3. ✅ **File Tags / Labels** (Ch12, Room v8→v9 migration)
+4. ✅ **`PdfEditorViewModel` god-class split** — first safe slice (`ImageElementStateMapper`)
+
+### Further contained wins still available
+- Filter-by-tag UI in the file list (storage + editing already done)
+- Image **Crop / Replace** (Ch6)
+- **Remove blank pages**, **Page numbering** (Ch8)
+- Continue the incremental `PdfEditorViewModel` / `PdfReaderScreen` split (device-test each slice)

@@ -154,7 +154,9 @@ sealed class AnnotationCommand {
         val rotation: Float,
         val opacity: Float = 1f,
         val isLocked: Boolean = false,
-        val zIndex: Int = 0
+        val zIndex: Int = 0,
+        val flipHorizontal: Boolean = false,
+        val flipVertical: Boolean = false
     )
 
     /**
@@ -283,6 +285,22 @@ sealed class AnnotationCommand {
         val elementId: String,
         val beforeLocked: Boolean,
         val afterLocked: Boolean
+    ) : AnnotationCommand()
+
+    /**
+     * Command for flipping (mirroring) an image element horizontally and/or vertically.
+     * Stores both axes' before/after so a single undo restores the prior orientation.
+     */
+    data class FlipImageCommand(
+        override val id: String,
+        override val pdfPath: String,
+        override val pageIndex: Int,
+        override val timestamp: Long,
+        val elementId: String,
+        val beforeFlipH: Boolean,
+        val beforeFlipV: Boolean,
+        val afterFlipH: Boolean,
+        val afterFlipV: Boolean
     ) : AnnotationCommand()
 
     /**

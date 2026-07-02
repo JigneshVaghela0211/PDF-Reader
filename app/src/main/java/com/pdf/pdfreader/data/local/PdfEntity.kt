@@ -17,5 +17,7 @@ data class PdfEntity(
     val isFavorite: Boolean = false,
     val lastOpened: Long = 0L,
     val lastOpenedPage: Int = 0,
-    val thumbnailPath: String? = null
+    val thumbnailPath: String? = null,
+    /** Comma-separated user labels/tags. Empty string = none. */
+    val tags: String = ""
 )

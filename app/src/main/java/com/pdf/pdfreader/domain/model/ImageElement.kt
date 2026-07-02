@@ -49,6 +49,10 @@ data class ImageElement(
     val scale: Float = 1f,
     /** Rotation in degrees (0, 90, 180, 270) */
     val rotation: Float = 0f,
+    /** Mirror horizontally (flip across the vertical axis) */
+    val flipHorizontal: Boolean = false,
+    /** Mirror vertically (flip across the horizontal axis) */
+    val flipVertical: Boolean = false,
     /** Opacity from 0f (transparent) to 1f (fully opaque) */
     val opacity: Float = 1f,
     /** When true, element cannot be moved or resized */

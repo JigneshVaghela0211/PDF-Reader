@@ -11,6 +11,7 @@ interface PdfRepository {
     suspend fun updateFavorite(path: String, isFavorite: Boolean)
     suspend fun updateLastOpened(path: String, timestamp: Long)
     suspend fun updateLastOpenedPage(path: String, page: Int)
+    suspend fun updateTags(path: String, tags: List<String>)
     suspend fun getBookmarksForPdf(path: String): Flow<List<com.pdf.pdfreader.data.local.BookmarkEntity>>
     suspend fun addBookmark(path: String, pageIndex: Int, label: String? = null)
     suspend fun removeBookmark(path: String, pageIndex: Int)

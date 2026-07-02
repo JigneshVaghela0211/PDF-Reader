@@ -149,7 +149,8 @@ fun HomeScreen(
                 onDuplicate = { viewModel.duplicatePdf(it) },
                 onShare = { /* TODO: Share logic */ },
                 onFavorite = { viewModel.toggleFavorite(it) },
-                onDeleteConfirm = { viewModel.deletePdf(it) }
+                onDeleteConfirm = { viewModel.deletePdf(it) },
+                onUpdateTags = { pdf, tags -> viewModel.updateTags(pdf, tags) }
             )
         }
     }

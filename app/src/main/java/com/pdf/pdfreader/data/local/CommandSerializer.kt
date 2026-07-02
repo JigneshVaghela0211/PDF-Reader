@@ -36,6 +36,7 @@ object CommandSerializer {
     const val TYPE_CHANGE_LAYER = "CHANGE_LAYER"
     const val TYPE_CHANGE_OPACITY = "CHANGE_OPACITY"
     const val TYPE_LOCK_IMAGE = "LOCK_IMAGE"
+    const val TYPE_FLIP_IMAGE = "FLIP_IMAGE"
     const val TYPE_COMPOSITE_COMMAND = "COMPOSITE_COMMAND"
 
     // ─── Serialize: AnnotationCommand → (type, payload JSON) ────
@@ -57,6 +58,7 @@ object CommandSerializer {
         is AnnotationCommand.ChangeLayerCommand -> TYPE_CHANGE_LAYER
         is AnnotationCommand.ChangeImageOpacityCommand -> TYPE_CHANGE_OPACITY
         is AnnotationCommand.LockImageCommand -> TYPE_LOCK_IMAGE
+        is AnnotationCommand.FlipImageCommand -> TYPE_FLIP_IMAGE
         is AnnotationCommand.CompositeCommand -> TYPE_COMPOSITE_COMMAND
     }
 
@@ -110,6 +112,7 @@ object CommandSerializer {
         is AnnotationCommand.ChangeLayerCommand -> gson.toJson(command)
         is AnnotationCommand.ChangeImageOpacityCommand -> gson.toJson(command)
         is AnnotationCommand.LockImageCommand -> gson.toJson(command)
+        is AnnotationCommand.FlipImageCommand -> gson.toJson(command)
         is AnnotationCommand.CompositeCommand -> gson.toJson(command)
     }
 
@@ -219,6 +222,9 @@ object CommandSerializer {
 
             TYPE_LOCK_IMAGE -> {
                 gson.fromJson(entity.payload, AnnotationCommand.LockImageCommand::class.java)
+            }
+            TYPE_FLIP_IMAGE -> {
+                gson.fromJson(entity.payload, AnnotationCommand.FlipImageCommand::class.java)
             }
             TYPE_COMPOSITE_COMMAND -> {
                 gson.fromJson(entity.payload, AnnotationCommand.CompositeCommand::class.java)

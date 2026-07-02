@@ -158,6 +158,12 @@ class PdfViewModel @Inject constructor(
         }
     }
 
+    fun updateTags(pdf: PdfFile, tags: List<String>) {
+        viewModelScope.launch {
+            pdfRepository.updateTags(pdf.path, tags)
+        }
+    }
+
     fun renamePdf(pdf: PdfFile, newName: String) {
         viewModelScope.launch {
             val success = pdfRepository.renameFile(pdf.path, newName)

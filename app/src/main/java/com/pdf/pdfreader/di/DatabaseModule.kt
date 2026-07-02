@@ -73,8 +73,13 @@ object DatabaseModule {
                 // No-op: new command types are stored using existing columns (type, payload)
             }
         }
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE pdf_files ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+            }
+        }
         return Room.databaseBuilder(context, AppDatabase::class.java, "pdf_reader_db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .fallbackToDestructiveMigration()
             .build()
     }

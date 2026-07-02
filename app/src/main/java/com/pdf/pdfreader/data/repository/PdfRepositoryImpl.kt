@@ -114,7 +114,8 @@ class PdfRepositoryImpl @Inject constructor(
                                 isFavorite = dbEntity?.isFavorite ?: false,
                                 lastOpened = dbEntity?.lastOpened ?: 0L,
                                 lastOpenedPage = dbEntity?.lastOpenedPage ?: 0,
-                                thumbnailPath = thumbnailPath
+                                thumbnailPath = thumbnailPath,
+                                tags = dbEntity?.tags ?: ""
                             )
                         )
                     }
@@ -151,6 +152,10 @@ class PdfRepositoryImpl @Inject constructor(
 
     override suspend fun updateLastOpenedPage(path: String, page: Int) {
         pdfDao.updateLastOpenedPage(path, page)
+    }
+
+    override suspend fun updateTags(path: String, tags: List<String>) {
+        pdfDao.updateTags(path, tags.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString(","))
     }
 
     override suspend fun getBookmarksForPdf(path: String): Flow<List<com.pdf.pdfreader.data.local.BookmarkEntity>> {
@@ -278,7 +283,8 @@ class PdfRepositoryImpl @Inject constructor(
         isFavorite = isFavorite,
         lastOpened = lastOpened,
         lastOpenedPage = lastOpenedPage,
-        thumbnailPath = thumbnailPath
+        thumbnailPath = thumbnailPath,
+        tags = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     )
 
     private fun isPdfLocked(path: String): Boolean {

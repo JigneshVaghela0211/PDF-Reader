@@ -29,6 +29,9 @@ interface PdfDao {
     @Query("UPDATE pdf_files SET lastOpenedPage = :page WHERE path = :path")
     suspend fun updateLastOpenedPage(path: String, page: Int)
 
+    @Query("UPDATE pdf_files SET tags = :tags WHERE path = :path")
+    suspend fun updateTags(path: String, tags: String)
+
     @Query("DELETE FROM pdf_files WHERE path NOT IN (:remainingPaths)")
     suspend fun deleteStalePdfs(remainingPaths: List<String>)
 

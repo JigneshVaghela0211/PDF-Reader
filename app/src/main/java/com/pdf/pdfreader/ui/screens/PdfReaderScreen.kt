@@ -229,8 +229,10 @@ fun PdfReaderScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(editorUiState.exportResult) {
         editorUiState.exportResult?.let { result ->
+            // A real save returns the output file path; status/error messages are shown verbatim.
+            val message = if (result.contains('/')) "Saved: ${java.io.File(result).name}" else result
             snackbarHostState.showSnackbar(
-                message = "Saved: ${java.io.File(result).name}",
+                message = message,
                 duration = SnackbarDuration.Short
             )
             editorViewModel.clearExportResult()
@@ -256,7 +258,7 @@ fun PdfReaderScreen(
                         onUndo = editorViewModel::undo,
                         onRedo = editorViewModel::redo,
                         onClose = { editorViewModel.setEditMode(false) },
-                        onSave = { editorViewModel.saveAnnotationsToPdf(screenWidthPx) },
+                        onSave = { editorViewModel.exportEditedPdf(screenWidthPx) },
                         onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) }
                     )
                 }
@@ -640,6 +642,8 @@ fun PdfReaderScreen(
                                                 opacity = selectedImage.opacity,
                                                 onRotateLeft = { editorViewModel.rotateImage(selectedImage.id, -90f) },
                                                 onRotateRight = { editorViewModel.rotateImage(selectedImage.id, 90f) },
+                                                onFlipHorizontal = { editorViewModel.flipImage(selectedImage.id, horizontal = true) },
+                                                onFlipVertical = { editorViewModel.flipImage(selectedImage.id, horizontal = false) },
                                                 onDelete = { editorViewModel.deleteImage(selectedImage.id) },
                                                 onDuplicate = { editorViewModel.duplicateImage(selectedImage.id) },
                                                 onBringToFront = { editorViewModel.bringToFront(selectedImage.id) },
@@ -902,17 +906,33 @@ fun PdfReaderScreen(
         }
 
         // ─── Signature UIs ───────────────────────────────────────
+        var showInitialsDialog by remember { mutableStateOf(false) }
         com.pdf.pdfreader.ui.components.SignatureBottomSheet(
             visible = editorUiState.isSignatureSheetVisible,
             savedSignatures = editorUiState.savedSignatures,
             onDismissRequest = { editorViewModel.setSignatureSheetVisible(false) },
-            onCreateNewSignature = { 
+            onCreateNewSignature = {
                 editorViewModel.setSignatureSheetVisible(false)
                 editorViewModel.setSignaturePadVisible(true)
             },
             onSelectSignature = { editorViewModel.insertSignatureAsImage(it) },
-            onDeleteSignature = { editorViewModel.deleteSignature(it) }
+            onDeleteSignature = { editorViewModel.deleteSignature(it) },
+            onAddDateStamp = {
+                editorViewModel.setSignatureSheetVisible(false)
+                editorViewModel.insertDateStamp()
+            },
+            onAddInitials = {
+                editorViewModel.setSignatureSheetVisible(false)
+                showInitialsDialog = true
+            }
         )
+
+        if (showInitialsDialog) {
+            com.pdf.pdfreader.feature.signature.presentation.component.InitialsDialog(
+                onConfirm = { editorViewModel.insertInitials(it) },
+                onDismiss = { showInitialsDialog = false }
+            )
+        }
 
         if (editorUiState.isSignaturePadVisible) {
             com.pdf.pdfreader.ui.components.SignaturePadDialog(

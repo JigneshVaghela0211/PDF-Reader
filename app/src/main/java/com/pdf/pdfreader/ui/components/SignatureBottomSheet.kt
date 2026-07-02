@@ -13,7 +13,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +36,9 @@ fun SignatureBottomSheet(
     onDismissRequest: () -> Unit,
     onCreateNewSignature: () -> Unit,
     onSelectSignature: (String) -> Unit,
-    onDeleteSignature: (String) -> Unit
+    onDeleteSignature: (String) -> Unit,
+    onAddDateStamp: () -> Unit = {},
+    onAddInitials: () -> Unit = {}
 ) {
     if (visible) {
         ModalBottomSheet(
@@ -69,6 +73,29 @@ fun SignatureBottomSheet(
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Create Signature", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
+                // Quick stamps: today's date and initials (inserted as movable text notes)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onAddDateStamp,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Date Stamp", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                    OutlinedButton(
+                        onClick = onAddInitials,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Initials", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
                 }
 
                 if (savedSignatures.isNotEmpty()) {

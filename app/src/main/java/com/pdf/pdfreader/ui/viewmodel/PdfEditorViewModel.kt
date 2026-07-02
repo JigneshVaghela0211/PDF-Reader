@@ -225,6 +225,35 @@ class PdfEditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Insert a one-shot text note on the current page (used by Date Stamp / Initials).
+     * Reuses the text-note pipeline so it's movable, undoable and persisted like any note.
+     */
+    fun insertTextNote(text: String, position: Offset = Offset(60f, 90f), fontSize: Float = 18f) {
+        if (text.isBlank()) return
+        val note = PdfAnnotation.TextNote(
+            pageIndex = currentPage,
+            text = text.trim(),
+            position = position,
+            color = _uiState.value.currentColor,
+            fontSize = fontSize
+        )
+        _uiState.update { it.copy(annotations = it.annotations + note) }
+        commitTextAnnotation(before = null, after = textNoteToState(note), pageIndex = currentPage)
+    }
+
+    /** Insert today's date as a text note (Ch7 Date Stamp). */
+    fun insertDateStamp() {
+        val date = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        insertTextNote(date)
+    }
+
+    /** Insert user-supplied initials as a (slightly larger) text note (Ch7 Initials). */
+    fun insertInitials(initials: String) {
+        insertTextNote(initials.uppercase(), fontSize = 24f)
+    }
+
     // ─── Text Block Extraction & Editing ─────────────────────────
 
     fun extractTextBlocks() {
@@ -667,13 +696,8 @@ class PdfEditorViewModel @Inject constructor(
 
     // ─── Shared Helpers ──────────────────────────────────────────
 
-    private fun elementToImageState(elem: ImageElement) = AnnotationCommand.ImageState(
-        elementId = elem.id, uri = elem.uri,
-        positionX = elem.position.x, positionY = elem.position.y,
-        width = elem.width, height = elem.height,
-        scale = elem.scale, rotation = elem.rotation,
-        opacity = elem.opacity, isLocked = elem.isLocked, zIndex = elem.zIndex
-    )
+    private fun elementToImageState(elem: ImageElement) =
+        com.pdf.pdfreader.feature.image.domain.ImageElementStateMapper.toState(elem)
 
     // ─── Resize ──────────────────────────────────────────────────
 
@@ -816,6 +840,24 @@ class PdfEditorViewModel @Inject constructor(
         )); syncUndoRedoState() }
     }
 
+    /** Mirror the image across the vertical (horizontal=true) or horizontal axis. Undoable. */
+    fun flipImage(id: String, horizontal: Boolean) {
+        val el = _uiState.value.imageElements.find { it.id == id } ?: return
+        if (el.isLocked) return
+        val newH = if (horizontal) !el.flipHorizontal else el.flipHorizontal
+        val newV = if (horizontal) el.flipVertical else !el.flipVertical
+        _uiState.update { s -> s.copy(imageElements = s.imageElements.map {
+            if (it.id == id) it.copy(flipHorizontal = newH, flipVertical = newV) else it
+        }) }
+        viewModelScope.launch { undoRedoManager.execute(AnnotationCommand.FlipImageCommand(
+            id = java.util.UUID.randomUUID().toString(), pdfPath = pdfFilePath,
+            pageIndex = el.pageIndex, timestamp = System.currentTimeMillis(),
+            elementId = id,
+            beforeFlipH = el.flipHorizontal, beforeFlipV = el.flipVertical,
+            afterFlipH = newH, afterFlipV = newV
+        )); syncUndoRedoState() }
+    }
+
     fun setImageOpacity(id: String, opacity: Float) {
         val el = _uiState.value.imageElements.find { it.id == id } ?: return
         val c = opacity.coerceIn(0f, 1f)
@@ -878,10 +920,11 @@ class PdfEditorViewModel @Inject constructor(
             is AnnotationCommand.ResizeImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.beforeX, command.beforeY), width = command.beforeWidth, height = command.beforeHeight) else it }) }
             is AnnotationCommand.RotateImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(rotation = command.beforeRotation) else it }) }
             is AnnotationCommand.AddImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.filter { it.id != command.imageState.elementId }) }
-            is AnnotationCommand.DeleteImageCommand -> { val ds = command.deletedImageState; _uiState.update { it.copy(imageElements = it.imageElements + ImageElement(id = ds.elementId, pageIndex = command.pageIndex, uri = ds.uri, position = Offset(ds.positionX, ds.positionY), width = ds.width, height = ds.height, scale = ds.scale, rotation = ds.rotation, opacity = ds.opacity, isLocked = ds.isLocked, zIndex = ds.zIndex)) } }
+            is AnnotationCommand.DeleteImageCommand -> { val el = com.pdf.pdfreader.feature.image.domain.ImageElementStateMapper.toElement(command.deletedImageState, command.pageIndex); _uiState.update { it.copy(imageElements = it.imageElements + el) } }
             is AnnotationCommand.ChangeLayerCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(zIndex = command.beforeZIndex) else it }) }
             is AnnotationCommand.ChangeImageOpacityCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(opacity = command.beforeOpacity) else it }) }
             is AnnotationCommand.LockImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(isLocked = command.beforeLocked) else it }) }
+            is AnnotationCommand.FlipImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(flipHorizontal = command.beforeFlipH, flipVertical = command.beforeFlipV) else it }) }
             is AnnotationCommand.CompositeCommand -> command.commands.reversed().forEach { applyUndoCommand(it) }
             else -> {}
         }
@@ -902,11 +945,12 @@ class PdfEditorViewModel @Inject constructor(
             is AnnotationCommand.MoveImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.afterX, command.afterY)) else it }) }
             is AnnotationCommand.ResizeImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(position = Offset(command.afterX, command.afterY), width = command.afterWidth, height = command.afterHeight) else it }) }
             is AnnotationCommand.RotateImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(rotation = command.afterRotation) else it }) }
-            is AnnotationCommand.AddImageCommand -> { val is_ = command.imageState; _uiState.update { it.copy(imageElements = it.imageElements + ImageElement(id = is_.elementId, pageIndex = command.pageIndex, uri = is_.uri, position = Offset(is_.positionX, is_.positionY), width = is_.width, height = is_.height, scale = is_.scale, rotation = is_.rotation, opacity = is_.opacity, isLocked = is_.isLocked, zIndex = is_.zIndex)) } }
+            is AnnotationCommand.AddImageCommand -> { val el = com.pdf.pdfreader.feature.image.domain.ImageElementStateMapper.toElement(command.imageState, command.pageIndex); _uiState.update { it.copy(imageElements = it.imageElements + el) } }
             is AnnotationCommand.DeleteImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.filter { it.id != command.deletedImageState.elementId }) }
             is AnnotationCommand.ChangeLayerCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(zIndex = command.afterZIndex) else it }) }
             is AnnotationCommand.ChangeImageOpacityCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(opacity = command.afterOpacity) else it }) }
             is AnnotationCommand.LockImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(isLocked = command.afterLocked) else it }) }
+            is AnnotationCommand.FlipImageCommand -> _uiState.update { s -> s.copy(imageElements = s.imageElements.map { if (it.id == command.elementId) it.copy(flipHorizontal = command.afterFlipH, flipVertical = command.afterFlipV) else it }) }
             is AnnotationCommand.CompositeCommand -> command.commands.forEach { applyRedoCommand(it) }
             else -> {}
         }
@@ -955,149 +999,32 @@ class PdfEditorViewModel @Inject constructor(
 
     // ─── Export ───────────────────────────────────────────────────
 
-    fun saveAnnotationsToPdf(viewWidth: Int) {
-        if (pdfFilePath.isEmpty() || _uiState.value.annotations.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val state = _uiState.value
-                val file = java.io.File(pdfFilePath)
-                com.tom_roush.pdfbox.pdmodel.PDDocument.load(file).use { document ->
-                    for ((pageIndex, pageAnns) in state.annotations.groupBy { it.pageIndex }) {
-                        val page = document.getPage(pageIndex)
-                        val cropBox = page.cropBox; val pdfHeight = cropBox.height
-                        val scaleX = cropBox.width / viewWidth.toFloat()
-                        com.tom_roush.pdfbox.pdmodel.PDPageContentStream(document, page,
-                            com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
-                            for (ann in pageAnns) {
-                                when (ann) {
-                                    is PdfAnnotation.Path -> {
-                                        if (ann.points.size < 2) continue
-                                        cs.setStrokingColor((ann.color.red * 255).toInt(), (ann.color.green * 255).toInt(), (ann.color.blue * 255).toInt())
-                                        cs.setLineWidth(ann.strokeWidth * scaleX)
-                                        val gs = com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState()
-                                        gs.strokingAlphaConstant = if (ann.isHighlighter) 0.5f else 1.0f
-                                        cs.setGraphicsStateParameters(gs)
-                                        val s = ann.points.first(); cs.moveTo(s.x * scaleX, pdfHeight - (s.y * scaleX))
-                                        for (i in 1 until ann.points.size) { val p = ann.points[i]; cs.lineTo(p.x * scaleX, pdfHeight - (p.y * scaleX)) }
-                                        cs.stroke()
-                                    }
-                                    is PdfAnnotation.TextNote -> {
-                                        cs.beginText()
-                                        cs.setNonStrokingColor((ann.color.red * 255).toInt(), (ann.color.green * 255).toInt(), (ann.color.blue * 255).toInt())
-                                        cs.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, ann.fontSize * scaleX)
-                                        val tx = ann.position.x * scaleX
-                                        val ty = pdfHeight - (ann.position.y * scaleX) - (ann.fontSize * scaleX)
-                                        // Compose rotationZ is clockwise (screen y-down); PDF text rotation is
-                                        // counter-clockwise (y-up), so negate the angle. Pivot at the baseline origin.
-                                        if (ann.rotation != 0f) {
-                                            cs.setTextRotation(Math.toRadians(-ann.rotation.toDouble()), tx.toDouble(), ty.toDouble())
-                                        } else {
-                                            cs.newLineAtOffset(tx, ty)
-                                        }
-                                        cs.showText(ann.text); cs.endText()
-                                    }
-                                    // Markup (highlight/underline/strikeout) is a real
-                                    // page-level annotation object, not content-stream
-                                    // drawing — added after this stream closes below.
-                                    is PdfAnnotation.TextMarkup -> Unit
-                                }
-                            }
-                        }
-
-                        // ─── Real text-markup annotations (page-level) ──────────
-                        // Written as PDF Highlight/Underline/StrikeOut annotation
-                        // objects with QuadPoints so other viewers (Acrobat, Chrome,
-                        // Preview) recognise and can edit/remove them. Markup rects are
-                        // normalized (0..1), so they map straight to PDF points and do
-                        // not use the view-pixel scaleX path above.
-                        pageAnns.filterIsInstance<PdfAnnotation.TextMarkup>().forEach { markup ->
-                            writeMarkupAnnotation(page, markup, cropBox.width, pdfHeight)
-                        }
-                    }
-                    document.save(file)
-                }
-                Log.d(TAG, "Annotations saved to PDF")
-            } catch (e: Exception) { Log.e(TAG, "Failed to save annotations", e) }
-        }
-    }
-
-    /**
-     * Write one [PdfAnnotation.TextMarkup] as a real PDF text-markup annotation
-     * (Highlight / Underline / StrikeOut) on [page].
-     *
-     * The selection rects are normalized (0..1, origin top-left like the renderer), so they
-     * convert directly to PDF user-space points (origin bottom-left) — no view-pixel scaling.
-     * QuadPoints are emitted in Acrobat's expected order (top-left, top-right, bottom-left,
-     * bottom-right) per word so highlights wrap each word tightly. Opacity is carried on /CA;
-     * [com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.constructAppearances]
-     * generates the appearance stream so viewers without auto-rendering still show it.
-     */
-    private fun writeMarkupAnnotation(
-        page: com.tom_roush.pdfbox.pdmodel.PDPage,
-        markup: PdfAnnotation.TextMarkup,
-        pdfWidth: Float,
-        pdfHeight: Float
-    ) {
-        if (markup.rects.isEmpty()) return
-
-        val subType = when (markup.type) {
-            PdfAnnotation.MarkupType.HIGHLIGHT ->
-                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
-            PdfAnnotation.MarkupType.UNDERLINE ->
-                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_UNDERLINE
-            PdfAnnotation.MarkupType.STRIKETHROUGH ->
-                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_STRIKEOUT
-        }
-        val annotation = com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup(subType)
-
-        val quads = ArrayList<Float>(markup.rects.size * 8)
-        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
-        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
-        for (r in markup.rects) {
-            val left = r.left * pdfWidth
-            val right = r.right * pdfWidth
-            val top = pdfHeight - r.top * pdfHeight
-            val bottom = pdfHeight - r.bottom * pdfHeight
-            quads.add(left); quads.add(top)      // top-left
-            quads.add(right); quads.add(top)     // top-right
-            quads.add(left); quads.add(bottom)   // bottom-left
-            quads.add(right); quads.add(bottom)  // bottom-right
-            if (left < minX) minX = left
-            if (right > maxX) maxX = right
-            if (bottom < minY) minY = bottom
-            if (top > maxY) maxY = top
-        }
-        annotation.setQuadPoints(quads.toFloatArray())
-
-        // Full-opacity RGB; transparency is applied via /CA so the colour stays true.
-        annotation.setColor(
-            com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor(
-                floatArrayOf(markup.color.red, markup.color.green, markup.color.blue),
-                com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB.INSTANCE
-            )
-        )
-        annotation.cosObject.setFloat(com.tom_roush.pdfbox.cos.COSName.CA, markup.color.alpha)
-        annotation.setRectangle(
-            com.tom_roush.pdfbox.pdmodel.common.PDRectangle(minX, minY, maxX - minX, maxY - minY)
-        )
-        annotation.setPrinted(true)
-        annotation.constructAppearances()
-        page.annotations.add(annotation)
-    }
 
     fun exportEditedPdf(viewWidth: Int) {
+        val state = _uiState.value
+        if (pdfFilePath.isEmpty()) return
+        // Persist EVERYTHING: drawings/notes/markup, inserted images & signatures, and real
+        // text edits. Previously the Save button only handled `annotations` and silently
+        // no-oped (and gave no feedback) when the user had only added an image / edited text.
+        if (state.annotations.isEmpty() && state.imageElements.isEmpty() && state.editedTextBlocks.isEmpty()) {
+            _uiState.update { it.copy(exportResult = "Nothing to save yet") }
+            return
+        }
         _uiState.update { it.copy(isExporting = true, exportResult = null) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val state = _uiState.value
                 val result = pdfExportManager.exportEditedPdf(
                     getApplication(), pdfFilePath,
-                    state.editedTextBlocks, state.imageElements, viewWidth
+                    state.editedTextBlocks, state.imageElements, state.annotations, viewWidth
                 )
-                withContext(Dispatchers.Main) { _uiState.update { it.copy(isExporting = false, exportResult = result) } }
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(isExporting = false, exportResult = result ?: "Save failed")
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Export failed", e)
-                withContext(Dispatchers.Main) { _uiState.update { it.copy(isExporting = false, exportResult = "Export failed: ${e.message}") } }
+                withContext(Dispatchers.Main) { _uiState.update { it.copy(isExporting = false, exportResult = "Save failed: ${e.message}") } }
             }
         }
     }

@@ -13,5 +13,7 @@ data class PdfFile(
     val isFavorite: Boolean = false,
     val lastOpened: Long = 0L,
     val lastOpenedPage: Int = 0,
-    val thumbnailPath: String? = null
+    val thumbnailPath: String? = null,
+    /** User-assigned labels/tags. */
+    val tags: List<String> = emptyList()
 )

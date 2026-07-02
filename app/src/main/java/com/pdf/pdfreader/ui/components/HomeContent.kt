@@ -48,10 +48,12 @@ fun HomeContent(
     onDuplicate: (PdfFile) -> Unit,
     onShare: (PdfFile) -> Unit,
     onFavorite: (PdfFile) -> Unit,
-    onDeleteConfirm: (PdfFile) -> Unit
+    onDeleteConfirm: (PdfFile) -> Unit,
+    onUpdateTags: (PdfFile, List<String>) -> Unit = { _, _ -> }
 ) {
     var showRenameDialog by remember { mutableStateOf<PdfFile?>(null) }
     var showDeleteDialog by remember { mutableStateOf<PdfFile?>(null) }
+    var showTagsDialog by remember { mutableStateOf<PdfFile?>(null) }
     var selectedPdfPath by remember { mutableStateOf<String?>(null) }
     var toolsPdfPath by remember { mutableStateOf<String?>(null) }
     val selectedPdf = remember(selectedPdfPath, files) {
@@ -97,9 +99,21 @@ fun HomeContent(
                     toolsPdfPath = pdf.path
                     selectedPdfPath = null
                 },
+                onTags = {
+                    showTagsDialog = pdf
+                    selectedPdfPath = null
+                },
                 onDismiss = { selectedPdfPath = null }
             )
         }
+    }
+
+    showTagsDialog?.let { pdf ->
+        com.pdf.pdfreader.feature.filemanager.presentation.component.TagEditorDialog(
+            initialTags = pdf.tags,
+            onConfirm = { tags -> onUpdateTags(pdf, tags) },
+            onDismiss = { showTagsDialog = null }
+        )
     }
 
     if (toolsPdf != null) {

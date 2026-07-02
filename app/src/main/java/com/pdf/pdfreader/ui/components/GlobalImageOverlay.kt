@@ -336,9 +336,11 @@ private fun GlobalImageElementView(
                 width = with(density) { scaledWidth.toDp() },
                 height = with(density) { scaledHeight.toDp() }
             )
-            // graphicsLayer now only handles rotation + opacity (constant during a drag).
+            // graphicsLayer now only handles rotation + flip + opacity (constant during a drag).
             .graphicsLayer {
                 rotationZ = element.rotation
+                scaleX = if (element.flipHorizontal) -1f else 1f
+                scaleY = if (element.flipVertical) -1f else 1f
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
                 alpha = element.opacity
             }

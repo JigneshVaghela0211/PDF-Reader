@@ -35,6 +35,7 @@ fun PdfActionsBottomSheet(
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onTools: () -> Unit,
+    onTags: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     // Show the PDF Tools entry only when at least one tool is visible per the feature config.
@@ -138,6 +139,11 @@ fun PdfActionsBottomSheet(
             icon = Icons.Outlined.Share,
             label = "Share",
             onClick = onShare
+        )
+        ActionRow(
+            icon = Icons.Outlined.LocalOffer,
+            label = if (pdf.tags.isEmpty()) "Add Tags" else "Tags (${pdf.tags.size})",
+            onClick = onTags
         )
         if (toolsVisible) {
             ActionRow(

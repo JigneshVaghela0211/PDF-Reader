@@ -6,8 +6,11 @@ import android.net.Uri
 import android.util.Log
 import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.ImageElement
+import com.pdf.pdfreader.domain.model.PdfAnnotation
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +58,7 @@ class PdfExportManager @Inject constructor() {
         originalPath: String,
         editedTextBlocks: List<EditedTextBlock>,
         imageElements: List<ImageElement>,
+        annotations: List<PdfAnnotation> = emptyList(),
         viewWidth: Int
     ): String? = withContext(Dispatchers.IO.limitedParallelism(1)) {
         try {
@@ -71,8 +75,10 @@ class PdfExportManager @Inject constructor() {
                 // Group edits by page index
                 val textEditsByPage = editedTextBlocks.groupBy { it.originalBlock.pageIndex }
                 val imagesByPage = imageElements.groupBy { it.pageIndex }
+                val annotationsByPage = annotations.groupBy { it.pageIndex }
 
-                val allPages = (textEditsByPage.keys + imagesByPage.keys).distinct().sorted()
+                val allPages = (textEditsByPage.keys + imagesByPage.keys + annotationsByPage.keys)
+                    .distinct().sorted()
 
                 for (pageIdx in allPages) {
                     coroutineContext.ensureActive()
@@ -94,9 +100,11 @@ class PdfExportManager @Inject constructor() {
                         textReplacementEngine.replaceText(document, pageIdx, editedBlock)
                     }
 
-                    // ─── Image inserts (appended overlay content) ─────────────
-                    val pageImages = imagesByPage[pageIdx]
-                    if (!pageImages.isNullOrEmpty()) {
+                    // ─── Image inserts + freehand/text annotations (appended overlay) ──
+                    val pageImages = imagesByPage[pageIdx].orEmpty()
+                    val pageAnns = annotationsByPage[pageIdx].orEmpty()
+                    val drawableAnns = pageAnns.filter { it is PdfAnnotation.Path || it is PdfAnnotation.TextNote }
+                    if (pageImages.isNotEmpty() || drawableAnns.isNotEmpty()) {
                         PDPageContentStream(
                             document, page,
                             PDPageContentStream.AppendMode.APPEND, true, true
@@ -105,7 +113,20 @@ class PdfExportManager @Inject constructor() {
                                 coroutineContext.ensureActive()
                                 drawImage(context, document, cs, imageElement, pdfWidth, pdfHeight, scaleX)
                             }
+                            drawableAnns.forEach { ann ->
+                                coroutineContext.ensureActive()
+                                when (ann) {
+                                    is PdfAnnotation.Path -> drawPathAnnotation(cs, ann, scaleX, pdfHeight)
+                                    is PdfAnnotation.TextNote -> drawTextNoteAnnotation(cs, ann, scaleX, pdfHeight)
+                                    else -> Unit
+                                }
+                            }
                         }
+                    }
+
+                    // ─── Text markup (real page-level Highlight/Underline/StrikeOut) ──
+                    pageAnns.filterIsInstance<PdfAnnotation.TextMarkup>().forEach { markup ->
+                        writeMarkupAnnotation(page, markup, pdfWidth, pdfHeight)
                     }
                 }
 
@@ -154,9 +175,13 @@ class PdfExportManager @Inject constructor() {
             val decodeOptions = BitmapFactory.Options().apply {
                 inSampleSize = sampleSize
             }
-            val bitmap = inputStream.use {
+            val rawBitmap = inputStream.use {
                 BitmapFactory.decodeStream(it, null, decodeOptions)
             } ?: return
+
+            // Bake any mirror (flip) into the pixels — matches the on-screen graphicsLayer
+            // scaleX/scaleY = -1. Returns the same bitmap when no flip is needed.
+            val bitmap = applyFlip(rawBitmap, imageElement.flipHorizontal, imageElement.flipVertical)
 
             try {
                 val pdImage = LosslessFactory.createFromImage(document, bitmap)
@@ -203,6 +228,132 @@ class PdfExportManager @Inject constructor() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to draw image: ${imageElement.uri}", e)
         }
+    }
+
+    /** Draw a freehand path annotation into the page content stream. */
+    private fun drawPathAnnotation(
+        cs: PDPageContentStream,
+        ann: PdfAnnotation.Path,
+        scaleX: Float,
+        pdfHeight: Float
+    ) {
+        if (ann.points.size < 2) return
+        cs.setStrokingColor((ann.color.red * 255).toInt(), (ann.color.green * 255).toInt(), (ann.color.blue * 255).toInt())
+        cs.setLineWidth(ann.strokeWidth * scaleX)
+        val gs = PDExtendedGraphicsState()
+        gs.strokingAlphaConstant = if (ann.isHighlighter) 0.5f else 1.0f
+        cs.setGraphicsStateParameters(gs)
+        val s = ann.points.first()
+        cs.moveTo(s.x * scaleX, pdfHeight - (s.y * scaleX))
+        for (i in 1 until ann.points.size) {
+            val p = ann.points[i]
+            cs.lineTo(p.x * scaleX, pdfHeight - (p.y * scaleX))
+        }
+        cs.stroke()
+    }
+
+    /** Draw a text-note annotation into the page content stream. */
+    private fun drawTextNoteAnnotation(
+        cs: PDPageContentStream,
+        ann: PdfAnnotation.TextNote,
+        scaleX: Float,
+        pdfHeight: Float
+    ) {
+        cs.beginText()
+        cs.setNonStrokingColor((ann.color.red * 255).toInt(), (ann.color.green * 255).toInt(), (ann.color.blue * 255).toInt())
+        cs.setFont(PDType1Font.HELVETICA, ann.fontSize * scaleX)
+        val tx = ann.position.x * scaleX
+        val ty = pdfHeight - (ann.position.y * scaleX) - (ann.fontSize * scaleX)
+        // Compose rotationZ is clockwise (screen y-down); PDF text rotation is
+        // counter-clockwise (y-up), so negate the angle. Pivot at the baseline origin.
+        if (ann.rotation != 0f) {
+            cs.setTextRotation(Math.toRadians(-ann.rotation.toDouble()), tx.toDouble(), ty.toDouble())
+        } else {
+            cs.newLineAtOffset(tx, ty)
+        }
+        cs.showText(ann.text)
+        cs.endText()
+    }
+
+    /**
+     * Write one [PdfAnnotation.TextMarkup] as a real PDF text-markup annotation
+     * (Highlight / Underline / StrikeOut). Selection rects are normalized (0..1, top-left
+     * origin), converting directly to PDF user-space points (bottom-left origin).
+     */
+    private fun writeMarkupAnnotation(
+        page: PDPage,
+        markup: PdfAnnotation.TextMarkup,
+        pdfWidth: Float,
+        pdfHeight: Float
+    ) {
+        if (markup.rects.isEmpty()) return
+
+        val subType = when (markup.type) {
+            PdfAnnotation.MarkupType.HIGHLIGHT ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
+            PdfAnnotation.MarkupType.UNDERLINE ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_UNDERLINE
+            PdfAnnotation.MarkupType.STRIKETHROUGH ->
+                com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_STRIKEOUT
+        }
+        val annotation = com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup(subType)
+
+        val quads = ArrayList<Float>(markup.rects.size * 8)
+        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+        for (r in markup.rects) {
+            val left = r.left * pdfWidth
+            val right = r.right * pdfWidth
+            val top = pdfHeight - r.top * pdfHeight
+            val bottom = pdfHeight - r.bottom * pdfHeight
+            quads.add(left); quads.add(top)      // top-left
+            quads.add(right); quads.add(top)     // top-right
+            quads.add(left); quads.add(bottom)   // bottom-left
+            quads.add(right); quads.add(bottom)  // bottom-right
+            if (left < minX) minX = left
+            if (right > maxX) maxX = right
+            if (bottom < minY) minY = bottom
+            if (top > maxY) maxY = top
+        }
+        annotation.setQuadPoints(quads.toFloatArray())
+
+        // Full-opacity RGB; transparency is applied via /CA so the colour stays true.
+        annotation.setColor(
+            com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor(
+                floatArrayOf(markup.color.red, markup.color.green, markup.color.blue),
+                com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB.INSTANCE
+            )
+        )
+        annotation.cosObject.setFloat(com.tom_roush.pdfbox.cos.COSName.CA, markup.color.alpha)
+        annotation.setRectangle(
+            com.tom_roush.pdfbox.pdmodel.common.PDRectangle(minX, minY, maxX - minX, maxY - minY)
+        )
+        annotation.setPrinted(true)
+        annotation.constructAppearances()
+        page.annotations.add(annotation)
+    }
+
+    /**
+     * Returns a mirrored copy of [src] (recycling [src]) when a flip is requested,
+     * or [src] unchanged otherwise.
+     */
+    private fun applyFlip(
+        src: android.graphics.Bitmap,
+        flipHorizontal: Boolean,
+        flipVertical: Boolean
+    ): android.graphics.Bitmap {
+        if (!flipHorizontal && !flipVertical) return src
+        val matrix = android.graphics.Matrix().apply {
+            postScale(
+                if (flipHorizontal) -1f else 1f,
+                if (flipVertical) -1f else 1f,
+                src.width / 2f,
+                src.height / 2f
+            )
+        }
+        val flipped = android.graphics.Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        if (flipped != src) src.recycle()
+        return flipped
     }
 
     /**

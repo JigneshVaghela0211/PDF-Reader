@@ -9,8 +9,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.FlipToBack
 import androidx.compose.material.icons.filled.FlipToFront
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Opacity
@@ -54,7 +56,9 @@ fun ImageEditToolbar(
     onSendToBack: () -> Unit = {},
     onToggleLock: () -> Unit = {},
     onOpacityChange: (Float) -> Unit = {},
-    onSnapToCenter: () -> Unit = {}
+    onSnapToCenter: () -> Unit = {},
+    onFlipHorizontal: () -> Unit = {},
+    onFlipVertical: () -> Unit = {}
 ) {
     var showOpacitySlider by remember { mutableStateOf(false) }
 
@@ -83,6 +87,8 @@ fun ImageEditToolbar(
                     // Transform
                     ToolButton(Icons.Default.RotateLeft, "Rotate Left", enabled = !isLocked, onClick = onRotateLeft)
                     ToolButton(Icons.Default.RotateRight, "Rotate Right", enabled = !isLocked, onClick = onRotateRight)
+                    ToolButton(Icons.Default.Flip, "Flip Horizontal", enabled = !isLocked, onClick = onFlipHorizontal)
+                    ToolButton(Icons.Default.SwapVert, "Flip Vertical", enabled = !isLocked, onClick = onFlipVertical)
                     ToolbarDivider()
                     // Arrange
                     ToolButton(Icons.Default.ContentCopy, "Duplicate", onClick = onDuplicate)
