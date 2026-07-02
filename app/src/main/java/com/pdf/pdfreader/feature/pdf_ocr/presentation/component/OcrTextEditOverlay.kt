@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
 import com.pdf.pdfreader.domain.model.EditedTextBlock
+import com.pdf.pdfreader.feature.pdf_ocr.data.engine.OcrPatchGeometry
 import com.pdf.pdfreader.feature.pdf_ocr.domain.model.OcrEditableWord
 import com.pdf.pdfreader.feature.pdf_ocr.domain.model.OcrWordEdit
 import com.pdf.pdfreader.ui.components.TextEditInlineEditor
@@ -106,10 +107,16 @@ fun OcrTextEditOverlay(
             val edit = edits[word.id] ?: return@forEach
             if (word.id == selectedWordId) return@forEach // editor is showing instead
 
-            val rectX = (word.block.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectY = (word.block.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectW = (word.block.width * pageWidth).toInt().coerceIn(8, MAX_SIZE_PX)
-            val rectH = (word.block.height * pageHeight).toInt().coerceIn(8, MAX_SIZE_PX)
+            // Grow the white preview patch by the same proportional rule the exporter
+            // uses (OcrPatchGeometry), so on-screen preview matches the exported cover.
+            val rawW = word.block.width * pageWidth
+            val rawH = word.block.height * pageHeight
+            val padX = OcrPatchGeometry.horizontalPadPx(rawW)
+            val padY = OcrPatchGeometry.verticalPadPx(rawH)
+            val rectX = (word.block.x * pageWidth - padX).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectY = (word.block.y * pageHeight - padY).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectW = (rawW + 2 * padX).toInt().coerceIn(8, MAX_SIZE_PX)
+            val rectH = (rawH + 2 * padY).toInt().coerceIn(8, MAX_SIZE_PX)
             val fontScale =
                 if (word.block.pdfPageWidth > 0f) pageWidth / word.block.pdfPageWidth else 1f
 

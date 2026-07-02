@@ -45,9 +45,6 @@ class OcrEditExporter @Inject constructor(
 
         /** Render width for background sampling — modest, only colors are needed. */
         private const val SAMPLE_RENDER_WIDTH = 1200
-
-        /** Patch inflation in PDF points so no glyph fringe survives at the edges. */
-        private const val PATCH_INFLATE_PT = 1f
     }
 
     private val pdfDispatcher = Dispatchers.IO.limitedParallelism(1)
@@ -114,15 +111,13 @@ class OcrEditExporter @Inject constructor(
                                 rotation = page.pageRotation
                             )
 
-                            // 1. Patch: cover the original scanned word.
+                            // 1. Patch: cover the original scanned word. Proportional
+                            //    inflation so the original glyph's halo / ascenders /
+                            //    descenders don't survive around the fill (the overlap bug).
                             val patch = patchColors[edit.id] ?: Color.WHITE
+                            val patchRect = OcrPatchGeometry.inflate(rect)
                             cs.setNonStrokingColor(Color.red(patch), Color.green(patch), Color.blue(patch))
-                            cs.addRect(
-                                rect.x - PATCH_INFLATE_PT,
-                                rect.y - PATCH_INFLATE_PT,
-                                rect.width + 2 * PATCH_INFLATE_PT,
-                                rect.height + 2 * PATCH_INFLATE_PT
-                            )
+                            cs.addRect(patchRect.x, patchRect.y, patchRect.width, patchRect.height)
                             cs.fill()
 
                             // 2. Visible replacement text.

@@ -49,7 +49,11 @@ data class PdfEditorUiState(
     val isSignaturePadVisible: Boolean = false,
     val isSignatureSheetVisible: Boolean = false,
     val isExporting: Boolean = false,
-    val exportResult: String? = null
+    val exportResult: String? = null,
+    /** Color the next highlight/underline/strikethrough uses (chosen via the picker). */
+    val markupColor: Color = com.pdf.pdfreader.feature.annotation.engine.PdfAnnotationColorManager.DEFAULT_MARKUP_COLOR,
+    /** Recently-used markup colors, newest first (for the picker's quick-pick row). */
+    val recentMarkupColors: List<Color> = emptyList()
 ) {
     val hasEditableOverlays: Boolean
         get() = editedTextBlocks.isNotEmpty() || imageElements.isNotEmpty()
@@ -75,7 +79,9 @@ class PdfEditorViewModel @Inject constructor(
     private val pdfExportManager: PdfExportManager,
     private val signatureManager: com.pdf.pdfreader.domain.repository.SignatureManager,
     private val selectionRangeManager: com.pdf.pdfreader.selection.range.PdfSelectionRangeManager,
-    private val clipboardManager: com.pdf.pdfreader.selection.clipboard.PdfClipboardManager
+    private val clipboardManager: com.pdf.pdfreader.selection.clipboard.PdfClipboardManager,
+    private val markupEngine: com.pdf.pdfreader.feature.annotation.engine.PdfMarkupEngine,
+    private val markupColorManager: com.pdf.pdfreader.feature.annotation.engine.PdfAnnotationColorManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -87,6 +93,15 @@ class PdfEditorViewModel @Inject constructor(
 
     private var pdfFilePath: String = ""
     private var currentPage: Int = 0
+
+    init {
+        // Keep the picker's "recent colors" row in sync with persisted history.
+        viewModelScope.launch {
+            markupColorManager.recentColorsFlow.collect { colors ->
+                _uiState.update { it.copy(recentMarkupColors = colors) }
+            }
+        }
+    }
 
     // ─── Lifecycle ────────────────────────────────────────────────
 
@@ -436,16 +451,16 @@ class PdfEditorViewModel @Inject constructor(
         val rects = sel.selectedWords.map { w ->
             androidx.compose.ui.geometry.Rect(w.x, w.y, w.x + w.width, w.y + w.height)
         }
-        val color = when (type) {
-            PdfAnnotation.MarkupType.HIGHLIGHT -> Color(0xFFFFEB3B).copy(alpha = 0.4f)
-            PdfAnnotation.MarkupType.UNDERLINE -> Color(0xFFE53935)
-            PdfAnnotation.MarkupType.STRIKETHROUGH -> Color.Red
-        }
-        val annotation = PdfAnnotation.TextMarkup(
-            pageIndex = sel.pageIndex, rects = rects, color = color, type = type
-        )
+        // Color/opacity policy + annotation construction live in PdfMarkupEngine.
+        val annotation = markupEngine.build(sel.pageIndex, rects, type, _uiState.value.markupColor)
         addAnnotation(annotation)
         clearTextSelection()
+    }
+
+    /** Set the color subsequent markups use (from the toolbar's Color picker) and record it as recent. */
+    fun setMarkupColor(color: Color) {
+        _uiState.update { it.copy(markupColor = color) }
+        viewModelScope.launch { markupColorManager.remember(color) }
     }
 
     // ─── Signature Methods ───────────────────────────────────────

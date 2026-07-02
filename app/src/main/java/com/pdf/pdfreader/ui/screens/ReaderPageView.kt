@@ -203,7 +203,10 @@ fun PdfPage(
                                 onSelectTextBlock = { editorViewModel.selectTextBlock(it) },
                                 onEditTextBlock = { blockId, newText, newFontSize, newColor ->
                                     editorViewModel.editTextBlock(blockId, newText, newFontSize, newColor)
-                                }
+                                },
+                                // Enable word-level long-press selection + markup in Edit-Text mode.
+                                textSelection = editorUiState.textSelection,
+                                editorViewModel = editorViewModel
                             )
 
                             // Show loading indicator while extracting text

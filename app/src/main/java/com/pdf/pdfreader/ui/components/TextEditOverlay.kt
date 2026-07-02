@@ -3,10 +3,7 @@ package com.pdf.pdfreader.ui.components
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -41,6 +38,9 @@ import androidx.compose.ui.zIndex
 import com.pdf.pdfreader.domain.model.EditedTextBlock
 import com.pdf.pdfreader.domain.model.TextAlignment
 import com.pdf.pdfreader.domain.model.TextBlock
+import com.pdf.pdfreader.domain.model.TextWord
+import com.pdf.pdfreader.selection.hit.PdfWordHitTester
+import com.pdf.pdfreader.ui.viewmodel.TextSelectionState
 
 private const val TAG = "TextEditOverlay"
 
@@ -68,7 +68,10 @@ fun TextEditOverlay(
     selectedTextBlockId: String?,
     isEditTextMode: Boolean,
     onSelectTextBlock: (String?) -> Unit,
-    onEditTextBlock: (blockId: String, newText: String, newFontSize: Float, newColor: Color) -> Unit
+    onEditTextBlock: (blockId: String, newText: String, newFontSize: Float, newColor: Color) -> Unit,
+    // Word-level selection for markup while in Edit-Text mode (same engine as reading mode).
+    textSelection: TextSelectionState? = null,
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null
 ) {
     if (!isEditTextMode || pageSize == IntSize.Zero) return
 
@@ -78,6 +81,11 @@ fun TextEditOverlay(
 
     val pageBlocks = remember(textBlocks, pageIndex) {
         textBlocks.filter { it.pageIndex == pageIndex }
+    }
+
+    // All words on this page in reading order — for word-level long-press selection.
+    val allWords = remember(pageBlocks) {
+        pageBlocks.flatMap { it.words }.sortedWith(compareBy({ it.y }, { it.x }))
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -183,36 +191,52 @@ fun TextEditOverlay(
             }
         }
 
-        // ─── Layer 3: Tap targets for each text block (zIndex 5) ───
-        pageBlocks.forEach { block ->
-            val rectX = (block.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectY = (block.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectW = (block.width * pageWidth).toInt().coerceIn(20, MAX_SIZE_PX)
-            val rectH = (block.height * pageHeight).toInt().coerceIn(20, MAX_SIZE_PX)
-
-            Box(
-                modifier = Modifier
-                    .zIndex(5f)
-                    .offset { IntOffset(rectX, rectY) }
-                    .size(
-                        width = with(density) { rectW.toDp() },
-                        height = with(density) { rectH.toDp() }
-                    )
-                    // Use awaitEachGesture to ensure we receive events even
-                    // when a parent pointerInput has consumed the down event
-                    .pointerInput(block.id) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            down.consume()
-                            val up = waitForUpOrCancellation()
-                            if (up != null) {
-                                up.consume()
-                                Log.d(TAG, "Text block tapped: id=${block.id} text='${block.text.take(30)}'")
+        // ─── Layer 3: Single gesture layer (zIndex 5) ───
+        // Quick TAP → select the block for inline text replacement (unchanged behavior).
+        // LONG-PRESS → select a single WORD for markup (highlight/underline/strike/color),
+        // showing the drag handles below — never a whole line/paragraph. One gesture owner
+        // (no per-block tap targets) so tap vs. long-press stay cleanly separated.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(5f)
+                .pointerInput(pageBlocks, allWords) {
+                    detectTapGestures(
+                        onTap = { pos ->
+                            val block = pageBlocks.firstOrNull { b ->
+                                val bx = b.x * pageWidth
+                                val by = b.y * pageHeight
+                                pos.x >= bx && pos.x <= bx + b.width * pageWidth &&
+                                    pos.y >= by && pos.y <= by + b.height * pageHeight
+                            }
+                            if (block != null) {
+                                Log.d(TAG, "Text block tapped: id=${block.id}")
                                 onSelectTextBlock(block.id)
                             }
+                        },
+                        onLongPress = { pos ->
+                            val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
+                            if (word != null && editorViewModel != null) {
+                                Log.d(TAG, "Word long-pressed for markup: '${word.text}'")
+                                editorViewModel.startTextSelection(pageIndex, word, allWords)
+                            }
                         }
-                    }
-            )
+                    )
+                }
+        )
+
+        // ─── Layer 3b: Word-selection highlight + drag handles (zIndex 6) ───
+        if (editorViewModel != null) {
+            Box(modifier = Modifier.zIndex(6f)) {
+                TextSelectionVisuals(
+                    pageIndex = pageIndex,
+                    pageWidth = pageWidth.toInt(),
+                    pageHeight = pageHeight.toInt(),
+                    textSelection = textSelection,
+                    allWords = allWords,
+                    editorViewModel = editorViewModel
+                )
+            }
         }
 
         // ─── Layer 4: Inline editor popup (zIndex 50) ───

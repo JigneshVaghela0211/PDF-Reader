@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatStrikethrough
 import androidx.compose.material.icons.filled.FormatUnderlined
 import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -43,7 +44,8 @@ fun TextSelectionToolbar(
     onEdit: () -> Unit,
     onHighlight: () -> Unit,
     onUnderline: () -> Unit,
-    onStrikethrough: () -> Unit
+    onStrikethrough: () -> Unit,
+    onColor: () -> Unit
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -70,6 +72,8 @@ fun TextSelectionToolbar(
                 SelectionEntry(EditorFeature.HIGHLIGHT, Icons.Default.Highlight, "Highlight", onHighlight, Color(0xFFFFD54A)),
                 SelectionEntry(EditorFeature.UNDERLINE, Icons.Default.FormatUnderlined, "Underline", onUnderline),
                 SelectionEntry(EditorFeature.STRIKETHROUGH, Icons.Default.FormatStrikethrough, "Strike", onStrikethrough),
+                // Color picker for the markups above; shares the HIGHLIGHT flag's visibility.
+                SelectionEntry(EditorFeature.HIGHLIGHT, Icons.Default.Palette, "Color", onColor),
             ).map { it to ToolbarFeatureProvider.uiModel(it.feature) }
                 .filter { (_, model) -> model.visible }
 

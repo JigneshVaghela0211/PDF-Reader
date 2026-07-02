@@ -194,6 +194,7 @@ fun PdfReaderScreen(
     var showGoToPage by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
     var showAnnotations by remember { mutableStateOf(false) }
+    var showMarkupColorPicker by remember { mutableStateOf(false) }
 
     // Jump to a page from go-to-page / bookmarks, keeping the page indicator in sync.
     val jumpToPage: (Int) -> Unit = { page ->
@@ -851,10 +852,24 @@ fun PdfReaderScreen(
                                     onEdit = { editorViewModel.editSelectedText() },
                                     onHighlight = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.HIGHLIGHT) },
                                     onUnderline = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.UNDERLINE) },
-                                    onStrikethrough = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH) }
+                                    onStrikethrough = { editorViewModel.annotateSelectedText(com.pdf.pdfreader.domain.model.PdfAnnotation.MarkupType.STRIKETHROUGH) },
+                                    onColor = { showMarkupColorPicker = true }
                                 )
                             }
                         }
+                    }
+
+                    // ─── Markup Color Picker ───────
+                    // Sets the color used by Highlight / Underline / Strikethrough; the
+                    // selection stays active so the user can tap a markup right after.
+                    if (showMarkupColorPicker) {
+                        com.pdf.pdfreader.ui.components.ColorSelectionDialog(
+                            initialColor = editorUiState.markupColor,
+                            showOpacity = true,
+                            recentColors = editorUiState.recentMarkupColors,
+                            onColorSelected = { editorViewModel.setMarkupColor(it) },
+                            onDismiss = { showMarkupColorPicker = false }
+                        )
                     }
                 }
 

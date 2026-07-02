@@ -45,24 +45,6 @@ fun TextSelectionOverlay(
     fun findWordAt(offset: Offset): TextWord? =
         PdfWordHitTester.wordAt(offset, pageWidth, pageHeight, allWords)
 
-    // Bounding rects for the selected words, in page pixels.
-    val selectedRects = remember(textSelection, pageWidth, pageHeight) {
-        if (textSelection?.pageIndex == pageIndex) {
-            textSelection.selectedWords.map { word ->
-                Rect(
-                    left = word.x * pageWidth,
-                    top = word.y * pageHeight,
-                    right = (word.x + word.width) * pageWidth,
-                    bottom = (word.y + word.height) * pageHeight
-                )
-            }
-        } else {
-            emptyList()
-        }
-    }
-
-    val hasSelection = textSelection?.pageIndex == pageIndex && textSelection.selectedWords.isNotEmpty()
-
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -108,43 +90,76 @@ fun TextSelectionOverlay(
                 )
             }
     ) {
-        // Draw selection highlights.
-        if (selectedRects.isNotEmpty()) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                selectedRects.forEach { rect ->
-                    drawRect(
-                        color = HANDLE_COLOR.copy(alpha = 0.3f),
-                        topLeft = rect.topLeft,
-                        size = rect.size
-                    )
-                }
+        // Highlight + draggable handles (shared with the Edit-Text overlay).
+        TextSelectionVisuals(
+            pageIndex = pageIndex,
+            pageWidth = pageWidth,
+            pageHeight = pageHeight,
+            textSelection = textSelection,
+            allWords = allWords,
+            editorViewModel = editorViewModel
+        )
+    }
+}
+
+/**
+ * Renders the word-selection highlight and the two draggable start/end handles for the
+ * active [textSelection]. Extracted so both reading-mode ([TextSelectionOverlay]) and
+ * Edit-Text mode reuse one implementation instead of duplicating the handle math. Must be
+ * placed inside a full-size parent; it fills that parent.
+ */
+@Composable
+internal fun TextSelectionVisuals(
+    pageIndex: Int,
+    pageWidth: Int,
+    pageHeight: Int,
+    textSelection: TextSelectionState?,
+    allWords: List<TextWord>,
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel
+) {
+    if (textSelection?.pageIndex != pageIndex || textSelection.selectedWords.isEmpty()) return
+    if (pageWidth <= 0 || pageHeight <= 0) return
+
+    fun findWordAt(offset: Offset): TextWord? =
+        PdfWordHitTester.wordAt(offset, pageWidth, pageHeight, allWords)
+
+    val selectedRects = textSelection.selectedWords.map { word ->
+        Rect(
+            left = word.x * pageWidth,
+            top = word.y * pageHeight,
+            right = (word.x + word.width) * pageWidth,
+            bottom = (word.y + word.height) * pageHeight
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            selectedRects.forEach { rect ->
+                drawRect(color = HANDLE_COLOR.copy(alpha = 0.3f), topLeft = rect.topLeft, size = rect.size)
             }
         }
 
-        // Draggable start/end handles, anchored to the first/last selected word.
-        if (hasSelection) {
-            val startWord = textSelection!!.startWord ?: textSelection.selectedWords.first()
-            val endWord = textSelection.endWord ?: textSelection.selectedWords.last()
+        val startWord = textSelection.startWord ?: textSelection.selectedWords.first()
+        val endWord = textSelection.endWord ?: textSelection.selectedWords.last()
 
-            SelectionHandle(
-                centerX = startWord.x * pageWidth,
-                centerY = (startWord.y + startWord.height) * pageHeight,
-                color = HANDLE_COLOR,
-                onDrag = { pageOffset ->
-                    findWordAt(pageOffset)?.let { editorViewModel.moveSelectionStart(pageIndex, it, allWords) }
-                },
-                onDragEnd = { editorViewModel.finalizeTextSelection() }
-            )
+        SelectionHandle(
+            centerX = startWord.x * pageWidth,
+            centerY = (startWord.y + startWord.height) * pageHeight,
+            color = HANDLE_COLOR,
+            onDrag = { pageOffset ->
+                findWordAt(pageOffset)?.let { editorViewModel.moveSelectionStart(pageIndex, it, allWords) }
+            },
+            onDragEnd = { editorViewModel.finalizeTextSelection() }
+        )
 
-            SelectionHandle(
-                centerX = (endWord.x + endWord.width) * pageWidth,
-                centerY = (endWord.y + endWord.height) * pageHeight,
-                color = HANDLE_COLOR,
-                onDrag = { pageOffset ->
-                    findWordAt(pageOffset)?.let { editorViewModel.moveSelectionEnd(pageIndex, it, allWords) }
-                },
-                onDragEnd = { editorViewModel.finalizeTextSelection() }
-            )
-        }
+        SelectionHandle(
+            centerX = (endWord.x + endWord.width) * pageWidth,
+            centerY = (endWord.y + endWord.height) * pageHeight,
+            color = HANDLE_COLOR,
+            onDrag = { pageOffset ->
+                findWordAt(pageOffset)?.let { editorViewModel.moveSelectionEnd(pageIndex, it, allWords) }
+            },
+            onDragEnd = { editorViewModel.finalizeTextSelection() }
+        )
     }
 }

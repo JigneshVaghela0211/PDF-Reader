@@ -31,6 +31,9 @@ class PreferenceManager @Inject constructor(
     private val pageSnapKey = booleanPreferencesKey("page_snap")
     private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
 
+    // ─── Markup Colors ──────────────────────────────────────────
+    private val recentMarkupColorsKey = stringPreferencesKey("recent_markup_colors")
+
     // ─── Theme & Language ───────────────────────────────────────
 
     val themeFlow: Flow<AppTheme> = context.dataStore.data.map { preferences ->
@@ -75,6 +78,22 @@ class PreferenceManager @Inject constructor(
             preferences[backgroundModeKey] = settings.backgroundMode.name
             preferences[pageSnapKey] = settings.isPageSnap
             preferences[keepScreenOnKey] = settings.keepScreenOn
+        }
+    }
+
+    // ─── Markup Colors ──────────────────────────────────────────
+
+    /** Recently-used markup colors as packed ARGB ints (newest first). */
+    val recentMarkupColorsFlow: Flow<List<Int>> = context.dataStore.data.map { preferences ->
+        preferences[recentMarkupColorsKey]
+            ?.split(",")
+            ?.mapNotNull { it.toIntOrNull() }
+            ?: emptyList()
+    }
+
+    suspend fun saveRecentMarkupColors(colors: List<Int>) {
+        context.dataStore.edit { preferences ->
+            preferences[recentMarkupColorsKey] = colors.joinToString(",")
         }
     }
 }

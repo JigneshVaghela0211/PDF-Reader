@@ -21,20 +21,26 @@ import androidx.compose.ui.unit.sp
 fun ColorSelectionDialog(
     initialColor: Color,
     onColorSelected: (Color) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** When true, show an opacity slider and bake the chosen alpha into the result. */
+    showOpacity: Boolean = false,
+    /** Recently-used colors shown as a quick-pick row (newest first). Empty = hidden. */
+    recentColors: List<Color> = emptyList()
 ) {
     var red by remember { mutableFloatStateOf(initialColor.red) }
     var green by remember { mutableFloatStateOf(initialColor.green) }
     var blue by remember { mutableFloatStateOf(initialColor.blue) }
+    var alpha by remember { mutableFloatStateOf(if (showOpacity) initialColor.alpha else 1f) }
 
     val predefinedColors = listOf(
-        Color(0xFFE53935), Color(0xFFFB8C00), Color(0xFFFDD835),
-        Color(0xFF43A047), Color(0xFF1E88E5), Color(0xFF8E24AA),
-        Color(0xFF00ACC1), Color(0xFF6D4C41), Color(0xFF1C1B1F),
-        Color(0xFF9E9E9E), Color(0xFFEC407A), Color(0xFFFFFFFF)
+        Color(0xFFFDD835), Color(0xFF43A047), Color(0xFF1E88E5), // Yellow, Green, Blue
+        Color(0xFFEC407A), Color(0xFFFB8C00), Color(0xFFE53935), // Pink, Orange, Red
+        Color(0xFF8E24AA), Color(0xFF1C1B1F), Color(0xFF00ACC1), // Purple, Black, Cyan
+        Color(0xFF6D4C41), Color(0xFF9E9E9E), Color(0xFFFFFFFF)  // Brown, Grey, White
     )
 
-    val currentColor = Color(red, green, blue)
+    // Result color: alpha only participates when the opacity slider is shown.
+    val currentColor = if (showOpacity) Color(red, green, blue, alpha) else Color(red, green, blue)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -49,6 +55,38 @@ fun ColorSelectionDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Recent colors (newest first) — quick re-pick
+                if (recentColors.isNotEmpty()) {
+                    Text(
+                        text = "RECENT",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        recentColors.take(8).forEach { color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                    .clickable {
+                                        red = color.red
+                                        green = color.green
+                                        blue = color.blue
+                                        if (showOpacity) alpha = color.alpha
+                                    }
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        thickness = 0.5.dp
+                    )
+                }
+
                 // Predefined colors label
                 Text(
                     text = "PREDEFINED",
@@ -63,7 +101,7 @@ fun ColorSelectionDialog(
                     predefinedColors.chunked(6).forEach { rowColors ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowColors.forEach { color ->
-                                val isSelected = currentColor == color
+                                val isSelected = red == color.red && green == color.green && blue == color.blue
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
@@ -151,6 +189,27 @@ fun ColorSelectionDialog(
                             onValueChange = { blue = it }
                         )
                     }
+                }
+
+                // Opacity — only for markup where transparency matters.
+                if (showOpacity) {
+                    Text(
+                        text = "OPACITY  ${(alpha * 100).toInt()}%",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    )
+                    ColorSliderRow(
+                        label = "α",
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        value = alpha,
+                        trackBrush = Brush.horizontalGradient(
+                            listOf(Color.White, Color(red, green, blue))
+                        ),
+                        thumbColor = Color(red, green, blue),
+                        onValueChange = { alpha = it.coerceIn(0.1f, 1f) }
+                    )
                 }
             }
         },
