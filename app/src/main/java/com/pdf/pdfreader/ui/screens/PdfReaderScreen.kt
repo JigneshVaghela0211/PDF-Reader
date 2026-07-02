@@ -71,8 +71,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.R
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.OcrRunState
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.PdfOcrViewModel
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrLanguagePickerDialog
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrProgressCard
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrRequiredDialog
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrSaveSheet
 import com.pdf.pdfreader.ui.components.AnnotationTopBar
 import com.pdf.pdfreader.ui.components.PdfAnnotationOverlay
 import com.pdf.pdfreader.ui.viewmodel.PageRenderState
@@ -108,9 +115,16 @@ fun PdfReaderScreen(
     val scrollState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // OCR decision flow (feature/pdf_ocr): analyze the doc so Edit Text can branch
+    // to the OCR pipeline when the document/page is image-based.
+    val ocrViewModel: PdfOcrViewModel = hiltViewModel()
+    val showOcrRequiredDialog by ocrViewModel.showOcrRequiredDialog.collectAsStateWithLifecycle()
+    val ocrRunState by ocrViewModel.runState.collectAsStateWithLifecycle()
+
     LaunchedEffect(path) {
         viewModel.initialize(path)
         editorViewModel.initialize(path)
+        ocrViewModel.prepare(path)
     }
 
     // Handle initial page / external search query
@@ -209,6 +223,15 @@ fun PdfReaderScreen(
         editorViewModel.setCurrentPage(firstVisible)
     }
 
+    // Edit Text on a scanned/image-only page → also raise the OCR-required dialog.
+    // Inert unless ENABLE_OCR_EDIT; the tool itself still activates as before.
+    val onToolChange: (com.pdf.pdfreader.ui.components.AnnotationTool) -> Unit = { tool ->
+        if (tool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT) {
+            ocrViewModel.onEditTextRequested(path, uiState.currentPage)
+        }
+        editorViewModel.setAnnotationToolWithAutoExtract(tool)
+    }
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -239,6 +262,80 @@ fun PdfReaderScreen(
         }
     }
 
+    // "OCR required" dialog for image-based docs: Run OCR & Edit asks for the
+    // script, OCRs the current page (cache-first) and enters word-editing mode.
+    var showOcrLanguagePicker by remember { mutableStateOf(false) }
+    var ocrPickerForWholeDoc by remember { mutableStateOf(false) }
+    if (showOcrRequiredDialog) {
+        OcrRequiredDialog(
+            onRunOcr = {
+                ocrViewModel.dismissOcrRequiredDialog()
+                ocrPickerForWholeDoc = false
+                showOcrLanguagePicker = true
+            },
+            onDismiss = ocrViewModel::dismissOcrRequiredDialog,
+            onRunWholeDocumentOcr =
+                if (com.pdf.pdfreader.core.config.PdfEditorFeatureConfig.ENABLE_BATCH_OCR) {
+                    {
+                        ocrViewModel.dismissOcrRequiredDialog()
+                        ocrPickerForWholeDoc = true
+                        showOcrLanguagePicker = true
+                    }
+                } else null
+        )
+    }
+    if (showOcrLanguagePicker) {
+        OcrLanguagePickerDialog(
+            onPick = { script ->
+                showOcrLanguagePicker = false
+                if (ocrPickerForWholeDoc) {
+                    ocrViewModel.runDocumentOcr(path, script)
+                } else {
+                    ocrViewModel.enterOcrEditMode(path, uiState.currentPage, script)
+                }
+            },
+            onDismiss = { showOcrLanguagePicker = false }
+        )
+    }
+
+    // OCR edit mode lives inside the editor's Edit Text tool; leaving the editor exits it.
+    val ocrEditState by ocrViewModel.ocrEditState.collectAsStateWithLifecycle()
+    LaunchedEffect(editorUiState.isEditMode) {
+        if (!editorUiState.isEditMode && ocrEditState.isOcrEditMode) {
+            ocrViewModel.exitOcrEditMode()
+        }
+    }
+    LaunchedEffect(ocrEditState.error) {
+        ocrEditState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            ocrViewModel.clearOcrEditError()
+        }
+    }
+    var showOcrSaveDialog by remember { mutableStateOf(false) }
+    if (showOcrSaveDialog) {
+        OcrSaveSheet(
+            defaultName = java.io.File(path).nameWithoutExtension + "_ocr",
+            editCount = ocrEditState.edits.size,
+            onSave = { name ->
+                showOcrSaveDialog = false
+                ocrViewModel.saveOcrEdits(name)
+            },
+            onDismiss = { showOcrSaveDialog = false }
+        )
+    }
+    (ocrRunState as? OcrRunState.Running)?.let { runState ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = ocrViewModel::cancelOcr) {
+            OcrProgressCard(state = runState, onCancel = ocrViewModel::cancelOcr)
+        }
+    }
+    LaunchedEffect(ocrRunState) {
+        when (val s = ocrRunState) {
+            is OcrRunState.Success -> { snackbarHostState.showSnackbar(s.message); ocrViewModel.resetRunState() }
+            is OcrRunState.Error -> { snackbarHostState.showSnackbar(s.message); ocrViewModel.resetRunState() }
+            else -> {}
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -252,13 +349,23 @@ fun PdfReaderScreen(
                         canUndo = editorUiState.canUndo,
                         canRedo = editorUiState.canRedo,
                         isExporting = editorUiState.isExporting,
-                        onToolChange = editorViewModel::setAnnotationToolWithAutoExtract,
+                        onToolChange = onToolChange,
                         onColorClick = { /* handled by bottom bar */ },
                         onStrokeWidthChange = editorViewModel::setAnnotationStrokeWidth,
                         onUndo = editorViewModel::undo,
                         onRedo = editorViewModel::redo,
                         onClose = { editorViewModel.setEditMode(false) },
-                        onSave = { editorViewModel.exportEditedPdf(screenWidthPx) },
+                        onSave = {
+                            // OCR edits have their own export path (patch + visible text);
+                            // everything else keeps the classic editor export.
+                            if (ocrEditState.isOcrEditMode && ocrEditState.edits.isNotEmpty() &&
+                                com.pdf.pdfreader.core.config.PdfEditorFeatureConfig.ENABLE_OCR_EXPORT
+                            ) {
+                                showOcrSaveDialog = true
+                            } else {
+                                editorViewModel.exportEditedPdf(screenWidthPx)
+                            }
+                        },
                         onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) }
                     )
                 }
@@ -367,7 +474,7 @@ fun PdfReaderScreen(
                 currentStrokeWidth = editorUiState.currentStrokeWidth,
                 canUndo = editorUiState.canUndo,
                 canRedo = editorUiState.canRedo,
-                onToolChange = editorViewModel::setAnnotationToolWithAutoExtract,
+                onToolChange = onToolChange,
                 onSignatureClick = { editorViewModel.setSignatureSheetVisible(true) },
                 onUndoClick = editorViewModel::undo,
                 onRedoClick = editorViewModel::redo,
@@ -482,7 +589,8 @@ fun PdfReaderScreen(
                                 } else {
                                     scale = 2.5f
                                 }
-                            }
+                            },
+                            ocrViewModel = ocrViewModel
                         )
                     }
 

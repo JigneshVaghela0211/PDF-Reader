@@ -47,6 +47,11 @@ interface PdfDao {
     @Query("DELETE FROM pdf_text_search WHERE pdfPath = :path")
     suspend fun deleteTextSnippetsByPath(path: String)
 
+    /** Page-scoped variant so OCR indexing can refresh its pages without dropping
+     *  snippets that PdfTextExtractor indexed for the same (mixed) document. */
+    @Query("DELETE FROM pdf_text_search WHERE pdfPath = :path AND pageIndex IN (:pages)")
+    suspend fun deleteTextSnippetsForPages(path: String, pages: List<Int>)
+
     @Query("""
         SELECT pdf_files.name as fileName, 
                pdf_text_search.pdfPath, 

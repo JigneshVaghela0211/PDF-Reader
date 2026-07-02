@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pdf.pdfreader.utiles.PdfCompressionEngine
 import com.pdf.pdfreader.utiles.PdfMergeEngine
-import com.pdf.pdfreader.utiles.PdfOcrEngine
 import com.pdf.pdfreader.utiles.PdfSplitEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +35,7 @@ class PdfToolsViewModel @Inject constructor(
     application: Application,
     private val mergeEngine: PdfMergeEngine,
     private val splitEngine: PdfSplitEngine,
-    private val compressionEngine: PdfCompressionEngine,
-    private val ocrEngine: PdfOcrEngine
+    private val compressionEngine: PdfCompressionEngine
 ) : AndroidViewModel(application) {
 
     private val _status = MutableStateFlow<ToolStatus>(ToolStatus.Idle)
@@ -82,18 +80,6 @@ class PdfToolsViewModel @Inject constructor(
             else ToolStatus.Success("Merged ${inputs.size} files · ${r.pageCount} pages", r.outputPath)
         } finally {
             cached.forEach { runCatching { File(it).delete() } }
-        }
-    }
-
-    fun runOcr(path: String) = run("Recognizing text…") {
-        val r = ocrEngine.makeSearchable(path)
-        when {
-            r == null -> ToolStatus.Error("OCR failed")
-            r.wordsAdded == 0 -> ToolStatus.Success("No text recognized on these pages", r.outputPath)
-            else -> ToolStatus.Success(
-                "Searchable PDF created · ${r.wordsAdded} words on ${r.pagesProcessed} pages",
-                r.outputPath
-            )
         }
     }
 

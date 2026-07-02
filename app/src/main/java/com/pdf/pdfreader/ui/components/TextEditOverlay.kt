@@ -253,9 +253,11 @@ fun TextEditOverlay(
 
 /**
  * Inline editor that appears below the selected text block.
+ * `internal` (not private) so the OCR edit overlay (feature/pdf_ocr) reuses the
+ * exact same editor popup instead of duplicating it.
  */
 @Composable
-private fun TextEditInlineEditor(
+internal fun TextEditInlineEditor(
     block: TextBlock,
     editedBlock: EditedTextBlock?,
     offsetX: Int,

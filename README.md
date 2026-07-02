@@ -13,6 +13,10 @@ existing working code stays in place until it's touched:
 feature/
   reader/presentation/component/      ← BookmarksSheet, GoToPageDialog
   annotation/presentation/component/  ← AnnotationListSheet
+  pdf_ocr/                            ← fully layered OCR feature (see "OCR" below)
+    domain/{model,repository,usecase}
+    data/{engine,cache,repository}
+    presentation/{PdfOcrViewModel, component/}
 ```
 
 The legacy fragment-based DI scaffold (`base/` package + `di/ActivityModule`) was unused and
@@ -136,6 +140,10 @@ Defaults below are the **production baseline** (debug builds may upgrade experim
 | `ENABLE_SEARCH` | `SEARCH` | ENABLED |
 | `ENABLE_COPY_TEXT` | `COPY_TEXT` | ENABLED |
 | `ENABLE_OCR` | `OCR` | BETA |
+| `ENABLE_OCR_EDIT` | `OCR_EDIT` | DISABLED (BETA in debug) |
+| `ENABLE_BATCH_OCR` | `BATCH_OCR` | DISABLED (BETA in debug) |
+| `ENABLE_OCR_SEARCH` | `OCR_SEARCH` | DISABLED (BETA in debug) |
+| `ENABLE_OCR_EXPORT` | `OCR_EXPORT` | DISABLED (BETA in debug) |
 | `ENABLE_COMPRESS` | `COMPRESS` | BETA |
 | `ENABLE_MERGE` | `MERGE` | BETA |
 | `ENABLE_SPLIT` | `SPLIT` | BETA |
@@ -156,3 +164,45 @@ Defaults below are the **production baseline** (debug builds may upgrade experim
    (and a `debugOverrides` / `releaseOverrides` entry if it's experimental).
 3. (Optional) add an `ENABLE_*` accessor for ergonomic call sites.
 4. Gate the UI control via `ToolbarFeatureProvider.uiModel(...)` — never with a hardcoded check.
+
+## OCR (scanned / image-based PDFs)
+
+`feature/pdf_ocr/` adds OCR-based text **editing** on top of the older "Make Searchable"
+tool. It only ever engages when a document (or page) has no selectable text — real PDF
+text editing (`PdfTextReplacementEngine`) is untouched and keeps handling text PDFs.
+
+**Decision flow:** opening the Edit Text tool runs `PdfDocumentAnalyzer`
+(SEARCHABLE / SCANNED / MIXED, per-page). Text pages edit as before; image-only pages
+raise *"This document is image-based — OCR is required before editing"* with
+**Run OCR & Edit** (current page) and, behind `BATCH_OCR`, **OCR whole document**.
+
+**Pipeline** (Compose → `PdfOcrViewModel` → use cases → `OcrRepository` → engines → ML Kit):
+
+```
+render page (PdfPageRenderer, 1654px ≈ 200 DPI)
+  → OcrImagePreProcessor (grayscale + contrast, upscale small pages; no deskew — ML Kit
+    reports per-line angle instead)
+  → ML Kit text recognition (TextRecognizerFactory picks the model per script:
+    Latin / Chinese / Devanagari / Japanese / Korean — all bundled)
+  → OcrPage hierarchy (blocks → lines → words, normalized display coords + confidence)
+  → OcrResultCache (Gson JSON per page in filesDir/ocr_cache/<sha256(path|size|mtime)>/…)
+```
+
+- **Cache = resume.** Each page persists as it finishes; Cancel keeps completed pages and
+  the next run skips them. Editing/replacing the source PDF changes the key → full re-run.
+- **Editing:** word-level tap targets (`OcrTextEditOverlay`; amber = confidence < 0.5),
+  reusing the same inline editor as real text editing. Edits live only in
+  `PdfOcrViewModel` — they never enter the editor ViewModel or the text-replacement path.
+- **Export (`OcrEditExporter`):** unedited words → invisible text layer (searchable /
+  selectable, raster unchanged); edited words → background-colored patch (median-sampled
+  around the word) + visible replacement text. Output is a sibling `<name>_ocr.pdf`
+  (auto-uniquified, original never modified). Page `/Rotate` is handled by
+  `OcrCoordinateMapper`.
+- **Fonts:** WinAnsi text uses Helvetica; other scripts embed a subsetted system Noto
+  font (`OcrFontProvider`, nothing bundled). Known limitation: devices whose Noto CJK
+  collection is CFF-flavored can't embed it (PDFBox 2.x needs TrueType outlines) — such
+  text falls back to `?`-sanitized output. Devanagari works via NotoSansDevanagari TTF.
+- **Search:** with `OCR_SEARCH`, recognized text is indexed into the existing FTS table
+  (page-scoped, so mixed documents keep their real-text snippets).
+- **Other limitations (v1):** patches are axis-aligned and visible on textured/gradient
+  backgrounds; heavily skewed scans (|angle| > ~5°) aren't deskewed.

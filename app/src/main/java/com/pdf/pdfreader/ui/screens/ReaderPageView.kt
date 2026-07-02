@@ -46,7 +46,8 @@ fun PdfPage(
     isScrolling: Boolean = false,
     reloadTrigger: Int = 0,
     pageContentColorMatrix: androidx.compose.ui.graphics.ColorMatrix? = null,
-    onDoubleTap: () -> Unit = {}
+    onDoubleTap: () -> Unit = {},
+    ocrViewModel: com.pdf.pdfreader.feature.pdf_ocr.presentation.PdfOcrViewModel? = null
 ) {
     val renderState = pageStates[pageIndex]
     val currentIsScrolling by rememberUpdatedState(isScrolling)
@@ -215,6 +216,39 @@ fun PdfPage(
                                         modifier = Modifier.size(36.dp),
                                         strokeWidth = 3.dp
                                     )
+                                }
+                            }
+                        }
+
+                        // ─── OCR Text Edit Overlay (feature/pdf_ocr, scanned pages) ────
+                        // Additive sibling of the EDIT_TEXT branch above: word-level
+                        // editing of OCR'd pages, driven entirely by PdfOcrViewModel.
+                        if (ocrViewModel != null &&
+                            editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT
+                        ) {
+                            val ocrEditState by ocrViewModel.ocrEditState.collectAsStateWithLifecycle()
+                            if (ocrEditState.isOcrEditMode && pageSize != IntSize.Zero) {
+                                com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrTextEditOverlay(
+                                    modifier = Modifier.matchParentSize(),
+                                    pageIndex = pageIndex,
+                                    pageSize = pageSize,
+                                    words = ocrEditState.words[pageIndex] ?: emptyList(),
+                                    edits = ocrEditState.edits,
+                                    selectedWordId = ocrEditState.selectedWordId,
+                                    lowConfidenceThreshold = ocrEditState.lowConfidenceThreshold,
+                                    onSelectWord = ocrViewModel::selectOcrWord,
+                                    onEditWord = ocrViewModel::editOcrWord
+                                )
+                                if (ocrEditState.recognizingPage == pageIndex) {
+                                    Box(
+                                        modifier = Modifier.matchParentSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(36.dp),
+                                            strokeWidth = 3.dp
+                                        )
+                                    }
                                 }
                             }
                         }

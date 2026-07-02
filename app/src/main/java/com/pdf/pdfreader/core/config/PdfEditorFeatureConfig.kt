@@ -71,7 +71,11 @@ object PdfEditorFeatureConfig {
         // ─── PDF TOOLS ───
         EditorFeature.SEARCH to FeatureState.ENABLED,
         EditorFeature.COPY_TEXT to FeatureState.ENABLED,
-        EditorFeature.OCR to FeatureState.BETA, // PdfOcrEngine (ML Kit) + PDF Tools sheet
+        EditorFeature.OCR to FeatureState.BETA, // feature/pdf_ocr pipeline (ML Kit) + PDF Tools sheet
+        EditorFeature.OCR_EDIT to FeatureState.DISABLED, // OCR-based editing of scanned PDFs (feature/pdf_ocr); enabled in debug
+        EditorFeature.BATCH_OCR to FeatureState.DISABLED, // whole-document OCR entry points
+        EditorFeature.OCR_SEARCH to FeatureState.DISABLED, // index recognized OCR text into FTS search
+        EditorFeature.OCR_EXPORT to FeatureState.DISABLED, // save OCR-edited PDFs (visible edits + invisible layer)
         EditorFeature.COMPRESS to FeatureState.BETA, // PdfCompressionEngine + PDF Tools sheet
         EditorFeature.MERGE to FeatureState.BETA,    // PdfMergeEngine + PDF Tools sheet
         EditorFeature.SPLIT to FeatureState.BETA,    // PdfSplitEngine + PDF Tools sheet
@@ -87,6 +91,10 @@ object PdfEditorFeatureConfig {
     /** Overrides applied only on DEBUG builds — enable experimental features for testing. */
     private val debugOverrides: Map<EditorFeature, FeatureState> = mapOf(
         EditorFeature.REAL_PDF_TEXT_EDITING to FeatureState.BETA,
+        EditorFeature.OCR_EDIT to FeatureState.BETA,
+        EditorFeature.OCR_EXPORT to FeatureState.BETA,
+        EditorFeature.BATCH_OCR to FeatureState.BETA,
+        EditorFeature.OCR_SEARCH to FeatureState.BETA,
     )
 
     /** Overrides applied only on RELEASE builds — keep non-production features hidden. */
@@ -161,6 +169,10 @@ object PdfEditorFeatureConfig {
     val ENABLE_SEARCH: Boolean get() = isEnabled(EditorFeature.SEARCH)
     val ENABLE_COPY_TEXT: Boolean get() = isEnabled(EditorFeature.COPY_TEXT)
     val ENABLE_OCR: Boolean get() = isEnabled(EditorFeature.OCR)
+    val ENABLE_OCR_EDIT: Boolean get() = isEnabled(EditorFeature.OCR_EDIT)
+    val ENABLE_BATCH_OCR: Boolean get() = isEnabled(EditorFeature.BATCH_OCR)
+    val ENABLE_OCR_SEARCH: Boolean get() = isEnabled(EditorFeature.OCR_SEARCH)
+    val ENABLE_OCR_EXPORT: Boolean get() = isEnabled(EditorFeature.OCR_EXPORT)
     val ENABLE_COMPRESS: Boolean get() = isEnabled(EditorFeature.COMPRESS)
     val ENABLE_MERGE: Boolean get() = isEnabled(EditorFeature.MERGE)
     val ENABLE_SPLIT: Boolean get() = isEnabled(EditorFeature.SPLIT)

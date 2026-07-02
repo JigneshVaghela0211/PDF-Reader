@@ -26,6 +26,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pdf.pdfreader.core.config.PdfEditorFeatureConfig
 import com.pdf.pdfreader.core.model.EditorFeature
 import com.pdf.pdfreader.domain.model.PdfFile
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.OcrRunState
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.PdfOcrViewModel
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrLanguagePickerDialog
+import com.pdf.pdfreader.feature.pdf_ocr.presentation.component.OcrProgressCard
 import com.pdf.pdfreader.presentation.editor.ToolbarFeatureProvider
 import com.pdf.pdfreader.utiles.PdfCompressionEngine
 import com.pdf.pdfreader.ui.viewmodel.PdfToolsViewModel
@@ -46,15 +50,33 @@ fun PdfToolsBottomSheet(
 ) {
     val vm: PdfToolsViewModel = hiltViewModel()
     val status by vm.status.collectAsStateWithLifecycle()
+    val ocrVm: PdfOcrViewModel = hiltViewModel()
+    val ocrRunState by ocrVm.runState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showCompress by remember { mutableStateOf(false) }
     var showSplit by remember { mutableStateOf(false) }
+    var showOcrLanguagePicker by remember { mutableStateOf(false) }
 
     val mergeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (!uris.isNullOrEmpty()) vm.merge(pdf.path, uris)
+    }
+
+    LaunchedEffect(ocrRunState) {
+        when (val s = ocrRunState) {
+            is OcrRunState.Success -> {
+                Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
+                ocrVm.resetRunState()
+                onDismiss()
+            }
+            is OcrRunState.Error -> {
+                Toast.makeText(context, s.message, Toast.LENGTH_LONG).show()
+                ocrVm.resetRunState()
+            }
+            else -> Unit
+        }
     }
 
     // Surface success/error as a toast, then reset so it doesn't re-fire on recomposition.
@@ -87,7 +109,7 @@ fun PdfToolsBottomSheet(
         )
         Spacer(Modifier.height(6.dp))
 
-        val running = status is ToolStatus.Running
+        val running = status is ToolStatus.Running || ocrRunState is OcrRunState.Running
 
         ToolRow(EditorFeature.COMPRESS, Icons.Default.Compress, "Compress", "Reduce file size", running) { showCompress = true }
         ToolRow(EditorFeature.SPLIT, Icons.Default.ContentCut, "Split", "Export pages or ranges", running) { showSplit = true }
@@ -95,10 +117,10 @@ fun PdfToolsBottomSheet(
             mergeLauncher.launch(arrayOf("application/pdf"))
         }
         ToolRow(EditorFeature.OCR, Icons.Default.DocumentScanner, "Make Searchable (OCR)", "Recognize text in scanned PDFs", running) {
-            vm.runOcr(pdf.path)
+            showOcrLanguagePicker = true
         }
 
-        if (running) {
+        if (status is ToolStatus.Running) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -107,6 +129,13 @@ fun PdfToolsBottomSheet(
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Text((status as ToolStatus.Running).label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+        (ocrRunState as? OcrRunState.Running)?.let { runState ->
+            OcrProgressCard(
+                state = runState,
+                onCancel = ocrVm::cancelOcr,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)
+            )
         }
     }
 
@@ -121,6 +150,12 @@ fun PdfToolsBottomSheet(
             onDismiss = { showSplit = false },
             onEveryPage = { showSplit = false; vm.splitEveryPage(pdf.path) },
             onRanges = { ranges -> showSplit = false; vm.splitRanges(pdf.path, ranges) }
+        )
+    }
+    if (showOcrLanguagePicker) {
+        OcrLanguagePickerDialog(
+            onPick = { script -> showOcrLanguagePicker = false; ocrVm.runDocumentOcr(pdf.path, script) },
+            onDismiss = { showOcrLanguagePicker = false }
         )
     }
 }
