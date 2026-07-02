@@ -96,7 +96,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 /** Maximum zoom factor. Kept in sync with the ViewModel's high-res render cap
  *  so the re-rendered bitmap always matches the on-screen zoom (stays crisp). */
-private const val MAX_ZOOM = 3f
+private const val MAX_ZOOM = 5f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

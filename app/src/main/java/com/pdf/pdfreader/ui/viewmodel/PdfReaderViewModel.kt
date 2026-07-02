@@ -126,7 +126,13 @@ class PdfReaderViewModel @Inject constructor(
         private const val ZOOM_RERENDER_THRESHOLD = 1.25f
         // Must match MAX_ZOOM in PdfReaderScreen so the re-rendered bitmap matches
         // the maximum on-screen zoom and stays crisp (and bounds memory use).
-        private const val MAX_ZOOM_RENDER_SCALE = 3f
+        private const val MAX_ZOOM_RENDER_SCALE = 5f
+        // Upper bound on a single high-res bitmap so a deep zoom can't OOM. A full
+        // page at 5x on a 1080px screen would be ~40MP (~165MB ARGB_8888), so we cap
+        // total pixels to ~1/8 of the heap and downscale the render to fit — the
+        // graphicsLayer magnifies any remainder. Bounded to a sane 6–24MP window.
+        private val MAX_RENDER_PIXELS = (Runtime.getRuntime().maxMemory() / 32L)
+            .coerceIn(6_000_000L, 24_000_000L)
     }
 
     private val _uiState = MutableStateFlow(PdfReaderUiState())
@@ -382,8 +388,16 @@ class PdfReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val dims = withContext(pdfDispatcher) { pdfRenderer?.getPageDimensions(pageIndex) } ?: return@launch
             val ratio = dims.second.toFloat() / dims.first.toFloat()
-            val targetWidth = (baseWidth * clampedScale).toInt()
-            val targetHeight = (targetWidth * ratio).toInt()
+            var targetWidth = (baseWidth * clampedScale).toInt()
+            var targetHeight = (targetWidth * ratio).toInt()
+            // Keep the bitmap within the pixel budget; downscale (preserving aspect
+            // ratio) rather than allocating a page too large for the heap.
+            val pixels = targetWidth.toLong() * targetHeight.toLong()
+            if (pixels > MAX_RENDER_PIXELS) {
+                val shrink = kotlin.math.sqrt(MAX_RENDER_PIXELS.toDouble() / pixels.toDouble()).toFloat()
+                targetWidth = (targetWidth * shrink).toInt().coerceAtLeast(baseWidth)
+                targetHeight = (targetWidth * ratio).toInt()
+            }
             val cacheKey = "${pageIndex}_${targetWidth}x${targetHeight}"
             val cached = bitmapCache.get(cacheKey)
             if (cached != null && !cached.isRecycled) {
