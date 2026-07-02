@@ -336,28 +336,17 @@ private fun GlobalImageElementView(
                 width = with(density) { scaledWidth.toDp() },
                 height = with(density) { scaledHeight.toDp() }
             )
-            // graphicsLayer now only handles rotation + flip + opacity (constant during a drag).
-            .graphicsLayer {
-                rotationZ = element.rotation
-                scaleX = if (element.flipHorizontal) -1f else 1f
-                scaleY = if (element.flipVertical) -1f else 1f
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
-                alpha = element.opacity
-            }
+            // DRAG detector placed ABOVE the rotation graphicsLayer (below in the chain),
+            // so pointer deltas arrive in VIEWPORT space. If this pointerInput sat UNDER
+            // graphicsLayer, Compose back-transforms pointer positions into the image's
+            // rotated local space, making positionChange() == R(−θ)·finger — which is what
+            // inverted drag at 180° and skewed it at 90°. Kept above the layer, the raw
+            // delta IS the finger delta at every angle, so onMoveBy → ImageTransformEngine
+            // .translate needs no rotation math. (Unified press → select → drag: pressing
+            // selects immediately and the SAME gesture drags — no "tap to select first",
+            // and dragging no longer depends on prior selection state that scrolling clears.)
             .then(
-                if (isLocked) {
-                    if (isSelected) {
-                        Modifier.border(2.dp, Color(0xFFFF9800))
-                    } else {
-                        Modifier
-                    }
-                } else if (isInteractive) {
-                    // Unified press → select → drag handler.
-                    // Pressing the image selects it immediately (so the toolbar shows) and
-                    // the SAME gesture can drag it — no separate "tap to select first" step.
-                    // This is what fixes "can't drag after scrolling": dragging no longer
-                    // depends on the image already being selected (a state that scrolling /
-                    // the deselect catcher could clear).
+                if (isInteractive && !isLocked) {
                     Modifier.pointerInput(element.id) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -373,20 +362,15 @@ private fun GlobalImageElementView(
                                     val change = event.changes.firstOrNull() ?: break
 
                                     if (change.pressed) {
-                                        // Frame-stable delta (immune to the graphicsLayer
-                                        // translation shifting the local coordinate space).
                                         val delta = change.positionChange()
                                         change.consume()
 
                                         if (delta != Offset.Zero) {
                                             hasDragged = true
-                                            // positionChange() is already in VIEWPORT space, and
-                                            // position is applied via Modifier.offset OUTSIDE the
-                                            // rotation graphicsLayer, so the raw delta tracks the
-                                            // finger at every angle. Translation is centralized in
-                                            // ImageTransformEngine (via the ViewModel) — the view
-                                            // does no rotation/drag math. Rotating the delta here
-                                            // was the bug that inverted drag after rotation.
+                                            // Viewport-space delta (detector is above the
+                                            // rotation layer) → tracks the finger at any
+                                            // angle with zero trig. Translation is centralized
+                                            // in ImageTransformEngine via the ViewModel.
                                             onMoveBy(delta)
                                         }
                                     } else {
@@ -404,6 +388,21 @@ private fun GlobalImageElementView(
                             onInteractionEnd()
                         }
                     }
+                } else {
+                    Modifier
+                }
+            )
+            // graphicsLayer handles rotation + flip + opacity only (constant during a drag).
+            .graphicsLayer {
+                rotationZ = element.rotation
+                scaleX = if (element.flipHorizontal) -1f else 1f
+                scaleY = if (element.flipVertical) -1f else 1f
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                alpha = element.opacity
+            }
+            .then(
+                if (isLocked && isSelected) {
+                    Modifier.border(2.dp, Color(0xFFFF9800))
                 } else {
                     Modifier
                 }
