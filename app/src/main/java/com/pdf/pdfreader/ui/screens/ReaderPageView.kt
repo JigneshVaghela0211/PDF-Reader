@@ -204,12 +204,9 @@ fun PdfPage(
                                 onEditTextBlock = { blockId, newText, newFontSize, newColor ->
                                     editorViewModel.editTextBlock(blockId, newText, newFontSize, newColor)
                                 },
-                                // Enable word-level long-press selection + markup in Edit-Text mode.
+                                // Word-level selection + draggable handles in Edit-Text mode.
                                 textSelection = editorUiState.textSelection,
-                                editorViewModel = editorViewModel,
-                                // Micro Chunk 1: tap → word hit-test → temporary highlight.
-                                selectedEditWord = editorUiState.selectedEditWord,
-                                onSelectWord = { editorViewModel.selectEditWord(it) }
+                                editorViewModel = editorViewModel
                             )
 
                             // Show loading indicator while extracting text

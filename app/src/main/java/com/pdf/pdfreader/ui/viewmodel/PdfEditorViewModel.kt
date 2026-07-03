@@ -40,9 +40,6 @@ data class PdfEditorUiState(
     val textBlocks: Map<Int, List<TextBlock>> = emptyMap(),
     val editedTextBlocks: List<EditedTextBlock> = emptyList(),
     val selectedTextBlockId: String? = null,
-    /** Micro Chunk 1: the single word hit-tested by a tap in Edit-Text mode (drives a temporary
-     *  highlight rectangle only — no handles, no editor, no replacement). */
-    val selectedEditWord: com.pdf.pdfreader.domain.model.TextWord? = null,
     val isTextBlocksLoading: Boolean = false,
     val textSelection: TextSelectionState? = null,
     val imageElements: List<ImageElement> = emptyList(),
@@ -284,11 +281,6 @@ class PdfEditorViewModel @Inject constructor(
     }
 
     fun selectTextBlock(id: String?) { _uiState.update { it.copy(selectedTextBlockId = id) } }
-
-    /** Micro Chunk 1: expose the tapped word so the overlay can draw a temporary highlight. */
-    fun selectEditWord(word: com.pdf.pdfreader.domain.model.TextWord?) {
-        _uiState.update { it.copy(selectedEditWord = word) }
-    }
 
     fun editTextBlock(blockId: String, newText: String, newFontSize: Float, newColor: Color) {
         val allBlocks = _uiState.value.textBlocks.values.flatten()

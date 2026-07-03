@@ -69,12 +69,9 @@ fun TextEditOverlay(
     isEditTextMode: Boolean,
     onSelectTextBlock: (String?) -> Unit,
     onEditTextBlock: (blockId: String, newText: String, newFontSize: Float, newColor: Color) -> Unit,
-    // Word-level selection for markup while in Edit-Text mode (same engine as reading mode).
+    // Word-level selection + draggable handles in Edit-Text mode (shared selection engine).
     textSelection: TextSelectionState? = null,
-    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null,
-    // Micro Chunk 1: the tapped word (temporary highlight) + callback to expose it.
-    selectedEditWord: TextWord? = null,
-    onSelectWord: (TextWord?) -> Unit = {}
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null
 ) {
     if (!isEditTextMode || pageSize == IntSize.Zero) return
 
@@ -194,48 +191,24 @@ fun TextEditOverlay(
             }
         }
 
-        // ─── Micro Chunk 1: temporary highlight for the tapped word (zIndex 4, non-interactive) ───
-        // Just a rectangle over the hit-tested word — NO handles, NO editor, NO replacement.
-        selectedEditWord?.let { hw ->
-            val rectX = (hw.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectY = (hw.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
-            val rectW = (hw.width * pageWidth).toInt().coerceIn(4, MAX_SIZE_PX)
-            val rectH = (hw.height * pageHeight).toInt().coerceIn(4, MAX_SIZE_PX)
-            Box(
-                modifier = Modifier
-                    .zIndex(4f)
-                    .offset { IntOffset(rectX, rectY) }
-                    .size(
-                        width = with(density) { rectW.toDp() },
-                        height = with(density) { rectH.toDp() }
-                    )
-                    .background(Color(0x552196F3))
-                    .border(1.dp, Color(0xFF2196F3))
-            )
-        }
-
         // ─── Layer 3: Single gesture layer (zIndex 5) ───
-        // Micro Chunk 1: TAP → hit-test the nearest word and expose it (temporary highlight only;
-        //   no handles, no editor, no replacement). LONG-PRESS keeps the pre-existing, separately
-        //   approved markup selection (highlight/underline/strike + handles) untouched.
+        // Micro Chunk 2: TAP / LONG-PRESS → start a selection from the nearest single WORD
+        //   (PdfWordHitTester → startTextSelection). The two draggable handles (Layer 3b) then
+        //   expand it word → words → line → paragraph via PdfSelectionRangeManager. Selection always
+        //   starts from ONE word. No editor, no replacement (deferred to a later micro-chunk).
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(5f)
                 .pointerInput(pageBlocks, allWords) {
-                    detectTapGestures(
-                        onTap = { pos ->
-                            val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
-                            Log.d(TAG, "Word hit-tested: '${word?.text}'")
-                            onSelectWord(word)
-                        },
-                        onLongPress = { pos ->
-                            val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
-                            if (word != null && editorViewModel != null) {
-                                editorViewModel.startTextSelection(pageIndex, word, allWords)
-                            }
+                    val selectWordAt: (androidx.compose.ui.geometry.Offset) -> Unit = { pos ->
+                        val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
+                        if (word != null && editorViewModel != null) {
+                            Log.d(TAG, "Selection started from word: '${word.text}'")
+                            editorViewModel.startTextSelection(pageIndex, word, allWords)
                         }
-                    )
+                    }
+                    detectTapGestures(onTap = selectWordAt, onLongPress = selectWordAt)
                 }
         )
 
