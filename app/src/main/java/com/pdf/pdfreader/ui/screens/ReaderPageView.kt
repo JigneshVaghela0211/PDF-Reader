@@ -120,13 +120,50 @@ fun PdfPage(
                 if (!bitmap.isRecycled) {
                     var pageSize by remember { mutableStateOf(IntSize.Zero) }
 
+                    // While editing this page, draw the renderer-suppressed EDIT bitmap in place of
+                    // the cached normal bitmap (originals absent — no cover). The normal bitmap in the
+                    // reader cache is never touched; discarding the edit bitmap restores it.
+                    val editRender = editorUiState.editRenderState
+                    val editBitmapForThisPage = editRender != null &&
+                        editRender.pageIndex == pageIndex &&
+                        !editRender.bitmap.isRecycled
+                    val displayBitmap = if (editBitmapForThisPage) editRender!!.bitmap else bitmap
+
+                    // Report the normal bitmap's width so the edit bitmap renders pixel-aligned.
+                    if (editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT) {
+                        LaunchedEffect(bitmap.width) { editorViewModel.setEditRenderWidth(bitmap.width) }
+                    }
+
+                    // (Debug D1) Issue 3: confirm exactly one bitmap is drawn, and flag when the
+                    // NORMAL bitmap would still show while this page is being edited (Issue 2 cause).
+                    if (com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.ENABLED) {
+                        val editingThisPage = editorUiState.currentTool == com.pdf.pdfreader.ui.components.AnnotationTool.EDIT_TEXT &&
+                            (editorUiState.inlineEditPageIndex == pageIndex ||
+                                editorUiState.previewEdits.any { it.pageIndex == pageIndex })
+                        LaunchedEffect(editBitmapForThisPage, editingThisPage) {
+                            if (editingThisPage) {
+                                android.util.Log.d(
+                                    com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.TAG,
+                                    "[view] page=$pageIndex bitmapSwapped=$editBitmapForThisPage " +
+                                        "originalBitmapVisible=${!editBitmapForThisPage}"
+                                )
+                                if (!editBitmapForThisPage) {
+                                    android.util.Log.w(
+                                        com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.TAG,
+                                        "[view] page=$pageIndex editing but edit bitmap NOT ready — original glyphs visible."
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onSizeChanged { pageSize = it }
                     ) {
                         Image(
-                            bitmap = bitmap.asImageBitmap(),
+                            bitmap = displayBitmap.asImageBitmap(),
                             contentDescription = "Page ${pageIndex + 1}",
                             modifier = Modifier.fillMaxWidth(),
                             contentScale = ContentScale.FillWidth,
@@ -206,7 +243,14 @@ fun PdfPage(
                                 },
                                 // Word-level selection + draggable handles in Edit-Text mode.
                                 textSelection = editorUiState.textSelection,
-                                editorViewModel = editorViewModel
+                                editorViewModel = editorViewModel,
+                                // True inline word editing (tap → edit in place) + preview layer.
+                                inlineEditWord = if (editorUiState.inlineEditPageIndex == pageIndex) editorUiState.inlineEditWord else null,
+                                previewEdits = editorUiState.previewEdits.filter { it.pageIndex == pageIndex },
+                                debugOps = if (editBitmapForThisPage) editRender!!.debug?.ops ?: emptyList() else emptyList(),
+                                onBeginEdit = { editorViewModel.beginInlineEdit(pageIndex, it) },
+                                onCommitEdit = { editorViewModel.commitInlineEdit(it) },
+                                onCancelEdit = { editorViewModel.cancelInlineEdit() }
                             )
 
                             // Show loading indicator while extracting text

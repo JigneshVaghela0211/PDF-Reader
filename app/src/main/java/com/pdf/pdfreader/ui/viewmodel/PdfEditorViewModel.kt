@@ -40,9 +40,17 @@ data class PdfEditorUiState(
     val textBlocks: Map<Int, List<TextBlock>> = emptyMap(),
     val editedTextBlocks: List<EditedTextBlock> = emptyList(),
     val selectedTextBlockId: String? = null,
-    /** Micro Chunk 3: whether the inline selection editor is open (UI-only; no PDF change). */
-    val isSelectionEditorVisible: Boolean = false,
-    /** Micro Chunk 3: confirmed edit intents, awaiting a future replacement micro-chunk. */
+    /** The word currently being edited inline (its TextField is shown over the word). */
+    val inlineEditWord: com.pdf.pdfreader.domain.model.TextWord? = null,
+    val inlineEditPageIndex: Int = -1,
+    /** Dedicated preview edits (word → new text), rendered by PreviewLayer. NOT EditedTextBlock,
+     *  never touches the PDF; removed on Cancel. */
+    val previewEdits: List<com.pdf.pdfreader.selection.model.WordPreviewEdit> = emptyList(),
+    /** Temporary renderer-suppressed edit bitmap for the page being edited: the original glyphs of
+     *  the edited words are absent (skipped during rendering, NOT painted over). Shown in place of —
+     *  never replacing — the reader's cached normal bitmap; null when not editing. */
+    val editRenderState: com.pdf.pdfreader.feature.reader.data.engine.EditRenderState? = null,
+    /** Confirmed edit intents (audit trail). */
     val selectionEditRequests: List<com.pdf.pdfreader.selection.model.SelectionEditRequest> = emptyList(),
     val isTextBlocksLoading: Boolean = false,
     val textSelection: TextSelectionState? = null,
@@ -95,6 +103,17 @@ class PdfEditorViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PdfEditorUiState())
     val uiState = _uiState.asStateFlow()
 
+    /** Pure analyzer used on inline-edit "Done" to classify the edit (logged only this chunk). */
+    private val replacementAnalyzer = com.pdf.pdfreader.utiles.ReplacementAnalyzer()
+
+    /** Renders the temporary edit bitmap (original glyphs suppressed at render time — no cover). */
+    private val editPreviewRenderer = com.pdf.pdfreader.feature.reader.data.engine.EditPreviewRenderer()
+    /** Pixel width the edit bitmap is rendered at, reported by the page from its normal bitmap so the
+     *  two align. Same for every page (fixed column width). */
+    private var editTargetWidthPx = 0
+    /** In-flight edit-bitmap render, cancelled/replaced when the edited word set changes. */
+    private var editBitmapJob: kotlinx.coroutines.Job? = null
+
     private var pdfFilePath: String = ""
     private var currentPage: Int = 0
 
@@ -129,6 +148,11 @@ class PdfEditorViewModel @Inject constructor(
 
     fun setCurrentPage(page: Int) { currentPage = page }
 
+    override fun onCleared() {
+        super.onCleared()
+        discardEditBitmap()
+    }
+
     private fun syncUndoRedoState() {
         _uiState.update { it.copy(canUndo = undoRedoManager.canUndo.value, canRedo = undoRedoManager.canRedo.value) }
     }
@@ -136,6 +160,7 @@ class PdfEditorViewModel @Inject constructor(
     // ─── Edit Mode & Tool State ──────────────────────────────────
 
     fun setEditMode(isEditMode: Boolean) {
+        if (!isEditMode) discardEditBitmap()
         _uiState.update {
             if (isEditMode) {
                 it.copy(isEditMode = true)
@@ -391,7 +416,7 @@ class PdfEditorViewModel @Inject constructor(
         applyRange(sel.pageIndex, selectionRangeManager.of(sel.selectedWords))
     }
 
-    fun clearTextSelection() { _uiState.update { it.copy(textSelection = null, isSelectionEditorVisible = false) } }
+    fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
 
     /**
      * Select every word on the page the user is currently selecting on. Lets the user grab a long
@@ -419,39 +444,158 @@ class PdfEditorViewModel @Inject constructor(
         return copied
     }
 
-    /**
-     * Micro Chunk 3: open the inline SELECTION editor for the current selection (UI only). It does
-     * NOT open the block editor and does NOT modify the PDF — confirming produces a
-     * [com.pdf.pdfreader.selection.model.SelectionEditRequest] for a future replacement micro-chunk.
-     */
+    // ─── Inline word editing (true in-place editor + PreviewLayer; NO replacement) ───
+
+    /** Entry from the reading-mode selection toolbar: enter Edit-Text mode and inline-edit the
+     *  first selected word. Direct tapping in Edit-Text uses [beginInlineEdit] straight away. */
     fun editSelectedText() {
         if (!PdfEditorFeatureConfig.ENABLE_EDIT_TEXT) return
         val sel = _uiState.value.textSelection ?: return
-        if (sel.selectedWords.isEmpty()) return
-        _uiState.update { it.copy(isSelectionEditorVisible = true) }
+        val word = sel.selectedWords.firstOrNull() ?: return
+        val page = sel.pageIndex
+        _uiState.update { it.copy(isEditMode = true, currentTool = AnnotationTool.EDIT_TEXT, textSelection = null) }
+        beginInlineEdit(page, word)
     }
 
-    /** Confirm the inline edit: record a [SelectionEditRequest] (no PDF change) and close the editor. */
-    fun confirmSelectionEdit(newText: String) {
-        val sel = _uiState.value.textSelection ?: return
+    /** Put [word] into inline edit mode (its TextField shows over the word) and render the edit
+     *  bitmap so the original glyphs of the edited words are suppressed (no cover). */
+    fun beginInlineEdit(pageIndex: Int, word: com.pdf.pdfreader.domain.model.TextWord) {
+        _uiState.update { it.copy(inlineEditWord = word, inlineEditPageIndex = pageIndex) }
+        regenerateEditBitmap(pageIndex)
+    }
+
+    /**
+     * Reported by the page while in Edit-Text mode: the pixel width of its normal bitmap, used as the
+     * edit bitmap's render width so the two align. Regenerates the edit bitmap if an edit is active
+     * and this is the first/changed width (covers the reading-toolbar entry path where the width was
+     * not yet known when editing began).
+     */
+    fun setEditRenderWidth(px: Int) {
+        if (px <= 0 || px == editTargetWidthPx) return
+        editTargetWidthPx = px
+        val page = _uiState.value.inlineEditPageIndex
+        if (page >= 0) regenerateEditBitmap(page)
+    }
+
+    /**
+     * Done: commit the typed text into the PreviewLayer (visual only — no PDF change) and run the
+     * pipeline SelectionEditRequest → ReplacementAnalyzer → ReplacementDecision (logged). Replacement
+     * itself is intentionally NOT executed in this chunk.
+     */
+    fun commitInlineEdit(newText: String) {
+        val word = _uiState.value.inlineEditWord ?: return
+        val page = _uiState.value.inlineEditPageIndex
         val request = com.pdf.pdfreader.selection.model.SelectionEditRequest(
-            pageIndex = sel.pageIndex,
-            words = sel.selectedWords,
-            originalText = sel.selectedWords.joinToString(" ") { it.text },
+            pageIndex = page,
+            words = listOf(word),
+            originalText = word.text,
             newText = newText
         )
-        android.util.Log.d(TAG, "SelectionEditRequest generated (no PDF modified): $request")
-        _uiState.update {
-            it.copy(
-                isSelectionEditorVisible = false,
-                selectionEditRequests = it.selectionEditRequests + request
+        _uiState.update { state ->
+            val others = state.previewEdits.filterNot { it.pageIndex == page && it.word == word }
+            val updated = if (newText == word.text || newText.isEmpty()) others
+                else others + com.pdf.pdfreader.selection.model.WordPreviewEdit(page, word, newText)
+            state.copy(
+                previewEdits = updated,
+                inlineEditWord = null,
+                inlineEditPageIndex = -1,
+                selectionEditRequests = state.selectionEditRequests + request
             )
+        }
+        // Keep the edited word suppressed on the page (preview text drawn into the empty slot);
+        // clearing the active word means the edit bitmap now covers just the committed previews.
+        regenerateEditBitmap(page)
+        runAnalysisOnly(request)
+    }
+
+    /** Cancel: close the editor and remove any preview for that word (restore original). */
+    fun cancelInlineEdit() {
+        val word = _uiState.value.inlineEditWord
+        val page = _uiState.value.inlineEditPageIndex
+        _uiState.update { state ->
+            val updated = if (word != null) {
+                state.previewEdits.filterNot { it.pageIndex == page && it.word == word }
+            } else state.previewEdits
+            state.copy(previewEdits = updated, inlineEditWord = null, inlineEditPageIndex = -1)
+        }
+        // Re-render (or discard) the edit bitmap for whatever previews remain on the page.
+        regenerateEditBitmap(page)
+    }
+
+    /**
+     * Render (or discard) the temporary edit bitmap for [pageIndex]: the source page re-rendered with
+     * the original glyphs of every edited word on it — the committed [PdfEditorUiState.previewEdits]
+     * plus the actively-edited word — suppressed at render time (see [EditPreviewRenderer]). The
+     * reader's cached normal bitmap is never touched; on discard it simply shows again.
+     */
+    private fun regenerateEditBitmap(pageIndex: Int) {
+        val state = _uiState.value
+        val words = buildList {
+            state.previewEdits.filter { it.pageIndex == pageIndex }.forEach { add(it.word) }
+            val active = state.inlineEditWord
+            if (active != null && state.inlineEditPageIndex == pageIndex) add(active)
+        }.distinct()
+
+        val width = editTargetWidthPx
+        if (words.isEmpty() || width <= 0) {
+            // Nothing to suppress (or width not reported yet) — fall back to the normal bitmap.
+            if (com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.ENABLED) {
+                Log.d(com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.TAG,
+                    "[vm] regenerate page=$pageIndex words=${words.size} width=$width -> SKIP (nothing/no-width)")
+            }
+            if (words.isEmpty()) discardEditBitmap()
+            return
+        }
+
+        val path = pdfFilePath
+        editBitmapJob?.cancel()
+        editBitmapJob = viewModelScope.launch {
+            val render = withContext(Dispatchers.IO) {
+                editPreviewRenderer.render(path, pageIndex, words, width)
+            }
+            val previous = _uiState.value.editRenderState
+            if (render != null) {
+                _uiState.update { it.copy(editRenderState = render) }
+            } else {
+                _uiState.update { it.copy(editRenderState = null) }
+            }
+            if (com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.ENABLED) {
+                Log.d(com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.TAG,
+                    "[vm] regenerate page=$pageIndex words=${words.map { it.text }} width=$width " +
+                        "editBitmapReady=${render != null}")
+            }
+            // Recycle the superseded edit bitmap (the UI now draws the new one / the normal bitmap).
+            if (previous != null && previous.bitmap != render?.bitmap && !previous.bitmap.isRecycled) {
+                previous.bitmap.recycle()
+            }
         }
     }
 
-    /** Cancel the inline edit: close the editor but keep the selection active. */
-    fun cancelSelectionEdit() {
-        _uiState.update { it.copy(isSelectionEditorVisible = false) }
+    /** Drop the temporary edit bitmap and recycle it — the untouched normal bitmap shows again. */
+    private fun discardEditBitmap() {
+        editBitmapJob?.cancel()
+        val previous = _uiState.value.editRenderState ?: return
+        _uiState.update { it.copy(editRenderState = null) }
+        if (!previous.bitmap.isRecycled) previous.bitmap.recycle()
+    }
+
+    /** Run the analyzer for logging/telemetry only — this chunk does NOT execute replacement. */
+    private fun runAnalysisOnly(request: com.pdf.pdfreader.selection.model.SelectionEditRequest) {
+        val path = pdfFilePath
+        if (path.isBlank()) return
+        viewModelScope.launch {
+            val decision = withContext(Dispatchers.IO) {
+                try {
+                    com.tom_roush.pdfbox.pdmodel.PDDocument.load(java.io.File(path)).use { doc ->
+                        replacementAnalyzer.analyze(doc, request)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Inline-edit analysis failed", e)
+                    com.pdf.pdfreader.utiles.ReplacementDecision.Reject("Analysis failed: ${e.message}")
+                }
+            }
+            Log.d(TAG, "Inline-edit decision '${request.originalText}' -> '${request.newText}': $decision (no replacement executed)")
+        }
     }
 
     fun annotateSelectedText(type: PdfAnnotation.MarkupType) {

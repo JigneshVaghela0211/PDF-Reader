@@ -71,7 +71,15 @@ fun TextEditOverlay(
     onEditTextBlock: (blockId: String, newText: String, newFontSize: Float, newColor: Color) -> Unit,
     // Word-level selection + draggable handles in Edit-Text mode (shared selection engine).
     textSelection: TextSelectionState? = null,
-    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null,
+    // True inline word editing: tap → edit the word in place; TextReplacementPreviewLayer shows edits.
+    inlineEditWord: TextWord? = null,
+    previewEdits: List<com.pdf.pdfreader.selection.model.WordPreviewEdit> = emptyList(),
+    // (Debug D1) resolved-op geometry for the visual baseline/bbox overlay (empty in release/off).
+    debugOps: List<com.pdf.pdfreader.feature.reader.data.engine.DebugWordOp> = emptyList(),
+    onBeginEdit: (TextWord) -> Unit = {},
+    onCommitEdit: (String) -> Unit = {},
+    onCancelEdit: () -> Unit = {}
 ) {
     if (!isEditTextMode || pageSize == IntSize.Zero) return
 
@@ -191,39 +199,110 @@ fun TextEditOverlay(
             }
         }
 
-        // ─── Layer 3: Single gesture layer (zIndex 5) ───
-        // Micro Chunk 2: TAP / LONG-PRESS → start a selection from the nearest single WORD
-        //   (PdfWordHitTester → startTextSelection). The two draggable handles (Layer 3b) then
-        //   expand it word → words → line → paragraph via PdfSelectionRangeManager. Selection always
-        //   starts from ONE word. No editor, no replacement (deferred to a later micro-chunk).
+        // Displayed font size (px) for a word, from its block's PDF font size (fallback: glyph box).
+        fun fontPxFor(word: TextWord): Float {
+            val block = pageBlocks.firstOrNull { it.words.contains(word) }
+            return if (block != null && block.pdfPageWidth > 0f) {
+                block.fontSize * (pageWidth / block.pdfPageWidth)
+            } else {
+                word.height * pageHeight * 0.82f
+            }
+        }
+
+        // ─── Text Replacement Preview Layer (zIndex 7): committed edits over their words ───
+        // The original glyphs are already gone (the page is showing the renderer-suppressed edit
+        // bitmap), so this only paints the new text into the empty slot — no cover / patch.
+        TextReplacementPreviewLayer(
+            pageWidth = pageWidth,
+            pageHeight = pageHeight,
+            previewEdits = previewEdits,
+            activeWord = inlineEditWord,
+            fontPxFor = ::fontPxFor
+        )
+
+        // ─── (Debug D1) Visual overlay (zIndex 8): baseline vs bbox vs matrix origin ───
+        // MAGENTA = real glyph bbox · YELLOW = true PDF baseline (text-matrix origin y) ·
+        // RED dot = matrix origin · CYAN = the selection bbox the TextField is anchored to.
+        // The vertical gap between CYAN top and YELLOW baseline is exactly the editor offset.
+        if (com.pdf.pdfreader.feature.reader.data.engine.SuppressionDebug.VISUAL &&
+            (debugOps.isNotEmpty() || inlineEditWord != null || previewEdits.isNotEmpty())
+        ) {
+            val selWords = (listOfNotNull(inlineEditWord) + previewEdits.map { it.word }).distinct()
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .zIndex(8f)
+                    .drawBehind {
+                        // Selection bbox (what we currently position the editor with).
+                        selWords.forEach { w ->
+                            drawRect(
+                                color = Color(0xFF00E5FF),
+                                topLeft = Offset(w.x * pageWidth, w.y * pageHeight),
+                                size = Size(w.width * pageWidth, w.height * pageHeight),
+                                style = Stroke(width = 2f)
+                            )
+                        }
+                        // Real detected-op glyph bbox + true baseline + matrix origin.
+                        debugOps.forEach { op ->
+                            val left = op.leftN * pageWidth
+                            val right = op.rightN * pageWidth
+                            val top = op.topN * pageHeight
+                            val bottom = op.bottomN * pageHeight
+                            val baseY = op.baselineN * pageHeight
+                            drawRect(
+                                color = Color(0xFFFF00FF),
+                                topLeft = Offset(left, top),
+                                size = Size((right - left), (bottom - top)),
+                                style = Stroke(width = 1.5f)
+                            )
+                            drawLine(
+                                color = Color(0xFFFFEB3B),
+                                start = Offset(left, baseY),
+                                end = Offset(right, baseY),
+                                strokeWidth = 2f
+                            )
+                            drawCircle(
+                                color = Color.Red,
+                                radius = 4f,
+                                center = Offset(left, baseY)
+                            )
+                        }
+                    }
+            )
+        }
+
+        // ─── Gesture layer (zIndex 5): TAP → inline-edit the nearest word in place ───
+        // (Supersedes MC2's tap-to-select+handles in Edit-Text mode; the selection engine and
+        //  reading-mode selection are unchanged.)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .zIndex(5f)
                 .pointerInput(pageBlocks, allWords) {
-                    val selectWordAt: (androidx.compose.ui.geometry.Offset) -> Unit = { pos ->
+                    detectTapGestures(onTap = { pos ->
                         val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
-                        if (word != null && editorViewModel != null) {
-                            Log.d(TAG, "Selection started from word: '${word.text}'")
-                            editorViewModel.startTextSelection(pageIndex, word, allWords)
+                        if (word != null) {
+                            Log.d(TAG, "Inline edit begin on word: '${word.text}'")
+                            onBeginEdit(word)
                         }
-                    }
-                    detectTapGestures(onTap = selectWordAt, onLongPress = selectWordAt)
+                    })
                 }
         )
 
-        // ─── Layer 3b: Word-selection highlight + drag handles (zIndex 6) ───
-        if (editorViewModel != null) {
-            Box(modifier = Modifier.zIndex(6f)) {
-                TextSelectionVisuals(
-                    pageIndex = pageIndex,
-                    pageWidth = pageWidth.toInt(),
-                    pageHeight = pageHeight.toInt(),
-                    textSelection = textSelection,
-                    allWords = allWords,
-                    editorViewModel = editorViewModel
-                )
-            }
+        // ─── Inline editor (zIndex 9): the TextField positioned exactly over the word ───
+        if (inlineEditWord != null) {
+            val w = inlineEditWord
+            val initial = previewEdits.firstOrNull { it.word == w }?.newText ?: w.text
+            InlineWordEditor(
+                initialText = initial,
+                fontPx = fontPxFor(w),
+                offsetX = (w.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX),
+                offsetY = (w.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX),
+                width = (w.width * pageWidth).toInt().coerceIn(24, MAX_SIZE_PX),
+                height = (w.height * pageHeight).toInt().coerceIn(16, MAX_SIZE_PX),
+                onDone = onCommitEdit,
+                onCancel = onCancelEdit
+            )
         }
 
         // ─── Layer 4: Inline editor popup (zIndex 50) ───
