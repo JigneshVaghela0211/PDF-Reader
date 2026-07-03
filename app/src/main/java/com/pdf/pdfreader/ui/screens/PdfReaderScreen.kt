@@ -127,6 +127,14 @@ fun PdfReaderScreen(
         ocrViewModel.prepare(path)
     }
 
+    // Document editing session lifecycle (feature/document_session):
+    // open PDF → create session, leave the reader → close session. Foundation only.
+    val sessionViewModel: com.pdf.pdfreader.feature.document_session.presentation.viewmodel.DocumentSessionViewModel = hiltViewModel()
+    DisposableEffect(path) {
+        sessionViewModel.openDocument(path)
+        onDispose { sessionViewModel.closeDocument() }
+    }
+
     // Handle initial page / external search query
     LaunchedEffect(uiState.totalPages) {
         if (uiState.totalPages > 0) {
