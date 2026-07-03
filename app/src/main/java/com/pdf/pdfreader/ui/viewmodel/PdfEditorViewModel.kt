@@ -40,6 +40,10 @@ data class PdfEditorUiState(
     val textBlocks: Map<Int, List<TextBlock>> = emptyMap(),
     val editedTextBlocks: List<EditedTextBlock> = emptyList(),
     val selectedTextBlockId: String? = null,
+    /** Micro Chunk 3: whether the inline selection editor is open (UI-only; no PDF change). */
+    val isSelectionEditorVisible: Boolean = false,
+    /** Micro Chunk 3: confirmed edit intents, awaiting a future replacement micro-chunk. */
+    val selectionEditRequests: List<com.pdf.pdfreader.selection.model.SelectionEditRequest> = emptyList(),
     val isTextBlocksLoading: Boolean = false,
     val textSelection: TextSelectionState? = null,
     val imageElements: List<ImageElement> = emptyList(),
@@ -387,7 +391,7 @@ class PdfEditorViewModel @Inject constructor(
         applyRange(sel.pageIndex, selectionRangeManager.of(sel.selectedWords))
     }
 
-    fun clearTextSelection() { _uiState.update { it.copy(textSelection = null) } }
+    fun clearTextSelection() { _uiState.update { it.copy(textSelection = null, isSelectionEditorVisible = false) } }
 
     /**
      * Select every word on the page the user is currently selecting on. Lets the user grab a long
@@ -415,29 +419,39 @@ class PdfEditorViewModel @Inject constructor(
         return copied
     }
 
+    /**
+     * Micro Chunk 3: open the inline SELECTION editor for the current selection (UI only). It does
+     * NOT open the block editor and does NOT modify the PDF — confirming produces a
+     * [com.pdf.pdfreader.selection.model.SelectionEditRequest] for a future replacement micro-chunk.
+     */
     fun editSelectedText() {
         if (!PdfEditorFeatureConfig.ENABLE_EDIT_TEXT) return
         val sel = _uiState.value.textSelection ?: return
-        val words = sel.selectedWords
-        if (words.isEmpty()) return
-        
-        val blocksOnPage = _uiState.value.textBlocks[sel.pageIndex] ?: emptyList()
-        val firstWord = words.first()
-        val cx = firstWord.x + firstWord.width / 2f
-        val cy = firstWord.y + firstWord.height / 2f
-        // Prefer the block whose bounds contain the word's center; otherwise pick the nearest
-        // block so Edit always lands on something rather than silently doing nothing.
-        val block = blocksOnPage.firstOrNull { b ->
-            cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height
-        } ?: blocksOnPage.minByOrNull { b ->
-            val bcx = b.x + b.width / 2f; val bcy = b.y + b.height / 2f
-            (bcx - cx) * (bcx - cx) + (bcy - cy) * (bcy - cy)
+        if (sel.selectedWords.isEmpty()) return
+        _uiState.update { it.copy(isSelectionEditorVisible = true) }
+    }
+
+    /** Confirm the inline edit: record a [SelectionEditRequest] (no PDF change) and close the editor. */
+    fun confirmSelectionEdit(newText: String) {
+        val sel = _uiState.value.textSelection ?: return
+        val request = com.pdf.pdfreader.selection.model.SelectionEditRequest(
+            pageIndex = sel.pageIndex,
+            words = sel.selectedWords,
+            originalText = sel.selectedWords.joinToString(" ") { it.text },
+            newText = newText
+        )
+        android.util.Log.d(TAG, "SelectionEditRequest generated (no PDF modified): $request")
+        _uiState.update {
+            it.copy(
+                isSelectionEditorVisible = false,
+                selectionEditRequests = it.selectionEditRequests + request
+            )
         }
-        clearTextSelection()
-        if (block != null) {
-            _uiState.update { it.copy(isEditMode = true, currentTool = AnnotationTool.EDIT_TEXT) }
-            selectTextBlock(block.id)
-        }
+    }
+
+    /** Cancel the inline edit: close the editor but keep the selection active. */
+    fun cancelSelectionEdit() {
+        _uiState.update { it.copy(isSelectionEditorVisible = false) }
     }
 
     fun annotateSelectedText(type: PdfAnnotation.MarkupType) {

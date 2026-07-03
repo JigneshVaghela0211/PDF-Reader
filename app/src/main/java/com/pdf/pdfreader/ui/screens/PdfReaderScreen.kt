@@ -859,6 +859,43 @@ fun PdfReaderScreen(
                         }
                     }
 
+                    // ─── Micro Chunk 3: Inline Selection Editor ───────
+                    // Opens on the toolbar's Edit action. Edits UI state only and produces a
+                    // SelectionEditRequest on Confirm — it does NOT modify the PDF. Cancel keeps
+                    // the selection active.
+                    if (editorUiState.isSelectionEditorVisible && textSel != null && textSel.bounds != null) {
+                        val editorPageLayouts = com.pdf.pdfreader.ui.components.rememberVisiblePageLayouts(scrollState)
+                        val editorPageLayout = editorPageLayouts.find { it.pageIndex == textSel.pageIndex }
+                        if (editorPageLayout != null) {
+                            // Surrounding read-only context: the words immediately before/after the
+                            // selection in reading order (so the user sees what they're editing in place).
+                            val pageWords = remember(editorUiState.textBlocks, textSel.pageIndex) {
+                                (editorUiState.textBlocks[textSel.pageIndex] ?: emptyList())
+                                    .flatMap { it.words }
+                                    .sortedWith(compareBy({ it.y }, { it.x }))
+                            }
+                            val firstIdx = textSel.selectedWords.firstOrNull()?.let { pageWords.indexOf(it) } ?: -1
+                            val lastIdx = textSel.selectedWords.lastOrNull()?.let { pageWords.indexOf(it) } ?: -1
+                            val prevContext = if (firstIdx > 0) pageWords[firstIdx - 1].text else null
+                            val nextContext = if (lastIdx >= 0 && lastIdx < pageWords.size - 1) pageWords[lastIdx + 1].text else null
+
+                            val editorGlobalY = editorPageLayout.offsetInViewport + textSel.bounds.bottom.toInt() + 8
+                            Box(modifier = Modifier.fillMaxSize().zIndex(210f)) {
+                                com.pdf.pdfreader.ui.components.SelectionInlineEditor(
+                                    initialText = textSel.selectedWords.joinToString(" ") { it.text },
+                                    isMultiline = textSel.selectedWords.size > 1,
+                                    wordCount = textSel.selectedWords.size,
+                                    previousContext = prevContext,
+                                    nextContext = nextContext,
+                                    offsetX = textSel.bounds.left.toInt(),
+                                    offsetY = editorGlobalY.coerceAtLeast(0),
+                                    onConfirm = { editorViewModel.confirmSelectionEdit(it) },
+                                    onCancel = { editorViewModel.cancelSelectionEdit() }
+                                )
+                            }
+                        }
+                    }
+
                     // ─── Markup Color Picker ───────
                     // Sets the color used by Highlight / Underline / Strikethrough; the
                     // selection stays active so the user can tap a markup right after.
