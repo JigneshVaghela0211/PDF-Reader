@@ -7,11 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 /**
- * Room SCHEMA (DAO) for [DocumentSessionEntity].
- *
- * Declared as part of the schema foundation. Nothing calls these methods in this chunk — there is no
- * persistence logic yet; they exist so the schema is complete and future work can persist sessions
- * without changing the shape.
+ * Room DAO for [DocumentSessionEntity] (MC11 — persisted).
  */
 @Dao
 interface DocumentSessionDao {
@@ -21,6 +17,10 @@ interface DocumentSessionDao {
 
     @Query("SELECT * FROM document_sessions WHERE sessionId = :sessionId")
     suspend fun getById(sessionId: String): DocumentSessionEntity?
+
+    /** Restore lookup: the most recent session for a document identity. */
+    @Query("SELECT * FROM document_sessions WHERE documentId = :documentId ORDER BY modifiedTime DESC LIMIT 1")
+    suspend fun getByDocumentId(documentId: String): DocumentSessionEntity?
 
     @Query("SELECT * FROM document_sessions WHERE documentPath = :documentPath")
     suspend fun getByPath(documentPath: String): DocumentSessionEntity?

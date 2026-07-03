@@ -4,23 +4,20 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 /**
- * Room SCHEMA container for document editing sessions.
+ * Room database for document editing sessions and their undo/redo history (MC11 — now persisted).
  *
- * Defined so the [DocumentSessionEntity] table and [DocumentSessionDao] form a complete, valid Room
- * schema. This chunk provides **schema only**: the database is intentionally NOT provided through
- * Hilt and is never instantiated, so no persistence occurs. Wiring it (DI provider, migrations) is
- * deliberately deferred to when session persistence / undo-redo is implemented.
- *
- * Kept separate from the app's main `AppDatabase` so the session schema can evolve without touching
- * the shared database or its migrations.
+ * Kept **separate** from the app's main `AppDatabase` so the session/history schema can evolve
+ * independently and never risks the shared database's migrations. It only stores editing-session
+ * state (session + undo/redo stacks) — no user documents, no save/export data.
  */
 @Database(
-    entities = [DocumentSessionEntity::class],
+    entities = [DocumentSessionEntity::class, HistoryCommandEntity::class],
     version = 1,
     exportSchema = false
 )
 abstract class DocumentSessionDatabase : RoomDatabase() {
     abstract fun documentSessionDao(): DocumentSessionDao
+    abstract fun historyCommandDao(): HistoryCommandDao
 
     companion object {
         const val DATABASE_NAME = "document_session_db"
