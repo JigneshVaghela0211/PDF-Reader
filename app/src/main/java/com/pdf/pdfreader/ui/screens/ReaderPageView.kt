@@ -206,7 +206,10 @@ fun PdfPage(
                                 },
                                 // Enable word-level long-press selection + markup in Edit-Text mode.
                                 textSelection = editorUiState.textSelection,
-                                editorViewModel = editorViewModel
+                                editorViewModel = editorViewModel,
+                                // Micro Chunk 1: tap → word hit-test → temporary highlight.
+                                selectedEditWord = editorUiState.selectedEditWord,
+                                onSelectWord = { editorViewModel.selectEditWord(it) }
                             )
 
                             // Show loading indicator while extracting text

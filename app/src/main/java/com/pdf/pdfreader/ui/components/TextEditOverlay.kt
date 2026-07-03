@@ -71,7 +71,10 @@ fun TextEditOverlay(
     onEditTextBlock: (blockId: String, newText: String, newFontSize: Float, newColor: Color) -> Unit,
     // Word-level selection for markup while in Edit-Text mode (same engine as reading mode).
     textSelection: TextSelectionState? = null,
-    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null
+    editorViewModel: com.pdf.pdfreader.ui.viewmodel.PdfEditorViewModel? = null,
+    // Micro Chunk 1: the tapped word (temporary highlight) + callback to expose it.
+    selectedEditWord: TextWord? = null,
+    onSelectWord: (TextWord?) -> Unit = {}
 ) {
     if (!isEditTextMode || pageSize == IntSize.Zero) return
 
@@ -191,11 +194,30 @@ fun TextEditOverlay(
             }
         }
 
+        // ─── Micro Chunk 1: temporary highlight for the tapped word (zIndex 4, non-interactive) ───
+        // Just a rectangle over the hit-tested word — NO handles, NO editor, NO replacement.
+        selectedEditWord?.let { hw ->
+            val rectX = (hw.x * pageWidth).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectY = (hw.y * pageHeight).toInt().coerceIn(0, MAX_SIZE_PX)
+            val rectW = (hw.width * pageWidth).toInt().coerceIn(4, MAX_SIZE_PX)
+            val rectH = (hw.height * pageHeight).toInt().coerceIn(4, MAX_SIZE_PX)
+            Box(
+                modifier = Modifier
+                    .zIndex(4f)
+                    .offset { IntOffset(rectX, rectY) }
+                    .size(
+                        width = with(density) { rectW.toDp() },
+                        height = with(density) { rectH.toDp() }
+                    )
+                    .background(Color(0x552196F3))
+                    .border(1.dp, Color(0xFF2196F3))
+            )
+        }
+
         // ─── Layer 3: Single gesture layer (zIndex 5) ───
-        // Quick TAP → select the block for inline text replacement (unchanged behavior).
-        // LONG-PRESS → select a single WORD for markup (highlight/underline/strike/color),
-        // showing the drag handles below — never a whole line/paragraph. One gesture owner
-        // (no per-block tap targets) so tap vs. long-press stay cleanly separated.
+        // Micro Chunk 1: TAP → hit-test the nearest word and expose it (temporary highlight only;
+        //   no handles, no editor, no replacement). LONG-PRESS keeps the pre-existing, separately
+        //   approved markup selection (highlight/underline/strike + handles) untouched.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -203,21 +225,13 @@ fun TextEditOverlay(
                 .pointerInput(pageBlocks, allWords) {
                     detectTapGestures(
                         onTap = { pos ->
-                            val block = pageBlocks.firstOrNull { b ->
-                                val bx = b.x * pageWidth
-                                val by = b.y * pageHeight
-                                pos.x >= bx && pos.x <= bx + b.width * pageWidth &&
-                                    pos.y >= by && pos.y <= by + b.height * pageHeight
-                            }
-                            if (block != null) {
-                                Log.d(TAG, "Text block tapped: id=${block.id}")
-                                onSelectTextBlock(block.id)
-                            }
+                            val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
+                            Log.d(TAG, "Word hit-tested: '${word?.text}'")
+                            onSelectWord(word)
                         },
                         onLongPress = { pos ->
                             val word = PdfWordHitTester.wordAt(pos, pageWidth.toInt(), pageHeight.toInt(), allWords)
                             if (word != null && editorViewModel != null) {
-                                Log.d(TAG, "Word long-pressed for markup: '${word.text}'")
                                 editorViewModel.startTextSelection(pageIndex, word, allWords)
                             }
                         }
